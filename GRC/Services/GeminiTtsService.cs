@@ -1,4 +1,4 @@
-﻿
+
 
 using GRC.Models;
 using System;
@@ -15,40 +15,12 @@ using Google.Apis.Auth.OAuth2;
 
 namespace GRC.Services;
 
-public class GeminiTtsService(HttpClient httpClient, IAppSettingsService appSettingsService) : IGoogleTtsService
+public class GeminiTtsService(HttpClient httpClient, IAppSettingsService appSettingsService, IGoogleAuthService googleAuthService) : IGoogleTtsService
 {
-    private static GoogleCredential? _cachedCredential;
-    private static readonly SemaphoreSlim _credentialLock = new(1, 1);
-
     private const string AiStudioModel = "gemini-3.1-flash-tts-preview";
     private const string VertexModel = "gemini-3.1-flash-tts-preview";
     private const int DefaultSampleRate = 24000;
     private const string DefaultVoiceName = "Zephyr"; 
-
-    private async Task<string> GetGoogleAccessTokenAsync(CancellationToken cancellationToken)
-    {
-        if (_cachedCredential == null)
-        {
-            await _credentialLock.WaitAsync(cancellationToken);
-            try
-            {
-                if (_cachedCredential == null)
-                {
-                    string jsonKeyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config", "google-credentials.json");
-                    string jsonContent = await File.ReadAllTextAsync(jsonKeyPath, cancellationToken);
-                    var specificCredential = Google.Apis.Auth.OAuth2.CredentialFactory.FromJson<Google.Apis.Auth.OAuth2.ServiceAccountCredential>(jsonContent);
-
-                    _cachedCredential = specificCredential.ToGoogleCredential()
-                        .CreateScoped("https://www.googleapis.com/auth/cloud-platform");
-                }
-            }
-            finally
-            {
-                _credentialLock.Release();
-            }
-        }
-        return await ((ITokenAccess)_cachedCredential).GetAccessTokenForRequestAsync(authUri: null, cancellationToken: cancellationToken);
-    }
 
     public async Task<string> GenerateSpeechAsync(string text, string characterName, string narration, string activeLorebook)
     {
@@ -71,7 +43,7 @@ public class GeminiTtsService(HttpClient httpClient, IAppSettingsService appSett
 
             try
             {
-                string token = await GetGoogleAccessTokenAsync(CancellationToken.None);
+                string token = await googleAuthService.GetGoogleAccessTokenAsync(CancellationToken.None);
                 httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
             catch (Exception ex)

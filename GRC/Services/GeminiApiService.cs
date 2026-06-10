@@ -1,4 +1,4 @@
-﻿using GRC.Models;
+using GRC.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -14,11 +14,8 @@ using Google.Apis.Auth.OAuth2;
 
 namespace GRC.Services;
 
-public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSettingsService) : IGeminiApiService
+public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSettingsService, IGoogleAuthService googleAuthService) : IGeminiApiService
 {
-    private static GoogleCredential? _cachedCredential;
-    private static readonly SemaphoreSlim _credentialLock = new(1, 1);
-
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -41,30 +38,6 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
         ModelTier.FlashLite => "gemini-3.1-flash-lite-preview",
         _ => "gemini-3.5-flash"
     };
-
-    private async Task<string> GetGoogleAccessTokenAsync(CancellationToken cancellationToken)
-    {
-        if (_cachedCredential == null)
-        {
-            await _credentialLock.WaitAsync(cancellationToken);
-            try
-            {
-                if (_cachedCredential == null) // Double-check locking
-                {
-                    string jsonKeyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config", "google-credentials.json");
-                    _cachedCredential = CredentialFactory.FromFile<ServiceAccountCredential>(jsonKeyPath)
-                        .ToGoogleCredential()
-                        .CreateScoped("https://www.googleapis.com/auth/cloud-platform");
-                }
-            }
-            finally
-            {
-                _credentialLock.Release();
-            }
-        }
-        // GoogleCredential 내부에서 자체적으로 만료를 체크하여 갱신/캐싱된 토큰을 반환합니다.
-        return await ((ITokenAccess)_cachedCredential).GetAccessTokenForRequestAsync(authUri: null, cancellationToken: cancellationToken);
-    }
 
     public async Task<string> SendMessageAsync(GeminiRequest request, ModelTier? overrideTier = null, CancellationToken cancellationToken = default)
     {
@@ -92,7 +65,7 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
 
             try
             {
-                string token = await GetGoogleAccessTokenAsync(cancellationToken);
+                string token = await googleAuthService.GetGoogleAccessTokenAsync(cancellationToken);
                 httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
             catch (Exception ex)
@@ -224,7 +197,7 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
             string? authErrorMessage = null;
             try
             {
-                string token = await GetGoogleAccessTokenAsync(cancellationToken);
+                string token = await googleAuthService.GetGoogleAccessTokenAsync(cancellationToken);
                 httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
             catch (Exception ex)

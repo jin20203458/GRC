@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Windows;
 using GRC.Services;
@@ -66,6 +66,7 @@ public partial class App : Application
         // 앱 전체의 설정값(API 키, 모델 정보, 안전 필터 강도 등)을 관리하는 서비스
         services.AddSingleton<IAppSettingsService, AppSettingsService>();
 
+        services.AddSingleton<IGoogleAuthService, GoogleAuthService>();
         services.AddSingleton<IAudioService, AudioService>();
         services.AddSingleton<ILorebookService, LorebookService>();
         services.AddSingleton<IChatWorkflowService, ChatWorkflowService>();
