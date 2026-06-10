@@ -1,4 +1,4 @@
-﻿using GRC.Helpers;
+using GRC.Helpers;
 using GRC.Models;
 using System;
 using System.Collections.Concurrent;
@@ -159,7 +159,14 @@ public class ChatWorkflowService(
                         }
                     }
 
-                    await Task.Delay(currentChatDelay, cancellationToken);
+                    if (currentChatDelay > 0)
+                    {
+                        await Task.Delay(currentChatDelay, cancellationToken);
+                    }
+                    else
+                    {
+                        await Task.Yield();
+                    }
                 }
             }, cancellationToken);
 

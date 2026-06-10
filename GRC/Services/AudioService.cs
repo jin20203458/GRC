@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows.Media;
 using System.Collections.Generic;
 namespace GRC.Services;
@@ -29,6 +29,7 @@ public class AudioService : IAudioService
     private TaskCompletionSource<bool>? _currentVoiceTcs;
 
     private bool _isVoicePlaying = false;
+    private string? _lastPlayedFilePath;
 
     public AudioService()
     {
@@ -112,6 +113,24 @@ public class AudioService : IAudioService
 
     private void PlayNextVoice()
     {
+        // 1. 기존 재생이 끝난 파일이 있다면 디스크에서 삭제
+        if (_lastPlayedFilePath != null)
+        {
+            try
+            {
+                _voicePlayer.Close(); // 파일 잠금 해제
+                if (System.IO.File.Exists(_lastPlayedFilePath))
+                {
+                    System.IO.File.Delete(_lastPlayedFilePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Audio Cleanup Error]: {ex.Message}");
+            }
+            _lastPlayedFilePath = null;
+        }
+
         if (_voiceQueue.Count > 0)
         {
             _isVoicePlaying = true;
@@ -120,6 +139,7 @@ public class AudioService : IAudioService
 
             _voicePlayer.Open(new Uri(next.FilePath, UriKind.Absolute));
             _voicePlayer.Play();
+            _lastPlayedFilePath = next.FilePath; // 지워야 할 파일로 지정
         }
         else
         {
@@ -129,11 +149,42 @@ public class AudioService : IAudioService
     }
     public void StopVoiceSound()
     {
-        _voiceQueue.Clear();
         _voicePlayer.Stop();
+        _voicePlayer.Close(); // 파일 잠금 해제
+
+        // 2. 최근에 연주 중이던 파일 즉시 삭제
+        if (_lastPlayedFilePath != null)
+        {
+            try
+            {
+                if (System.IO.File.Exists(_lastPlayedFilePath))
+                {
+                    System.IO.File.Delete(_lastPlayedFilePath);
+                }
+            }
+            catch {}
+            _lastPlayedFilePath = null;
+        }
+
+        // 3. 대기 큐에 쌓여 아직 재생되지 못한 파일들도 전부 삭제 처리
+        while (_voiceQueue.Count > 0)
+        {
+            var next = _voiceQueue.Dequeue();
+            try
+            {
+                if (System.IO.File.Exists(next.FilePath))
+                {
+                    System.IO.File.Delete(next.FilePath);
+                }
+            }
+            catch {}
+            next.Tcs.TrySetResult(false);
+        }
+
         _isVoicePlaying = false;
         // 스킵(정지) 시 무한 대기에 빠지지 않도록 취소 신호를 보냄
         _currentVoiceTcs?.TrySetResult(false);
         _currentVoiceTcs = null;
     }
+
 }

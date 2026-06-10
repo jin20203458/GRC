@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GRC.Models;
 using GRC.Services;
@@ -109,7 +109,7 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private async Task SaveSettingsAsync()
     {
-        int delayValue = int.TryParse(ChatDelay, out int result) ? result : 25;
+        int delayValue = int.TryParse(ChatDelay, out int result) ? Math.Clamp(result, 0, 1000) : 25;
 
         var newSettings = new AppSettings(
             ApiKey,
