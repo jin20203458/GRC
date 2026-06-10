@@ -1,0 +1,238 @@
+﻿<Window
+    x:Class="GRC.Views.StatusWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="clr-namespace:GRC.Helpers"
+    Title="현재 상태창"
+    Width="400"
+    Height="600"
+    helpers:WindowTitleBarBehavior.EnableDarkTitleBar="True"
+    Icon="/Resources/GRC.ico"
+    MouseLeftButtonDown="Window_MouseLeftButtonDown"
+    WindowStartupLocation="CenterOwner">
+
+    <Window.Background>
+        <ImageBrush ImageSource="{Binding CurrentBackgroundImage}" Stretch="UniformToFill" />
+    </Window.Background>
+
+    <Grid>
+        <!--  배경 오버레이  -->
+        <Border Background="#D4050505" />
+
+        <!--  기존에 있던 Margin="20" 제거  -->
+        <Grid>
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+
+                <!--  1열 단일 레이아웃: 내용물에만 여백(Margin)을 줍니다  -->
+                <StackPanel Margin="20">
+
+                    <!--  1. 현재 위치  -->
+                    <ItemsControl ItemsSource="{Binding CurrentPlaces}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Margin="0,0,0,12" Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border
+                                    Margin="0,0,8,8"
+                                    Padding="10,6"
+                                    Background="#660B192C"
+                                    BorderBrush="#33FFFFFF"
+                                    BorderThickness="1"
+                                    CornerRadius="10">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock
+                                            Margin="0,0,6,0"
+                                            VerticalAlignment="Center"
+                                            FontSize="12"
+                                            Foreground="#F4A261"
+                                            Text="📍" />
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            FontSize="12.5"
+                                            FontWeight="SemiBold"
+                                            Foreground="#008B99"
+                                            Text="{Binding}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!--  2. 커스텀 스탯 (❖ 기호 사용)  -->
+                    <ItemsControl ItemsSource="{Binding CustomStatsUIList}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Margin="0,0,0,12" Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border
+                                    Margin="0,0,8,8"
+                                    Padding="10,6"
+                                    Background="#660B192C"
+                                    BorderBrush="#33FFFFFF"
+                                    BorderThickness="1"
+                                    CornerRadius="10">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock
+                                                Margin="0,0,6,0"
+                                                VerticalAlignment="Center"
+                                                FontSize="13"
+                                                Foreground="#88E0EF"
+                                                Text="❖" />
+                                            <TextBlock
+                                                Margin="0,0,8,0"
+                                                VerticalAlignment="Center"
+                                                FontSize="12.5"
+                                                Foreground="#AAB2C0"
+                                                Text="{Binding Name}" />
+                                            <TextBlock
+                                                VerticalAlignment="Center"
+                                                FontSize="13"
+                                                FontWeight="Bold"
+                                                Foreground="#00A5B5"
+                                                Text="{Binding Value}" />
+                                        </StackPanel>
+                                        <ProgressBar
+                                            x:Name="StatGauge"
+                                            Height="4"
+                                            Margin="0,6,0,0"
+                                            Background="#33000000"
+                                            BorderThickness="0"
+                                            Foreground="#00A5B5"
+                                            Maximum="{Binding MaxValue}"
+                                            Minimum="0"
+                                            RenderTransformOrigin="0,0.5"
+                                            Visibility="Collapsed"
+                                            Value="{Binding CurrentValue}">
+                                            <ProgressBar.RenderTransform>
+                                                <ScaleTransform ScaleX="0" ScaleY="1" />
+                                            </ProgressBar.RenderTransform>
+                                            <ProgressBar.Triggers>
+                                                <EventTrigger RoutedEvent="Loaded">
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation
+                                                                Storyboard.TargetProperty="Opacity"
+                                                                From="0"
+                                                                To="1"
+                                                                Duration="0:0:0.4" />
+                                                            <DoubleAnimation
+                                                                DecelerationRatio="0.8"
+                                                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                                From="0"
+                                                                To="1"
+                                                                Duration="0:0:0.5" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </EventTrigger>
+                                            </ProgressBar.Triggers>
+                                        </ProgressBar>
+                                    </StackPanel>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsGauge}" Value="True">
+                                        <Setter TargetName="StatGauge" Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!--  3. 캐릭터 상태 (▣ 기호 적용)  -->
+                    <ItemsControl ItemsSource="{Binding CharacterStatuses}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border
+                                    Margin="0,0,0,10"
+                                    Padding="14"
+                                    Background="#660B192C"
+                                    BorderBrush="#33FFFFFF"
+                                    BorderThickness="1"
+                                    CornerRadius="10">
+                                    <StackPanel>
+                                        <StackPanel Margin="0,0,0,6" Orientation="Horizontal">
+                                            <TextBlock
+                                                Margin="0,0,6,0"
+                                                VerticalAlignment="Center"
+                                                FontSize="15"
+                                                Foreground="#00A5B5"
+                                                Text="▣" />
+                                            <TextBlock
+                                                VerticalAlignment="Center"
+                                                FontSize="15"
+                                                FontWeight="Bold"
+                                                Foreground="#008B99"
+                                                Text="{Binding Name}" />
+                                        </StackPanel>
+                                        <TextBlock
+                                            FontSize="13"
+                                            Foreground="#C5CDD9"
+                                            LineHeight="20"
+                                            Text="{Binding StatusText}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!--  4. 인벤토리 아이템  -->
+                    <ItemsControl ItemsSource="{Binding InventoryItems}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Margin="0,0,0,12" Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border
+                                    Margin="0,0,8,8"
+                                    Padding="8,6"
+                                    Background="#660B192C"
+                                    BorderBrush="#33FFFFFF"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock
+                                            Margin="0,0,6,0"
+                                            VerticalAlignment="Center"
+                                            FontSize="11"
+                                            Foreground="#008B99"
+                                            Text="🔹" />
+                                        <TextBlock
+                                            Margin="0,0,8,0"
+                                            VerticalAlignment="Center"
+                                            FontSize="13"
+                                            FontWeight="SemiBold"
+                                            Foreground="#EAEAEA"
+                                            Text="{Binding Name}" />
+                                        <Border
+                                            Padding="6,2"
+                                            VerticalAlignment="Center"
+                                            Background="#33000000"
+                                            BorderBrush="{Binding BadgeColor}"
+                                            BorderThickness="1"
+                                            CornerRadius="4">
+                                            <TextBlock
+                                                FontSize="10"
+                                                FontWeight="Bold"
+                                                Foreground="{Binding BadgeColor}"
+                                                Text="{Binding Category}" />
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Window>

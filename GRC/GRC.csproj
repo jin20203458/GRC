@@ -1,0 +1,107 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>Resources\GRC.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Config\google-credentials.json" />
+    <None Remove="Resources\bg1.png" />
+    <None Remove="Resources\bg10.PNG" />
+    <None Remove="Resources\bg11.PNG" />
+    <None Remove="Resources\bg2.jpg" />
+    <None Remove="Resources\bg3.jpg" />
+    <None Remove="Resources\bg4.jpg" />
+    <None Remove="Resources\bg5.jpg" />
+    <None Remove="Resources\bg6.jpg" />
+    <None Remove="Resources\bg7.png" />
+    <None Remove="Resources\bg8.png" />
+    <None Remove="Resources\bg9.PNG" />
+    <None Remove="Resources\bgm.m4a" />
+    <None Remove="Resources\Cyberpunk\bg1.jpg" />
+    <None Remove="Resources\Cyberpunk\bg2.jpg" />
+    <None Remove="Resources\Cyberpunk\bg3.jpg" />
+    <None Remove="Resources\Cyberpunk\bg4.jpg" />
+    <None Remove="Resources\Cyberpunk\bg5.jpg" />
+    <None Remove="Resources\Fantasy\bg1.jpg" />
+    <None Remove="Resources\Fantasy\bg1.png" />
+    <None Remove="Resources\Fantasy\bg10.PNG" />
+    <None Remove="Resources\Fantasy\bg11.PNG" />
+    <None Remove="Resources\Fantasy\bg2.jpg" />
+    <None Remove="Resources\Fantasy\bg3.jpg" />
+    <None Remove="Resources\Fantasy\bg4.jpg" />
+    <None Remove="Resources\Fantasy\bg5.jpg" />
+    <None Remove="Resources\Fantasy\bg6.jpg" />
+    <None Remove="Resources\Fantasy\bg7.png" />
+    <None Remove="Resources\Fantasy\bg8.png" />
+    <None Remove="Resources\Fantasy\bg9.PNG" />
+    <None Remove="Resources\GRC.ico" />
+    <None Remove="Resources\GRC.png" />
+    <None Remove="Resources\Image_fx.png" />
+    <None Remove="Resources\Modern\bg1.jpg" />
+    <None Remove="Resources\Modern\bg2.jpg" />
+    <None Remove="Resources\Modern\bg3.jpg" />
+    <None Remove="Resources\Modern\bg4.jpg" />
+    <None Remove="Resources\Modern\bg5.jpg" />
+    <None Remove="Resources\typing.mp3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Config\google-credentials.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\Cyberpunk\bg1.jpg" />
+    <Resource Include="Resources\Cyberpunk\bg2.jpg" />
+    <Resource Include="Resources\Cyberpunk\bg3.jpg" />
+    <Resource Include="Resources\Cyberpunk\bg4.jpg" />
+    <Resource Include="Resources\Cyberpunk\bg5.jpg" />
+    <Resource Include="Resources\Fantasy\bg1.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\Fantasy\bg9.PNG" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Google.Apis.Auth" Version="1.73.0" />
+    <PackageReference Include="Google.Cloud.TextToSpeech.V1" Version="3.18.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\bgm.m4a">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\typing.mp3">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <Resource Include="Resources\Fantasy\bg10.PNG" />
+    <Resource Include="Resources\Fantasy\bg11.PNG" />
+    <Resource Include="Resources\Fantasy\bg2.jpg" />
+    <Resource Include="Resources\Fantasy\bg3.jpg" />
+    <Resource Include="Resources\Fantasy\bg4.jpg" />
+    <Resource Include="Resources\Fantasy\bg5.jpg" />
+    <Resource Include="Resources\Fantasy\bg6.jpg" />
+    <Resource Include="Resources\Fantasy\bg7.png" />
+    <Resource Include="Resources\Fantasy\bg8.png" />
+    <Resource Include="Resources\GRC.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Resources\Modern\bg1.jpg" />
+    <Resource Include="Resources\Modern\bg2.jpg" />
+    <Resource Include="Resources\Modern\bg3.jpg" />
+    <Resource Include="Resources\Modern\bg4.jpg" />
+    <Resource Include="Resources\Modern\bg5.jpg" />
+  </ItemGroup>
+
+</Project>

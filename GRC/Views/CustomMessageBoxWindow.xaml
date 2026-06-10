@@ -1,0 +1,67 @@
+﻿<Window
+    x:Class="GRC.Views.CustomMessageBoxWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="clr-namespace:GRC.Helpers"
+    Title="{Binding DialogTitle}"
+    Width="380"
+    Height="200"
+    helpers:WindowTitleBarBehavior.EnableDarkTitleBar="True"
+    Background="#1E1E20"
+    Icon="/Resources/GRC.ico"
+    ResizeMode="NoResize"
+    WindowStartupLocation="CenterOwner"
+    WindowStyle="ToolWindow">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!--  팝업 메시지 내용  -->
+        <TextBlock
+            Grid.Row="0"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            FontSize="14"
+            Foreground="#EAEAEA"
+            Text="{Binding DialogMessage}"
+            TextAlignment="Center"
+            TextWrapping="Wrap" />
+
+        <!--  하단 버튼 영역  -->
+        <StackPanel
+            Grid.Row="1"
+            Margin="0,15,0,0"
+            HorizontalAlignment="Center"
+            Orientation="Horizontal">
+            <!--  취소 버튼 (Confirm 모드에서만 보임)  -->
+            <Button
+                x:Name="BtnCancel"
+                Width="80"
+                Margin="0,0,10,0"
+                Padding="8,6"
+                Background="#2A2A2A"
+                BorderThickness="0"
+                Click="BtnCancel_Click"
+                Cursor="Hand"
+                Foreground="#AAAAAA">
+                <TextBlock Text="취소" />
+            </Button>
+
+            <!--  확인 버튼  -->
+            <Button
+                x:Name="BtnOk"
+                Width="100"
+                Padding="8,6"
+                Background="#008B99"
+                BorderThickness="0"
+                Click="BtnOk_Click"
+                Cursor="Hand"
+                Foreground="White">
+                <TextBlock FontWeight="Bold" Text="확인" />
+            </Button>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,480 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="clr-namespace:GRC.Helpers"
+    xmlns:models="clr-namespace:GRC.Models">
+    <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    <helpers:MessageRoleplayConverter x:Key="RoleplayConverter" />
+
+
+    <Style TargetType="ContextMenu">
+        <Setter Property="Background" Value="#1E1E20" />
+        <Setter Property="BorderBrush" Value="#33FFFFFF" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="#EAEAEA" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border
+                        Padding="4"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="8">
+                        <!--  DropShadow 시각 효과 추가  -->
+                        <Border.Effect>
+                            <DropShadowEffect
+                                BlurRadius="10"
+                                Opacity="0.3"
+                                ShadowDepth="3" />
+                        </Border.Effect>
+                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--  ContextMenu 안의 개별 메뉴(MenuItem) 호버 액션 및 디자인  -->
+    <Style TargetType="MenuItem">
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="#EAEAEA" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border
+                        x:Name="Border"
+                        Padding="{TemplateBinding Padding}"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <!--  아이콘이 들어갈 자리  -->
+                                <ColumnDefinition Width="30" SharedSizeGroup="Icon" />
+                                <!--  글씨가 들어갈 자리  -->
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter
+                                Margin="0,0,8,0"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                ContentSource="Icon" />
+                            <ContentPresenter
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                ContentSource="Header" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <!--  마우스 호버 시 살짝 밝아지는 효과  -->
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="#33FFFFFF" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="#666666" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ModernScrollThumb" TargetType="Thumb">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border
+                        x:Name="ThumbBorder"
+                        Margin="2"
+                        Background="#22FFFFFF"
+                        CornerRadius="3" />
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ThumbBorder" Property="Background" Value="#44FFFFFF" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="ThumbBorder" Property="Background" Value="#66FFFFFF" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="ScrollBar">
+        <Setter Property="Width" Value="8" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Border Background="{TemplateBinding Background}">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True">
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource ModernScrollThumb}" />
+                            </Track.Thumb>
+                        </Track>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="HeaderActionButton" TargetType="Button">
+        <Setter Property="Background" Value="#252525" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="FontSize" Value="11" />
+
+        <Setter Property="Foreground" Value="White" />
+
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border
+                        x:Name="border"
+                        Padding="{TemplateBinding Padding}"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="#333333"
+                        BorderThickness="1"
+                        CornerRadius="4">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#353535" />
+                            <Setter TargetName="border" Property="BorderBrush" Value="#444444" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="GhostButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent">
+                        <ContentPresenter
+                            x:Name="content"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Opacity="0.6" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="content" Property="Opacity" Value="1.0" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="content" Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="FadeInViewStyle" TargetType="UserControl">
+        <Style.Triggers>
+            <EventTrigger RoutedEvent="Loaded">
+                <BeginStoryboard>
+                    <Storyboard>
+                        <DoubleAnimation
+                            Storyboard.TargetProperty="Opacity"
+                            From="0.0"
+                            To="1.0"
+                            Duration="0:0:0.9" />
+                        <DoubleAnimation
+                            Storyboard.TargetProperty="RenderTransform.(TranslateTransform.Y)"
+                            From="10"
+                            To="0"
+                            Duration="0:0:0.3">
+                            <DoubleAnimation.EasingFunction>
+                                <CubicEase EasingMode="EaseOut" />
+                            </DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                    </Storyboard>
+                </BeginStoryboard>
+            </EventTrigger>
+        </Style.Triggers>
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <TranslateTransform Y="0" />
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <DataTemplate x:Key="ChatMessageTemplate" DataType="{x:Type models:ChatMessage}">
+        <Grid
+            x:Name="MessageContainer"
+            Margin="15,8"
+            Background="Transparent"
+            Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
+
+            <Grid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem
+                        Command="{Binding PlacementTarget.Tag.ResendMessageCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        Header="이 메시지 재전송">
+                        <MenuItem.Icon>
+                            <TextBlock
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Foreground="#00E676"
+                                Text="🔄" />
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem
+                        Command="{Binding PlacementTarget.Tag.CopyMessageCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        Header="이 메시지 복사">
+                        <MenuItem.Icon>
+                            <TextBlock
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Foreground="#4DA6FF"
+                                Text="📋" />
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem
+                        Command="{Binding PlacementTarget.Tag.DeleteMessageCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        Header="이 메시지 삭제">
+                        <MenuItem.Icon>
+                            <TextBlock
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Foreground="#FF5555"
+                                Text="🗑" />
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem
+                        Command="{Binding PlacementTarget.Tag.BranchSessionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        Header="이 시점부터 새 세션으로 분기">
+                        <MenuItem.Icon>
+                            <TextBlock
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Foreground="#B088FF"
+                                Text="🌱" />
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem
+                        Command="{Binding PlacementTarget.Tag.SaveMemoryCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        Header="이 대화를 기억으로 저장">
+                        <MenuItem.Icon>
+                            <TextBlock
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Foreground="#FFD700"
+                                Text="💾" />
+                        </MenuItem.Icon>
+                    </MenuItem>
+                </ContextMenu>
+            </Grid.ContextMenu>
+
+            <!--  [기존 코드] 스트리밍 완료 후 등장할 '완성형 말풍선'  -->
+            <ItemsControl Margin="0">
+                <ItemsControl.ItemsSource>
+                    <MultiBinding Converter="{StaticResource RoleplayConverter}">
+                        <Binding Path="Text" />
+                        <Binding Path="Role" />
+                    </MultiBinding>
+                </ItemsControl.ItemsSource>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,4,0,4">
+                            <Border
+                                x:Name="BubbleBorder"
+                                MaxWidth="800"
+                                Padding="20,16"
+                                Visibility="Collapsed">
+                                <TextBlock
+                                    x:Name="BubbleText"
+                                    helpers:SimpleMarkdownHelper.Text="{Binding Text}"
+                                    FontSize="15"
+                                    LineHeight="25"
+                                    TextWrapping="Wrap" />
+                            </Border>
+                            <TextBlock
+                                x:Name="NarrationText"
+                                MaxWidth="800"
+                                Padding="20,16"
+                                helpers:SimpleMarkdownHelper.Text="{Binding Text}"
+                                FontSize="14.5"
+                                Foreground="#9BA1B0"
+                                LineHeight="24"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                            <TextBlock
+                                x:Name="InnerThoughtText"
+                                MaxWidth="800"
+                                Padding="20,16"
+                                helpers:SimpleMarkdownHelper.Text="{Binding Text}"
+                                FontSize="14.5"
+                                FontStyle="Italic"
+                                Foreground="#A2B9D8"
+                                LineHeight="24"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                            <TextBlock
+                                x:Name="SystemText"
+                                MaxWidth="800"
+                                Padding="20,16"
+                                HorizontalAlignment="Center"
+                                helpers:SimpleMarkdownHelper.Text="{Binding Text}"
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Foreground="#008B99"
+                                LineHeight="24"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                        </Grid>
+
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Type}" Value="UserBubble">
+                                <Setter TargetName="BubbleBorder" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="BubbleBorder" Property="HorizontalAlignment" Value="Right" />
+                                <Setter TargetName="BubbleBorder" Property="Background" Value="#660B192C" />
+                                <Setter TargetName="BubbleBorder" Property="BorderBrush" Value="#2E4A73" />
+                                <Setter TargetName="BubbleBorder" Property="BorderThickness" Value="1" />
+                                <Setter TargetName="BubbleBorder" Property="CornerRadius" Value="20,4,20,20" />
+                                <Setter TargetName="BubbleText" Property="FontWeight" Value="Normal" />
+                                <Setter TargetName="BubbleText" Property="Foreground" Value="#EAEAEA" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Type}" Value="ModelDialogue">
+                                <Setter TargetName="BubbleBorder" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="BubbleBorder" Property="HorizontalAlignment" Value="Left" />
+                                <Setter TargetName="BubbleBorder" Property="Background" Value="#66050505" />
+                                <Setter TargetName="BubbleBorder" Property="BorderBrush" Value="#22FFFFFF" />
+                                <Setter TargetName="BubbleBorder" Property="BorderThickness" Value="1" />
+                                <Setter TargetName="BubbleBorder" Property="CornerRadius" Value="4,20,20,20" />
+                                <Setter TargetName="BubbleText" Property="FontWeight" Value="Normal" />
+                                <Setter TargetName="BubbleText" Property="Foreground" Value="#F2F2F2" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Type}" Value="ModelNarration">
+                                <Setter TargetName="NarrationText" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="NarrationText" Property="HorizontalAlignment" Value="Left" />
+                                <Setter TargetName="NarrationText" Property="Foreground" Value="#AAB2C0" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Type}" Value="ModelInnerThought">
+                                <Setter TargetName="InnerThoughtText" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="InnerThoughtText" Property="HorizontalAlignment" Value="Left" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Type}" Value="System">
+                                <Setter TargetName="SystemText" Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!--  👇 [새로 추가] 2~3단계에서 만든 헬퍼가 부착될 '스트리밍 전용 말풍선'  -->
+            <StackPanel
+                x:Name="StreamingPanel"
+                Margin="0,4,0,4"
+                helpers:StatefulStreamingHelper.StreamingViewModel="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                Visibility="Collapsed" />
+
+        </Grid>
+
+        <DataTemplate.Triggers>
+            <!--  [기존 코드] 메시지 등장 시 페이드인/슬라이드업 애니메이션 트리거  -->
+            <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                <BeginStoryboard>
+                    <Storyboard>
+                        <DoubleAnimation
+                            Storyboard.TargetName="MessageContainer"
+                            Storyboard.TargetProperty="Opacity"
+                            From="0"
+                            To="1"
+                            Duration="0:0:0.3" />
+                        <ThicknessAnimation
+                            DecelerationRatio="0.8"
+                            Storyboard.TargetName="MessageContainer"
+                            Storyboard.TargetProperty="Margin"
+                            From="15,25,15,0"
+                            To="15,8,15,8"
+                            Duration="0:0:0.3" />
+                    </Storyboard>
+                </BeginStoryboard>
+            </EventTrigger>
+
+            <!--  👇 [새로 추가] 스와프(Swap) 작동을 위한 조건 트리거  -->
+            <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                    <Condition Binding="{Binding Role}" Value="model" />
+                    <Condition Binding="{Binding Text}" Value="" />
+                </MultiDataTrigger.Conditions>
+                <!--  👇 TargetName을 StreamingPanel로 변경  -->
+                <Setter TargetName="StreamingPanel" Property="Visibility" Value="Visible" />
+            </MultiDataTrigger>
+        </DataTemplate.Triggers>
+    </DataTemplate>
+    <!--  =========================================================  -->
+    <!--  AI 자동 추천 답변(선택지) 디자인 템플릿  -->
+    <!--  =========================================================  -->
+    <DataTemplate x:Key="SuggestedReplyTemplate">
+        <!--  1. 버튼 사이의 외부 여백을 줄입니다 (기존 0,0,0,8 -> 0,0,0,4)  -->
+        <Button
+            Margin="0,0,0,4"
+            HorizontalAlignment="Stretch"
+            HorizontalContentAlignment="Left"
+            Command="{Binding DataContext.UseSuggestionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+            CommandParameter="{Binding}"
+            Cursor="Hand">
+
+            <!--  1. 버튼 전체(배경+글씨)의 투명도와 색상을 제어하는 스타일  -->
+            <Button.Style>
+                <Style TargetType="Button">
+                    <!-- 기존: <Setter Property="Opacity" Value="0.2" /> -->
+                    <!--  변경: 0.6(60%) ~ 0.7(70%) 정도로 높여줍니다  -->
+                    <Setter Property="Opacity" Value="0.7" />
+
+                    <Setter Property="Background" Value="#880B192C" />
+                    <Setter Property="BorderBrush" Value="#2E4A73" />
+                    <Setter Property="BorderThickness" Value="1.2" />
+
+                    <Style.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Opacity" Value="1.0" />
+                            <Setter Property="Background" Value="#AA14284A" />
+                            <Setter Property="BorderBrush" Value="#4DA6FF" />
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </Button.Style>
+
+            <Button.Template>
+                <ControlTemplate TargetType="Button">
+                    <!--  2. 버튼 내부 여백 축소 (기존 16,12 -> 12,8)  -->
+                    <Border
+                        Padding="12,8"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="16">
+                        <!--  모서리도 조금 더 날렵하게 (24 -> 16)  -->
+                        <ContentPresenter />
+                    </Border>
+                </ControlTemplate>
+            </Button.Template>
+
+            <TextBlock
+                FontSize="13.5"
+                Foreground="#BCC6D5"
+                LineHeight="20"
+                Text="{Binding}"
+                TextWrapping="Wrap" />
+        </Button>
+    </DataTemplate>
+
+</ResourceDictionary>

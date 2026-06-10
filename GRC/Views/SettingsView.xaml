@@ -1,0 +1,233 @@
+﻿<UserControl
+    x:Class="GRC.Views.SettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="clr-namespace:GRC.Models"
+    Background="#121212"
+    Loaded="UserControl_Loaded">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--  상단 헤더  -->
+        <Grid Grid.Row="0" Margin="0,0,0,20">
+            <Button
+                HorizontalAlignment="Left"
+                Command="{Binding GoBackCommand}"
+                Style="{StaticResource GhostButton}">
+                <TextBlock
+                    FontSize="15"
+                    FontWeight="SemiBold"
+                    Foreground="#A0A0B0"
+                    Text="← 뒤로" />
+            </Button>
+            <TextBlock
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                FontSize="18"
+                FontWeight="Bold"
+                Foreground="White"
+                Text="환경 설정" />
+        </Grid>
+
+        <!--  💡 항목이 늘어나 화면을 벗어날 수 있으므로 ScrollViewer로 감싸줍니다  -->
+        <ScrollViewer
+            Grid.Row="1"
+            HorizontalScrollBarVisibility="Disabled"
+            VerticalScrollBarVisibility="Auto">
+            <StackPanel
+                Width="400"
+                Margin="0,0,0,20"
+                HorizontalAlignment="Center">
+
+                <!--  💡 추가된 Vertex AI 스위치  -->
+                <CheckBox
+                    Margin="0,0,0,20"
+                    Content="Google Cloud Vertex AI 인증 방식 사용"
+                    FontWeight="Bold"
+                    Foreground="White"
+                    IsChecked="{Binding UseVertexAI}" />
+
+                <!--  💡 추가된 구글 클라우드 Project ID  -->
+                <TextBlock
+                    Margin="0,0,0,8"
+                    FontWeight="SemiBold"
+                    Foreground="#D1D1D1"
+                    Text="구글 클라우드 Project ID (Vertex AI 전용)" />
+                <TextBox
+                    Margin="0,0,0,20"
+                    Padding="10"
+                    Background="#1E1E20"
+                    BorderBrush="#2A2A2A"
+                    Foreground="White"
+                    Text="{Binding ProjectId, UpdateSourceTrigger=PropertyChanged}" />
+
+                <!--  💡 추가된 구글 클라우드 Region  -->
+                <TextBlock
+                    Margin="0,0,0,8"
+                    FontWeight="SemiBold"
+                    Foreground="#D1D1D1"
+                    Text="구글 클라우드 Location (예: asia-northeast3)" />
+                <TextBox
+                    Margin="0,0,0,20"
+                    Padding="10"
+                    Background="#1E1E20"
+                    BorderBrush="#2A2A2A"
+                    Foreground="White"
+                    Text="{Binding Location, UpdateSourceTrigger=PropertyChanged}" />
+
+                <!--  기존 API Key 항목  -->
+                <TextBlock
+                    Margin="0,0,0,8"
+                    FontWeight="SemiBold"
+                    Foreground="#D1D1D1"
+                    Text="Gemini API Key (AI Studio 전용)" />
+                <TextBox
+                    Margin="0,0,0,20"
+                    Padding="10"
+                    Background="#1E1E20"
+                    BorderBrush="#2A2A2A"
+                    Foreground="White"
+                    Text="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock
+                    Margin="0,0,0,8"
+                    FontWeight="SemiBold"
+                    Foreground="#D1D1D1"
+                    Text="사용할 모델 (Model Tier)" />
+                <ComboBox
+                    Margin="0,0,0,20"
+                    Padding="5"
+                    Background="#1E1E20"
+                    Foreground="Black"
+                    ItemsSource="{Binding AvailableModelTiers}"
+                    SelectedItem="{Binding SelectedModel}" />
+
+                <TextBlock
+                    Margin="0,0,0,8"
+                    FontWeight="SemiBold"
+                    Foreground="#D1D1D1"
+                    Text="안전 필터 강도 (Safety Threshold)" />
+                <ComboBox
+                    Margin="0,0,0,30"
+                    Padding="5"
+                    Background="#1E1E20"
+                    Foreground="Black"
+                    ItemsSource="{Binding AvailableSafetyThresholds}"
+                    SelectedItem="{Binding SafetyThreshold}" />
+
+                <TextBlock
+                    Margin="0,0,0,8"
+                    FontWeight="SemiBold"
+                    Foreground="#D1D1D1"
+                    Text="세계관 배경 테마" />
+                <ComboBox
+                    Margin="0,0,0,20"
+                    Padding="5"
+                    Background="#1E1E20"
+                    Foreground="Black"
+                    ItemsSource="{Binding AvailableThemes}"
+                    SelectedItem="{Binding SelectedTheme}" />
+
+                <TextBlock
+                    Margin="0,0,0,8"
+                    FontWeight="SemiBold"
+                    Foreground="#D1D1D1"
+                    Text="텍스트 출력 속도 (Chat Delay, ms)" />
+                <TextBox
+                    Margin="0,0,0,30"
+                    Padding="10"
+                    Background="#1E1E20"
+                    BorderBrush="#2A2A2A"
+                    Foreground="White"
+                    Text="{Binding ChatDelay, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock
+                    Margin="0,0,0,8"
+                    FontWeight="SemiBold"
+                    Foreground="#D1D1D1"
+                    Text="오디오 설정" />
+
+                <CheckBox
+                    Margin="0,0,0,10"
+                    Content="배경음악(BGM) 활성화"
+                    Foreground="White"
+                    IsChecked="{Binding IsBgmEnabled}" />
+
+                <DockPanel Margin="0,0,0,20">
+                    <TextBlock
+                        Width="80"
+                        VerticalAlignment="Center"
+                        Foreground="#A0A0B0"
+                        Text="BGM 음량" />
+                    <Slider
+                        VerticalAlignment="Center"
+                        IsSnapToTickEnabled="True"
+                        Maximum="1"
+                        Minimum="0"
+                        TickFrequency="0.01"
+                        Value="{Binding BgmVolume, UpdateSourceTrigger=PropertyChanged}" />
+                </DockPanel>
+
+                <CheckBox
+                    Margin="0,0,0,10"
+                    Content="타이핑 효과음(타건음) 활성화"
+                    Foreground="White"
+                    IsChecked="{Binding IsTypingSoundEnabled}" />
+
+                <DockPanel Margin="0,0,0,30">
+                    <TextBlock
+                        Width="80"
+                        VerticalAlignment="Center"
+                        Foreground="#A0A0B0"
+                        Text="타건음 음량" />
+                    <Slider
+                        VerticalAlignment="Center"
+                        IsSnapToTickEnabled="True"
+                        Maximum="1"
+                        Minimum="0"
+                        TickFrequency="0.01"
+                        Value="{Binding TypingSoundVolume, UpdateSourceTrigger=PropertyChanged}" />
+
+                </DockPanel>
+                <CheckBox
+                    Margin="0,0,0,10"
+                    Content="음성 읽어주기(TTS) 활성화"
+                    Foreground="White"
+                    IsChecked="{Binding IsTtsEnabled}" />
+                <TextBlock
+                    Margin="0,0,0,8"
+                    FontWeight="SemiBold"
+                    Foreground="#D1D1D1"
+                    Text="TTS 읽어주기 언어" />
+                <ComboBox
+                    Margin="0,0,0,20"
+                    Padding="5"
+                    Background="#1E1E20"
+                    Foreground="Black"
+                    ItemsSource="{Binding AvailableTtsLanguages}"
+                    SelectedItem="{Binding SelectedTtsLanguage}" />
+                <Button
+                    Margin="0,20,0,15"
+                    Padding="0,12"
+                    Command="{Binding SaveSettingsCommand}"
+                    Style="{StaticResource HeaderActionButton}">
+                    <TextBlock
+                        FontWeight="Bold"
+                        Foreground="White"
+                        Text="설정 저장하기" />
+                </Button>
+
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    FontWeight="SemiBold"
+                    Foreground="#4CAF50"
+                    Text="{Binding StatusMessage}" />
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
