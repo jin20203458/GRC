@@ -1,8 +1,24 @@
 # GRC (GenAI Roleplay Chat)
 
-GRC는 Google Gemini API를 활용하여 고도로 몰입감 있고 생동감 넘치는 캐릭터와 롤플레잉 및 소설 창작을 즐길 수 있는 **C# WPF 기반의 데스크톱 클라이언트**입니다. 
+[![NET Version](https://img.shields.io/badge/.NET-8.0-blue.svg)](https://dotnet.microsoft.com/download/dotnet/8.0)
+[![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)](#)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+GRC는 Google Gemini API를 활용하여 고도로 몰입감 있고 생동감 넘치는 캐릭터와 롤플레잉 및 소설 창작을 즐길 수 있는 **C# WPF 기반의 데스크톱 클라이언트**입니다.
 
 단순히 이전 대화를 나열하여 보내는 한계를 뛰어넘어, 대규모 서사를 효율적으로 유지하기 위한 **3단계 압축 기억 메커니즘**, 지능적인 **재귀적 로어북**, 그리고 성우처럼 감정을 담아 말하는 **Gemini 멀티모달 TTS 워크플로우** 등이 탑재되어 있어 고품질의 AI 롤플레이 환경을 제공합니다.
+
+---
+
+## 📌 목차 (Table of Contents)
+
+1. [핵심 기능 (Key Features)](#-핵심-기능-key-features)
+2. [기술 스택 (Tech Stack)](#-기술-스택-tech-stack)
+3. [시작 가이드 (Getting Started)](#-시작-가이드-getting-started)
+4. [설정 가이드 (Configuration)](#-설정-가이드-configuration)
+5. [프로젝트 구조 (Architecture)](#-프로젝트-구조-architecture)
+6. [기여 방법 (Contributing)](#-기여-방법-contributing)
+7. [라이선스 (License)](#-라이선스-license)
 
 ---
 
@@ -33,106 +49,25 @@ GRC는 Google Gemini API를 활용하여 고도로 몰입감 있고 생동감 �
 
 ---
 
-## 📁 프로젝트 폴더 구조 (Architecture)
+## 🛠 기술 스택 (Tech Stack)
 
-본 프로젝트는 깔끔한 **MVVM (Model-View-ViewModel)** 패턴과 의존성 주입(DI) 형태로 설계되었습니다.
-
-```bash
-c:\GRC\GRC
-│  App.xaml
-│  App.xaml.cs          # 애플리케이션 진입점, DI 컨테이너(ServiceCollection) 구성
-│  AssemblyInfo.cs
-│  GRC.csproj
-│
-├─Config
-│      google-credentials.json  # 구글 클라우드 Vertex AI 자격증명 파일 (Git 커밋 제외)
-│
-├─Helpers               # 유틸리티 및 특화 헬퍼들
-│      AutoScrollHelper.cs
-│      ChatDataHelper.cs
-│      FullHistoryLogger.cs     # 전체 대화 원본 로그 저장 헬퍼
-│      LlmJsonParser.cs         # LLM 출력에서 JSON 및 태그 정밀 추출/역직렬화
-│      MemoryEventLogger.cs
-│      MessageRoleplayConverter.cs
-│      SimpleMarkdownHelper.cs
-│      StatefulStreamingHelper.cs
-│      TokenLogger.cs           # 대화별 토큰 소모량 로깅 헬퍼
-│      WindowTitleBarBehavior.cs
-│
-├─Models                # 데이터 모델 명세
-│      AppSettings.cs           # 앱 환경 설정 모델 (API 키, 테마, 오디오 볼륨 등)
-│      ChapterContext.cs        # 챕터별 줄거리 및 인물/장소/아이템 상태 명세
-│      CharacterPreset.cs       # 캐릭터 프롬프트 및 설정값 프리셋 DTO
-│      ChatMessage.cs           # 개별 메시지 (user/model/system) 구조
-│      ChatSession.cs           # 세션 파일 복구/저장용 통합 모델
-│      GeminiApiDto.cs          # 제미나이 API 전송 및 응답 규격 DTO
-│      LorebookEntry.cs         # 로어북 개별 엔트리 구조
-│      StatusPayload.cs         # AI로부터 수신하는 상태 데이터 규격
-│
-├─Properties
-│  └─PublishProfiles
-│
-├─Resources             # 배경 이미지, 효과음 및 폰트 파일
-│  ├─Cyberpunk
-│  ├─Fantasy
-│  └─Modern
-│
-├─Services              # 핵심 비즈니스 로직 및 통신 서비스
-│      AppSettingsService.cs    # 앱 환경설정 파일(.json) 영속화
-│      AudioService.cs          # BGM, 타건음 제어 및 재생 완료된 TTS 임시 파일 청소
-│      ChatWorkflowService.cs   # 실시간 채팅 스트리밍 큐잉 및 연기 TTS 제어
-│      GeminiApiService.cs      # Google Cloud / AI Studio 제미나이 연동
-│      GeminiTtsService.cs      # Gemini 오디오 모달리티 연기 TTS API 연동
-│      GoogleAuthService.cs     # 싱글톤 기반의 구글 OAuth 액세스 토큰 관리 공용 서비스
-│      LorebookService.cs       # 키워드 스캔 및 재귀적 설정북 주입 로직
-│      ReplySuggestionService.cs# 추천 선택지 3종 예측 생성 서비스
-│      SessionService.cs        # 세션 원자적 파일 쓰기(Atomic Write)를 통한 데이터 보호
-│      ThemeService.cs
-│
-├─Themes
-│      ModernStyles.xaml        # 현대적인 커스텀 다크테마 스타일 리소스
-│
-├─ViewModels            # MVVM의 프레젠테이션 레이어
-│      ChatViewModel.cs         # 대화방 화면 컨트롤러 (분기, 삭제, 저장, 전송 등)
-│      MainViewModel.cs         # 네비게이션 제어
-│      SessionListViewModel.cs  # 저장된 세션 카드 및 신규 생성 다이얼로그
-│      SettingsViewModel.cs     # 환경 설정 UI 데이터 바인딩 및 음량/딜레이 보정
-│
-└─Views                 # MVVM의 뷰 레이어 (XAML 및 코드 비하인드)
-        ChatView.xaml
-        ChatView.xaml.cs
-        CustomMessageBoxWindow.xaml
-        EditInitialScenarioWindow.xaml
-        EditLorebookWindow.xaml
-        EditWorldviewWindow.xaml
-        MainWindow.xaml
-        NewSessionSetupWindow.xaml
-        SessionListView.xaml
-        SettingsView.xaml
-        StatusWindow.xaml
-        StoryHistoryWindow.xaml
-```
+* **UI Framework**: Windows Presentation Foundation (WPF) / .NET 8.0
+* **State & MVVM**: `CommunityToolkit.Mvvm` (Microsoft MVVM Toolkit)
+* **Dependency Injection**: `Microsoft.Extensions.DependencyInjection`
+* **Authentication**: `Google.Apis.Auth` (Vertex AI OAuth2 토큰 발급)
+* **Media & Audio**: `System.Windows.Media.MediaPlayer` (BGM, 효과음, TTS 오디오 제어)
+* **JSON Serialization**: `System.Text.Json`
 
 ---
 
-## 🚀 시작 가이드 (Quick Start)
+## 🚀 시작 가이드 (Getting Started)
 
-### 1. 요구 사항 (Prerequisites)
+### 요구 사항 (Prerequisites)
 * Windows OS
-* **.NET 8.0 SDK** 이상 설치 필요
-* API 연동 방법 (다음 중 하나 필수):
-  * **Google AI Studio API Key**: 가장 빠르고 간단하게 사용 가능
-  * **Google Cloud 서비스 계정 키 파일**: Vertex AI 크레딧 사용 및 대용량 트래픽 통신 시 필요
+* [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) 이상 설치 필요
 
-### 2. 구글 클라우드 자격증명 설정 (Vertex AI 사용 시)
-1. 구글 클라우드 콘솔에서 Vertex AI API가 활성화된 프로젝트의 **서비스 계정 키 파일(`.json`)**을 생성하여 다운로드합니다.
-2. 다운로드한 JSON 파일의 이름을 `google-credentials.json`으로 변경합니다.
-3. 해당 파일을 아래 경로에 위치시킵니다:
-   `C:\GRC\GRC\Config\google-credentials.json`
-   *(주의: 이 경로는 `.gitignore`에 등록되어 있어 깃허브에 커밋되지 않으니 안심하셔도 됩니다.)*
-
-### 3. 빌드 및 실행
-명령 프롬프트 또는 PowerShell을 열고 프로젝트 루트 디렉토리(`C:\GRC`)에서 다음 명령을 실행합니다.
+### 빌드 및 실행 (Build & Run)
+명령 프롬프트 또는 PowerShell을 열고 프로젝트 루트 디렉토리에서 다음 명령을 실행합니다.
 
 ```bash
 # 의존성 복구 및 빌드
@@ -144,9 +79,63 @@ dotnet run --project GRC/GRC.csproj
 
 ---
 
-## 📦 기술 스택 및 오픈소스 (Dependencies)
-* **Framework**: .NET 8.0 (Windows Presentation Foundation)
-* **MVVM Toolkit**: `CommunityToolkit.Mvvm` (프레젠테이션 레이어 상태 제어)
-* **Google Auth**: `Google.Apis.Auth` (Vertex AI용 OAuth2 토큰 발급)
-* **Dependency Injection**: `Microsoft.Extensions.DependencyInjection` (의존성 일원화)
-* **Media / Sound**: `System.Windows.Media.MediaPlayer` (효과음, BGM 및 연기 오디오 스트림 재생)
+## ⚙️ 설정 가이드 (Configuration)
+
+GRC는 **Google AI Studio**와 **Google Cloud Vertex AI** 두 가지 연동 방식을 지원합니다.
+
+### 방법 1. Google AI Studio API 키 사용 (권장 - 가장 간편함)
+1. 앱을 실행한 후 우측 하단의 **설정(Settings)** 메뉴로 이동합니다.
+2. 발급받은 Google AI Studio API Key를 입력창에 넣고 저장합니다.
+3. 또는 프로젝트 빌드 출력 디렉토리의 `AppSettings.json` 파일에 직접 설정할 수도 있습니다:
+   ```json
+   {
+     "ApiKey": "YOUR_GEMINI_API_KEY",
+     "UseVertexAI": false
+   }
+   ```
+
+### 방법 2. Google Cloud Vertex AI 사용
+1. Google Cloud 콘솔에서 Vertex AI API가 활성화된 프로젝트의 **서비스 계정 키 파일(`.json`)**을 생성하여 다운로드합니다.
+2. 다운로드한 JSON 파일의 이름을 `google-credentials.json`으로 변경합니다.
+3. 해당 파일을 아래 경로에 위치시킵니다:
+   `GRC/Config/google-credentials.json`
+   *(주의: 이 파일은 `.gitignore`에 등록되어 있어 Git에 커밋되지 않습니다.)*
+
+---
+
+## 📁 프로젝트 구조 (Architecture)
+
+본 프로젝트는 의존성 주입(DI)이 적용된 **MVVM (Model-View-ViewModel)** 패턴으로 구성되어 있습니다.
+
+```bash
+GRC
+├─Config/               # 구글 클라우드 자격증명 설정 (.json)
+├─Helpers/              # UI 유틸리티 및 오디오/대화 관련 백엔드 헬퍼
+│  ├─LlmJsonParser.cs       # LLM 출력 내 JSON 데이터 추출 파서
+│  └─TokenLogger.cs         # 대화별 토큰 소모량 추적 로거
+├─Models/               # 데이터 구조 및 모델 명세 (Settings, Session, Lorebook 등)
+├─Services/             # 비즈니스 로직 및 API 연동 서비스
+│  ├─GeminiApiService.cs    # Gemini API 통신 제어
+│  └─LorebookService.cs     # 재귀적 로어북 및 키워드 매칭
+├─Themes/               # 애플리케이션 공통 스타일 및 테마 리소스
+├─ViewModels/           # 뷰와 비즈니스 로직을 연결하는 뷰모델
+└─Views/                # XAML 화면 구성 및 비하인드 코드
+```
+
+---
+
+## 🤝 기여 방법 (Contributing)
+
+버그 제보나 기능 제안은 언제나 환영합니다! 기여하고 싶으신 경우 아래 절차를 따라주세요:
+
+1. 프로젝트를 **Fork**합니다.
+2. 새로운 기능 브랜치를 생성합니다 (`git checkout -b feature/AmazingFeature`).
+3. 변경 사항을 **Commit**합니다 (`git commit -m 'Add some AmazingFeature'`).
+4. 브랜치에 **Push**합니다 (`git push origin feature/AmazingFeature`).
+5. Pull Request를 생성하여 검토를 요청합니다.
+
+---
+
+## 📄 라이선스 (License)
+
+본 프로젝트는 **MIT License** 하에 배포됩니다. 자세한 내용은 `LICENSE` 파일을 참고해 주세요.
