@@ -1,4 +1,4 @@
-﻿using GRC.Models;
+using GRC.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -46,7 +46,16 @@ public class SessionService : ISessionService
             }
 
             var json = JsonSerializer.Serialize(session, _options);
-            await File.WriteAllTextAsync(filePath, json);
+            string tempPath = filePath + ".tmp";
+            await File.WriteAllTextAsync(tempPath, json);
+            if (File.Exists(filePath))
+            {
+                File.Replace(tempPath, filePath, null);
+            }
+            else
+            {
+                File.Move(tempPath, filePath);
+            }
         }
         finally { _fileLock.Release(); }
     }
