@@ -1,4 +1,4 @@
-﻿using GRC.ViewModels;
+using GRC.ViewModels;
 using System;
 using System.Collections.Concurrent;
 using System.Text;
@@ -32,6 +32,11 @@ public class StreamingState
 
 public static class StatefulStreamingHelper
 {
+    private const string DialogueBorderStyleKey = "StreamingDialogueBorderStyle";
+    private const string DialogueTextStyleKey = "StreamingDialogueTextStyle";
+    private const string ThoughtTextStyleKey = "StreamingThoughtTextStyle";
+    private const string NarrativeTextStyleKey = "StreamingNarrativeTextStyle";
+
     public static readonly DependencyProperty StreamingViewModelProperty =
         DependencyProperty.RegisterAttached(
             "StreamingViewModel",
@@ -63,7 +68,7 @@ public static class StatefulStreamingHelper
                 panel.SetValue(StateProperty, state);
                 panel.Children.Clear();
 
-                // 💡 [최적화 핵심] 16ms(약 60FPS) 주기로 작동하는 렌더링 전용 타이머 세팅
+                //  [최적화 핵심] 16ms(약 60FPS) 주기로 작동하는 렌더링 전용 타이머 세팅
                 state.RenderTimer = new DispatcherTimer(DispatcherPriority.Render, panel.Dispatcher)
                 {
                     Interval = TimeSpan.FromMilliseconds(16)
@@ -318,13 +323,7 @@ public static class StatefulStreamingHelper
 
     private static void AddNewBlockToPanel(StackPanel panel, StreamingState state)
     {
-        var tb = new TextBlock
-        {
-            MaxWidth = 800,
-            Padding = new Thickness(20, 16, 20, 16),
-            TextWrapping = TextWrapping.Wrap,
-            HorizontalAlignment = HorizontalAlignment.Left
-        };
+        var tb = new TextBlock();
 
         state.CurrentTextBlock = tb;
         state.CurrentRun = CreateRun(state);
@@ -332,47 +331,24 @@ public static class StatefulStreamingHelper
 
         if (state.IsDialogue)
         {
-            tb.FontSize = 15;
-            tb.LineHeight = 25;
-            tb.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F2F2F2"));
-            tb.Padding = new Thickness(0);
+            tb.Style = panel.TryFindResource(DialogueTextStyleKey) as Style;
 
-            var border = new Border
-            {
-                MaxWidth = 800,
-                Padding = new Thickness(20, 16, 20, 16),
-                Margin = new Thickness(0, 4, 0, 4),
-                HorizontalAlignment = HorizontalAlignment.Left,
-                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#66050505")),
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#22FFFFFF")),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(4, 20, 20, 20),
-                Visibility = Visibility.Collapsed,
-                Child = tb
-            };
+            var border = new Border { Child = tb };
+            border.Style = panel.TryFindResource(DialogueBorderStyleKey) as Style;
 
             panel.Children.Add(border);
             state.CurrentUIRoot = border;
         }
         else if (state.IsThought)
         {
-            tb.FontSize = 14.5;
-            tb.LineHeight = 24;
-            tb.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A2B9D8"));
-            tb.FontStyle = FontStyles.Italic;
-            tb.Margin = new Thickness(0, 4, 0, 4);
-            tb.Visibility = Visibility.Collapsed;
+            tb.Style = panel.TryFindResource(ThoughtTextStyleKey) as Style;
 
             panel.Children.Add(tb);
             state.CurrentUIRoot = tb;
         }
         else
         {
-            tb.FontSize = 14.5;
-            tb.LineHeight = 24;
-            tb.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#AAB2C0"));
-            tb.Margin = new Thickness(0, 4, 0, 4);
-            tb.Visibility = Visibility.Collapsed;
+            tb.Style = panel.TryFindResource(NarrativeTextStyleKey) as Style;
 
             panel.Children.Add(tb);
             state.CurrentUIRoot = tb;
