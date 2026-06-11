@@ -108,20 +108,7 @@
                         Foreground="#EAEAEA"
                         VerticalAlignment="Center"
                         Text="AI 세션 아키텍트" />
-                    <Border
-                        Margin="10,0,0,0"
-                        Padding="6,2"
-                        Background="#1A1D21"
-                        BorderBrush="#008B99"
-                        BorderThickness="1"
-                        CornerRadius="4"
-                        VerticalAlignment="Center">
-                        <TextBlock
-                            FontSize="10"
-                            FontWeight="Bold"
-                            Foreground="#008B99"
-                            Text="AGENT WORKFLOW" />
-                    </Border>
+
                 </StackPanel>
             </Grid>
         </Border>
