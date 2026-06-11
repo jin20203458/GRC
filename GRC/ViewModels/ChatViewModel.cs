@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GRC.Models;
 using GRC.Services;
@@ -79,6 +79,7 @@ public partial class ChatViewModel : ObservableObject
     // 스트리밍 도중에 API 요청을 취소할 때 사용할 CancellationTokenSource
     private CancellationTokenSource? _cancellationTokenSource;
     private CancellationTokenSource? _suggestionCts;
+    private Task? _statusUpdateTask; // 백그라운드 상태창 갱신용 태스크 보관용 필드
 
     //  배경 이미지 바인딩용 프로퍼티 (초기 이미지)
     [ObservableProperty]
@@ -322,6 +323,23 @@ public partial class ChatViewModel : ObservableObject
 
         if (CurrentPreset == null) return;
 
+        // [세이프가드] 백그라운드 상태창 갱신이 진행 중이라면 완료될 때까지 대기하여 데이터 정합성 보장
+        if (_statusUpdateTask != null)
+        {
+            try
+            {
+                await _statusUpdateTask;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SendMessage SafeGuard] 이전 백그라운드 상태창 태스크 대기 중 에러 발생(무시됨): {ex.Message}");
+            }
+            finally
+            {
+                _statusUpdateTask = null; // 대기 완료 후 초기화
+            }
+        }
+
         IsBusy = true;
         _cancellationTokenSource = new CancellationTokenSource();
         bool isContinueMode = string.IsNullOrWhiteSpace(InputText);
@@ -471,6 +489,16 @@ public partial class ChatViewModel : ObservableObject
                     catch { }
                 }
             },
+            onStatusUpdated: (statusPayload) =>
+            {
+                // UI 스레드 안전성 보장 및 갱신 Task 보관
+                _statusUpdateTask = Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    UpdateStatusUI(statusPayload.CustomStats, statusPayload.Chars, statusPayload.Items, statusPayload.Places);
+                    _memoryService.UpdateContextStatus(statusPayload);
+                    System.Diagnostics.Debug.WriteLine("[ChatViewModel] 백그라운드 상태창 갱신 UI 및 데이터 반영 완료");
+                }).Task;
+            },
             cancellationToken: _cancellationTokenSource.Token
         );
 
@@ -478,12 +506,6 @@ public partial class ChatViewModel : ObservableObject
 
         if (result.IsSuccess)
         {
-            if (result.StatusPayload != null)
-            {
-                UpdateStatusUI(result.StatusPayload.CustomStats, result.StatusPayload.Chars, result.StatusPayload.Items, result.StatusPayload.Places);
-                _memoryService.UpdateContextStatus(result.StatusPayload);
-            }
-
             aiMessage.Text = result.FinalText;
             IsFastForwardEnabled = false;
             _memoryService.AddModelResponse(aiMessage);

@@ -103,6 +103,7 @@ public class ChatWorkflowService(
          Func<string, string, Task<string>>? onDialoguePrefetch = null,
          Func<string, Task>? onAudioReady = null,
          Func<ChatStreamResult, Task>? onDownloadComplete = null,
+         Action<StatusPayload>? onStatusUpdated = null,
          CancellationToken cancellationToken = default)
     {
         var result = new ChatStreamResult();
@@ -251,32 +252,43 @@ public class ChatWorkflowService(
 
             // ==============================================================
             // [호출 2] 상태창 갱신 API (Temperature=0.6, FlashLite, 방금 1턴 대화만 입력)
-            // 서사 스트리밍 완료 후 실행 — 과거 대화 기록 없이 현재 턴만 분석하여 정확도 극대화
+            // 백그라운드 스레드에서 비동기 처리하여 입력창 해제 딜레이 0초 실현
             // ==============================================================
             if (!cancellationToken.IsCancellationRequested && !string.IsNullOrWhiteSpace(responseText))
             {
-                try
+                _ = Task.Run(async () =>
                 {
-                    var statusRequest = memoryService.BuildStatusRequest(
-                        userMessage.Text, responseText, currentSettings.SafetyThreshold);
-
-                    string statusResponse = await apiService.SendMessageAsync(statusRequest, ModelTier.FlashLite);
-                    Debug.WriteLine($"[StatusAPI] 상태창 갱신 응답 수신 (앞 100자): {statusResponse?.Substring(0, Math.Min(100, statusResponse?.Length ?? 0))}");
-
-                    if (!string.IsNullOrWhiteSpace(statusResponse) && !statusResponse.StartsWith("[System"))
+                    try
                     {
-                        string? cleanJson = GRC.Helpers.LlmJsonParser.ExtractJson(statusResponse);
-                        if (!string.IsNullOrEmpty(cleanJson))
+                        var statusRequest = memoryService.BuildStatusRequest(
+                            userMessage.Text, responseText, currentSettings.SafetyThreshold);
+
+                        string statusResponse = await apiService.SendMessageAsync(statusRequest, ModelTier.FlashLite);
+                        Debug.WriteLine($"[StatusAPI - BG] 상태창 갱신 응답 수신 (앞 100자): {statusResponse?.Substring(0, Math.Min(100, statusResponse?.Length ?? 0))}");
+
+                        if (!string.IsNullOrWhiteSpace(statusResponse) && !statusResponse.StartsWith("[System"))
                         {
-                            result.StatusPayload = GRC.Helpers.LlmJsonParser.DeserializeSafe<StatusPayload>(cleanJson);
+                            string? cleanJson = GRC.Helpers.LlmJsonParser.ExtractJson(statusResponse);
+                            if (!string.IsNullOrEmpty(cleanJson))
+                            {
+                                var payload = GRC.Helpers.LlmJsonParser.DeserializeSafe<StatusPayload>(cleanJson);
+                                if (payload != null && onStatusUpdated != null)
+                                {
+                                    onStatusUpdated(payload);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            Debug.WriteLine($"[StatusAPI Error - BG] 상태창 API 비정상 응답: {statusResponse}");
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    // 상태 갱신 실패 시 서사는 정상 반환, 상태만 이전 값 유지 (Graceful Degradation)
-                    Debug.WriteLine($"[StatusAPI Error] 상태창 갱신 실패, 이전 상태 유지: {ex.Message}");
-                }
+                    catch (Exception ex)
+                    {
+                        // 상태 갱신 실패 시 로그만 남기고 이전 상태 유지 (Graceful Degradation)
+                        Debug.WriteLine($"[StatusAPI Error - BG] 상태창 백그라운드 갱신 실패: {ex.Message}");
+                    }
+                });
             }
 
             if (onDownloadComplete != null && result.IsSuccess)

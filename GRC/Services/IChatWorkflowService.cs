@@ -1,4 +1,4 @@
-﻿using GRC.Models;
+using GRC.Models;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -28,5 +28,6 @@ public interface IChatWorkflowService
         Func<string, string, Task<string>>? onDialoguePrefetch,
         Func<string, Task>? onAudioReady,
         Func<ChatStreamResult, Task>? onDownloadComplete,
+        Action<StatusPayload>? onStatusUpdated,
         CancellationToken cancellationToken);
 }

@@ -125,8 +125,8 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
 
                 if (candidate.FinishReason != "STOP" && candidate.FinishReason != "MAX_TOKENS")
                 {
-                    System.Diagnostics.Debug.WriteLine($"[System Error]: 생성 중단. 사유: {candidate.FinishReason}");
-                    return $"[System Error]: 생성 중단. 사유: {candidate.FinishReason}";
+                    System.Diagnostics.Debug.WriteLine($"[System Error]: 생성 비정상 중단. FinishReason: {candidate.FinishReason}");
+                    return $"[System Error]: 생성 비정상 중단. 사유: {candidate.FinishReason}";
                 }
 
                 if (candidate.Content?.Parts != null)
@@ -147,10 +147,25 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
                     {
                         return finalAnswer.ToString();
                     }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[GeminiApiService] Candidates[0]에 Parts는 존재하나 유효한 Text 내용이 없습니다. Raw Response:\n{responseBody}");
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[GeminiApiService] Candidates[0]의 Content 또는 Parts가 null입니다. Raw Response:\n{responseBody}");
                 }
             }
+            else
+            {
+                string feedbackStr = responseData?.PromptFeedback != null 
+                    ? JsonSerializer.Serialize(responseData.PromptFeedback, _jsonOptions) 
+                    : "없음";
+                System.Diagnostics.Debug.WriteLine($"[GeminiApiService] Candidates가 비어있거나 null입니다. PromptFeedback: {feedbackStr}. Raw Response:\n{responseBody}");
+            }
 
-            return "[System Error]: 구글 API로부터 유효한 텍스트를 받지 못했습니다.";
+            return $"[System Error]: 구글 API로부터 유효한 텍스트를 받지 못했습니다. (Candidates 개수: {responseData?.Candidates?.Count ?? 0}, PromptFeedback 존재 여부: {responseData?.PromptFeedback != null})";
         }
         catch (HttpRequestException ex)
         {

@@ -92,22 +92,13 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
         }
 
         string formatRule = """
-<output_structure>
-서사 전개만 출력. 상태창(JSON)은 출력하지 마십시오.
-</output_structure>
-
 <syntax_rules>
 - AI 메타발언(인사/요약/설명) 금지. 즉시 서사 시작.
 - 서사: 순수 산문 (※ 마크다운, *별표* 등 기호 절대 금지)
 - 대사: " "
 - 독백: 「 」
+- 상태창 수치(%, HP 분수, 골드 액수 등)나 시스템 용어를 서사에 날것으로 노출하지 말고, 신체 상태나 간접적인 묘사로 승화하십시오.
 </syntax_rules>
-
-<example>
-조심스럽게 밖으로 나간다.
-"누구 계신가요?"
-「아무도 없는 건가.」
-</example>
 """;
 
 
@@ -632,19 +623,12 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
     /// </summary>
     public GeminiRequest BuildStatusRequest(string userAction, string modelNarrative, BlockThreshold safetyThreshold)
     {
-        // 현재 상태 스냅샷 (이전 턴까지의 누적 상태)
-        string customStatsStr = _currentContext.CustomStats.Count > 0
-            ? string.Join(", ", _currentContext.CustomStats.Select(x => $"[{x.Key}]: {x.Value}"))
-            : "없음";
-        string charsStr = _currentContext.Chars.Count > 0
-            ? string.Join("\n  * ", _currentContext.Chars.Select(x => $"{x.Key}: {x.Value}"))
-            : "없음";
-        string itemsStr = _currentContext.Items.Count > 0
-            ? string.Join(", ", _currentContext.Items.Select(i => $"[{i}]"))
-            : "없음";
-        string placesStr = _currentContext.Places.Count > 0
-            ? string.Join(", ", _currentContext.Places.Select(p => $"[{p}]"))
-            : "없음";
+        // 현재 상태 스냅샷 (이전 턴까지의 누적 상태) — Plot 제외 (스레드 안전 lock 적용)
+        string stateSnapshot;
+        lock (_shortTermMemory)
+        {
+            stateSnapshot = _currentContext.ToStatusSnapshotString();
+        }
 
         string systemPrompt = """
 <role>상태창 갱신 전문가</role>
@@ -656,17 +640,26 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
 3. 아이템: 명시적인 획득/소비 묘사가 <latest_turn>에 존재할 때만 증감.
 4. NPC 상태(characterConditionDesc): 부상, 감정 변화 등이 묘사된 경우에만 갱신.
 5. 변화가 없는 항목은 이전 값을 그대로 유지.
-6. uiBadges의 Key는 절대 추가/삭제하지 말 것. Value만 갱신.
+6. uiBadges의 기존 Key는 삭제하지 말고 100% 보존하되, 새로운 동료나 스탯 추적을 위해 새로운 Key를 추가하는 것은 허용합니다.
 </rules>
 
 <output_format>
 반드시 아래 TypeScript 타입을 준수하는 순수 JSON만 출력하십시오.
-JSON 외의 텍스트, 설명, 마크다운을 절대 출력하지 마십시오.
+JSON 외의 텍스트, 설명, 마크다운(``` 등)을 절대 출력하지 마십시오.
 
 interface StatusWindow {
+  // 기존 Key는 100% 유지(삭제 금지)하되, 상황에 따라 새로운 Key 추가 허용.
+  // Value가 숫자(예: 10, 100/100)면 산술 연산으로 증감.
+  // Value가 텍스트면 문맥에 맞게 상태 단어 갱신.
   uiBadges: Record<string, string>;
+
+  // NPC 상태 묘사 (부상, 감정 등)
+  // 예시: {"NPC": "오른팔 화상, 두려움"}
   characterConditionDesc: Record<string, string>;
+
   items: string[];
+
+  // 현재 위치나 환경
   places: string[];
 }
 </output_format>
@@ -674,10 +667,7 @@ interface StatusWindow {
 
         string prompt = $"""
 <previous_state>
-[시스템 스탯] {customStatsStr}
-[NPC 상태] {charsStr}
-[인벤토리] {itemsStr}
-[위치] {placesStr}
+{stateSnapshot}
 </previous_state>
 
 <latest_turn>
@@ -694,10 +684,10 @@ interface StatusWindow {
             SafetySettings: GetSafetySettings(safetyThreshold),
             GenerationConfig: new GenerationConfig(
                 Temperature: 0.6f,
-                MaxOutputTokens: 1024,
+                MaxOutputTokens: 8192,
                 ResponseMimeType: "application/json",
                 ResponseSchema: null,
-                ThinkingConfig: new ThinkingConfig(ThinkingLevel.low)
+                ThinkingConfig: new ThinkingConfig(ThinkingLevel.minimal)
             )
         );
     }
