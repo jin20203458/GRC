@@ -492,11 +492,19 @@ public partial class ChatViewModel : ObservableObject
             onStatusUpdated: (statusPayload) =>
             {
                 // UI 스레드 안전성 보장 및 갱신 Task 보관
-                _statusUpdateTask = Application.Current.Dispatcher.InvokeAsync(() =>
+                _statusUpdateTask = Application.Current.Dispatcher.InvokeAsync(async () =>
                 {
                     UpdateStatusUI(statusPayload.CustomStats, statusPayload.Chars, statusPayload.Items, statusPayload.Places);
                     _memoryService.UpdateContextStatus(statusPayload);
                     System.Diagnostics.Debug.WriteLine("[ChatViewModel] 백그라운드 상태창 갱신 UI 및 데이터 반영 완료");
+
+                    // 💡 [해결] 상태창이 갱신된 최종 메모리 세션을 파일에 즉시 영구 세이브!
+                    if (CurrentPreset != null)
+                    {
+                        var currentSession = _memoryService.ExportSession(CurrentPreset);
+                        await _sessionService.SaveSessionAsync(_currentFileName, currentSession);
+                        System.Diagnostics.Debug.WriteLine("[ChatViewModel] 상태창 갱신본 세션 디스크 영구 저장 완료");
+                    }
                 }).Task;
             },
             cancellationToken: _cancellationTokenSource.Token
