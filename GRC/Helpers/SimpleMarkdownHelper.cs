@@ -22,48 +22,99 @@ public static class SimpleMarkdownHelper
             string text = (string)e.NewValue ?? string.Empty;
             if (string.IsNullOrEmpty(text)) return;
 
-            // **bold**, *italic*, `code`, \n(줄바꿈)을 추출하는 정규식
-            var regex = new Regex(@"(\*\*.*?\*\*)|(\*.*?\*)|(`.*?`)|(\r?\n)");
-            int lastIndex = 0;
+            // 1. 줄바꿈 기준으로 행 분리
+            string[] lines = text.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
 
-            foreach (Match match in regex.Matches(text))
+            for (int i = 0; i < lines.Length; i++)
             {
-                // 이전 일반 텍스트 추가
-                if (match.Index > lastIndex)
+                string line = lines[i];
+                int headerLevel = 0;
+                string lineContent = line;
+
+                // 시작 부분의 # 개수 파악
+                while (headerLevel < line.Length && line[headerLevel] == '#')
                 {
-                    string plainText = text.Substring(lastIndex, match.Index - lastIndex);
-                    tb.Inlines.Add(new Run(plainText));
+                    headerLevel++;
                 }
 
-                string value = match.Value;
-                if (value.StartsWith("**") && value.EndsWith("**"))
+                // # 뒤에 공백이 있으면 헤더로 인식
+                if (headerLevel > 0 && headerLevel < line.Length && line[headerLevel] == ' ')
                 {
-                    string content = value.Substring(2, value.Length - 4);
-                    tb.Inlines.Add(new Bold(new Run(content)));
+                    lineContent = line.Substring(headerLevel + 1);
                 }
-                else if (value.StartsWith("*") && value.EndsWith("*"))
+                else
                 {
-                    string content = value.Substring(1, value.Length - 2);
-                    tb.Inlines.Add(new Italic(new Run(content)));
+                    headerLevel = 0; // 헤더가 아닌 일반 줄
                 }
-                else if (value.StartsWith("`") && value.EndsWith("`"))
+
+                // 한 줄을 담을 Span 생성
+                var span = new Span();
+
+                // 헤더 레벨에 따른 스타일 차등 부여
+                if (headerLevel == 1)
                 {
-                    string content = value.Substring(1, value.Length - 2);
-                    var codeRun = new Run(content) { Foreground = new SolidColorBrush(Color.FromRgb(242, 108, 79)) };
-                    tb.Inlines.Add(codeRun);
+                    span.FontSize = tb.FontSize + 4;
+                    span.FontWeight = FontWeights.Bold;
+                    span.Foreground = new SolidColorBrush(Color.FromRgb(242, 242, 242));
                 }
-                else if (value.Contains("\n"))
+                else if (headerLevel == 2)
+                {
+                    span.FontSize = tb.FontSize + 2;
+                    span.FontWeight = FontWeights.Bold;
+                    span.Foreground = new SolidColorBrush(Color.FromRgb(220, 220, 220));
+                }
+                else if (headerLevel >= 3)
+                {
+                    span.FontSize = tb.FontSize + 1;
+                    span.FontWeight = FontWeights.Bold;
+                    span.Foreground = new SolidColorBrush(Color.FromRgb(0, 139, 153)); // 청록색 포인트 테마
+                }
+
+                // 2. 해당 행 내부의 인라인 문법 파싱 (**, *, `)
+                var inlineRegex = new Regex(@"(\*\*.*?\*\*)|(\*.*?\*)|(`.*?`)");
+                int lastIndex = 0;
+
+                foreach (Match match in inlineRegex.Matches(lineContent))
+                {
+                    if (match.Index > lastIndex)
+                    {
+                        string plainText = lineContent.Substring(lastIndex, match.Index - lastIndex);
+                        span.Inlines.Add(new Run(plainText));
+                    }
+
+                    string value = match.Value;
+                    if (value.StartsWith("**") && value.EndsWith("**"))
+                    {
+                        string content = value.Substring(2, value.Length - 4);
+                        span.Inlines.Add(new Bold(new Run(content)));
+                    }
+                    else if (value.StartsWith("*") && value.EndsWith("*"))
+                    {
+                        string content = value.Substring(1, value.Length - 2);
+                        span.Inlines.Add(new Italic(new Run(content)));
+                    }
+                    else if (value.StartsWith("`") && value.EndsWith("`"))
+                    {
+                        string content = value.Substring(1, value.Length - 2);
+                        var codeRun = new Run(content) { Foreground = new SolidColorBrush(Color.FromRgb(242, 108, 79)) };
+                        span.Inlines.Add(codeRun);
+                    }
+
+                    lastIndex = match.Index + match.Length;
+                }
+
+                if (lastIndex < lineContent.Length)
+                {
+                    span.Inlines.Add(new Run(lineContent.Substring(lastIndex)));
+                }
+
+                tb.Inlines.Add(span);
+
+                // 마지막 줄이 아니면 개행 추가
+                if (i < lines.Length - 1)
                 {
                     tb.Inlines.Add(new LineBreak());
                 }
-
-                lastIndex = match.Index + match.Length;
-            }
-
-            // 남은 일반 텍스트 추가
-            if (lastIndex < text.Length)
-            {
-                tb.Inlines.Add(new Run(text.Substring(lastIndex)));
             }
         }
     }
