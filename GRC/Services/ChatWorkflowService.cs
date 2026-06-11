@@ -287,16 +287,8 @@ public class ChatWorkflowService(
         }
         catch (OperationCanceledException)
         {
-            // 생성 중단(Cancel) 처리
-            string interruptedText = fullResponse.ToString();
-            int statusCutIndex = interruptedText.IndexOf("<st");
-
-            if (statusCutIndex != -1)
-            {
-                interruptedText = interruptedText.Substring(0, statusCutIndex).TrimEnd();
-            }
-
-            result.FinalText = interruptedText + "\n\n*[시스템: 사용자에 의해 생성이 중단되었습니다.]*";
+            // 생성 중단(Cancel) 처리 — 서사 모델은 status 태그를 출력하지 않으므로 텍스트를 그대로 사용
+            result.FinalText = fullResponse.ToString().TrimEnd() + "\n\n*[시스템: 사용자에 의해 생성이 중단되었습니다.]*";
         }
         catch (Exception ex)
         {
