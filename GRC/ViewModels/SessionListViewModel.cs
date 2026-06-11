@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GRC.Services;
 using System;
@@ -39,7 +39,7 @@ public partial class SessionListViewModel : ObservableObject
     private bool _isLoading;
 
     // MainViewModel에게 "이 세션 열어줘!" 라고 알리는 이벤트 델리게이트
-    public event Action<string?, string?, string?, string?, string?>? SessionSelected;
+    public event Action<string?, string?, string?, string?, string?, string?>? SessionSelected;
     // SettingsViewModel으로 "설정 화면 보여줘!" 라고 알리는 이벤트 델리게이트
     public event Action? SettingsRequested;
     public SessionListViewModel(ISessionService sessionService)
@@ -116,7 +116,7 @@ public partial class SessionListViewModel : ObservableObject
         if (setupDialog.ShowDialog() == true)
         {
             // 3. 파일명은 null(새 대화)로 주고, 유저가 입력한 설정값들을 같이 전달
-            SessionSelected?.Invoke(null, setupDialog.InputName, setupDialog.InputWorldview, setupDialog.InputScenario, setupDialog.InputCustomStats);
+            SessionSelected?.Invoke(null, setupDialog.InputName, setupDialog.InputWorldview, setupDialog.InputScenario, setupDialog.InputCustomStats, setupDialog.InputStatusUpdateGuide);
         }
     }
 
@@ -127,7 +127,7 @@ public partial class SessionListViewModel : ObservableObject
     private void OpenSession(SessionSummary summary)
     {
         // 세계관과 시나리오는 null로 전달
-        SessionSelected?.Invoke(summary.FileName, null, null, null, null);
+        SessionSelected?.Invoke(summary.FileName, null, null, null, null, null);
     }
 
     /// <summary>

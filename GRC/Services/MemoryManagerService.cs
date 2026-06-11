@@ -621,7 +621,7 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
     /// 방금 완료된 1턴의 대화와 이전 상태 스냅샷만으로 상태창 갱신 전용 경량 API 요청을 생성합니다.
     /// 과거 대화 기록을 주지 않음으로써 맥락 간섭을 원천 차단합니다.
     /// </summary>
-    public GeminiRequest BuildStatusRequest(string userAction, string modelNarrative, BlockThreshold safetyThreshold)
+    public GeminiRequest BuildStatusRequest(string userAction, string modelNarrative, string statusUpdateGuide, BlockThreshold safetyThreshold)
     {
         // 현재 상태 스냅샷 (이전 턴까지의 누적 상태) — Plot 제외 (스레드 안전 lock 적용)
         string stateSnapshot;
@@ -640,7 +640,7 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
 3. 아이템: 명시적인 획득/소비 묘사가 <latest_turn>에 존재할 때만 증감.
 4. NPC 상태(characterConditionDesc): 부상, 감정 변화 등이 묘사된 경우에만 갱신.
 5. 변화가 없는 항목은 이전 값을 그대로 유지.
-6. uiBadges의 기존 Key는 삭제하지 말고 100% 보존하되, 새로운 동료나 스탯 추적을 위해 새로운 Key를 추가하는 것은 허용합니다.
+6. uiBadges의 기존 Key는 삭제하지 말고 100% 보존하되, 새로운 동료나 스탯 추적을 위해 새로운 Key를 추가하는 것은 허용합니다.[CUSTOM_RULES]
 </rules>
 
 <output_format>
@@ -677,6 +677,13 @@ interface StatusWindow {
 
 위 <latest_turn>의 내용만을 바탕으로 <previous_state>를 갱신한 JSON을 즉시 출력하십시오.
 """;
+
+
+        string customRulesBlock = !string.IsNullOrWhiteSpace(statusUpdateGuide)
+            ? $"\n7. [상태창 갱신가이드 지침]\n{statusUpdateGuide}"
+            : "";
+
+        systemPrompt = systemPrompt.Replace("[CUSTOM_RULES]", customRulesBlock);
 
         return new GeminiRequest(
             SystemInstruction: new Content("system", [new Part(systemPrompt)]),

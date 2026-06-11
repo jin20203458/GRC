@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -19,6 +19,7 @@ public partial class NewSessionSetupWindow : Window
 
     public string InputName => NameTextBox.Text;
     public string InputWorldview => WorldviewTextBox.Text;
+    public string InputStatusUpdateGuide => StatusUpdateGuideTextBox.Text;
     public string InputScenario => ScenarioTextBox.Text;
 
     // 💡 기존 텍스트박스 값을 읽어오던 것을 리스트 조립으로 변경 (다른 파일 수정 불필요)

@@ -13,7 +13,7 @@ public interface IMemoryManagerService
     /// <summary>
     /// 방금 완료된 1턴의 대화와 이전 상태 스냅샷만으로 상태창 갱신 전용 경량 API 요청을 생성합니다.
     /// </summary>
-    GeminiRequest BuildStatusRequest(string userAction, string modelNarrative, BlockThreshold safetyThreshold);
+    GeminiRequest BuildStatusRequest(string userAction, string modelNarrative, string statusUpdateGuide, BlockThreshold safetyThreshold);
 
     /// <summary>
     /// 모델의 응답을 단기 기억에 추가합니다.

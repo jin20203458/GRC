@@ -261,7 +261,7 @@ public class ChatWorkflowService(
                     try
                     {
                         var statusRequest = memoryService.BuildStatusRequest(
-                            userMessage.Text, responseText, currentSettings.SafetyThreshold);
+                            userMessage.Text, responseText, preset.StatusUpdateGuide, currentSettings.SafetyThreshold);
 
                         string statusResponse = await apiService.SendMessageAsync(statusRequest, ModelTier.FlashLite);
                         Debug.WriteLine($"[StatusAPI - BG] 상태창 갱신 응답 수신 (앞 100자): {statusResponse?.Substring(0, Math.Min(100, statusResponse?.Length ?? 0))}");

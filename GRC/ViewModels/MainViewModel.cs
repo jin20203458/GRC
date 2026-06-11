@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using GRC.Services;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -50,7 +50,7 @@ public partial class MainViewModel : ObservableObject
         audioService.SetTypingSoundVolume(settings.TypingSoundVolume);
         audioService.SetTypingSoundState(settings.IsTypingSoundEnabled);
     }
-    private async void OnSessionSelected(string? fileName, string? presetName, string? worldview, string? scenario, string? customStats)
+    private async void OnSessionSelected(string? fileName, string? presetName, string? worldview, string? scenario, string? customStats, string? statusUpdateGuide)
     {
         try
         {
@@ -61,7 +61,7 @@ public partial class MainViewModel : ObservableObject
             _currentChatVm.RequestGoBack += NavigateToSessionList;
 
             // 3. 채팅방 초기화 및 화면 전환
-            await _currentChatVm.InitializeWithSession(fileName, presetName, worldview, scenario, customStats);
+            await _currentChatVm.InitializeWithSession(fileName, presetName, worldview, scenario, customStats, statusUpdateGuide);
             CurrentPage = _currentChatVm;
         }
         catch (Exception ex)

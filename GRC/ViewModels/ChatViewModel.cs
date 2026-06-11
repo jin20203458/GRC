@@ -145,7 +145,7 @@ public partial class ChatViewModel : ObservableObject
     // ==========================================
     // [4. 초기화 로직 (화면 진입 시 호출)]
     // ==========================================
-    public async Task InitializeWithSession(string? fileName, string? customName = null, string? customWorldview = null, string? initialScenario = null, string? initialCustomStats = null)
+    public async Task InitializeWithSession(string? fileName, string? customName = null, string? customWorldview = null, string? initialScenario = null, string? initialCustomStats = null, string? initialStatusUpdateGuide = null)
     {
         IsBusy = true;
         ChatHistory.Clear();
@@ -164,7 +164,7 @@ public partial class ChatViewModel : ObservableObject
 
                 var customStatsDict = GRC.Helpers.ChatDataHelper.ParseCustomStats(initialCustomStats);
 
-                CurrentPreset = basePreset with { Name = finalName, Worldview = finalWorldview };
+                CurrentPreset = basePreset with { Name = finalName, Worldview = finalWorldview, StatusUpdateGuide = initialStatusUpdateGuide ?? "" };
                 _memoryService.UpdateContextStatus(new StatusPayload { CustomStats = customStatsDict });
 
                 _currentFileName = GRC.Helpers.ChatDataHelper.GenerateSessionFileName(finalName);
@@ -260,12 +260,12 @@ public partial class ChatViewModel : ObservableObject
         }
 
         // 2. 다이얼로그 호출
-        var result = _dialogService.ShowEditWorldviewDialog(CurrentPreset.Worldview, latestStats, currentScenario);
+        var result = _dialogService.ShowEditWorldviewDialog(CurrentPreset.Worldview, latestStats, currentScenario, CurrentPreset.StatusUpdateGuide);
 
         if (result.HasValue && result.Value.IsSaved)
         {
             var customStatsDict = GRC.Helpers.ChatDataHelper.ParseCustomStats(result.Value.CustomStats);
-            CurrentPreset = CurrentPreset with { Worldview = result.Value.Worldview, CustomStats = customStatsDict };
+            CurrentPreset = CurrentPreset with { Worldview = result.Value.Worldview, CustomStats = customStatsDict, StatusUpdateGuide = result.Value.StatusUpdateGuide };
 
             await _presetService.SavePresetAsync(_currentFileName, CurrentPreset);
             _memoryService.UpdateContextStatus(new StatusPayload { CustomStats = customStatsDict });

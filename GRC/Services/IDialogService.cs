@@ -1,4 +1,4 @@
-﻿using GRC.Models;
+using GRC.Models;
 using GRC.Views;
 using System;
 using System.Collections.Generic;
@@ -9,7 +9,7 @@ namespace GRC.Services;
 
 public interface IDialogService
 {
-    (bool IsSaved, string Worldview, string CustomStats, string? InitialScenario)? ShowEditWorldviewDialog(string currentWorldview, Dictionary<string, string>? currentStats, string currentScenario);
+    (bool IsSaved, string Worldview, string CustomStats, string? InitialScenario, string StatusUpdateGuide)? ShowEditWorldviewDialog(string currentWorldview, Dictionary<string, string>? currentStats, string currentScenario, string currentStatusUpdateGuide);
     List<LorebookEntry>? ShowEditLorebookDialog(List<LorebookEntry>? currentLorebooks);
     void ShowStatusWindow(object viewModel);
     void ShowStoryHistoryWindow(object viewModel);
@@ -21,11 +21,11 @@ public interface IDialogService
 
 public class DialogService : IDialogService
 {
-    public (bool IsSaved, string Worldview, string CustomStats, string? InitialScenario)? ShowEditWorldviewDialog(string currentWorldview, Dictionary<string, string>? currentStats, string currentScenario)
+    public (bool IsSaved, string Worldview, string CustomStats, string? InitialScenario, string StatusUpdateGuide)? ShowEditWorldviewDialog(string currentWorldview, Dictionary<string, string>? currentStats, string currentScenario, string currentStatusUpdateGuide)
     {
-        var dialog = new EditWorldviewWindow(currentWorldview, currentStats, currentScenario);
+        var dialog = new EditWorldviewWindow(currentWorldview, currentStats, currentScenario, currentStatusUpdateGuide);
         if (dialog.ShowDialog() == true)
-            return (true, dialog.InputWorldview, dialog.InputCustomStats, dialog.ChangedInitialScenario);
+            return (true, dialog.InputWorldview, dialog.InputCustomStats, dialog.ChangedInitialScenario, dialog.InputStatusUpdateGuide);
         return null;
     }
 

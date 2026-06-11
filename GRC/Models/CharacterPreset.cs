@@ -1,4 +1,4 @@
-﻿namespace GRC.Models;
+namespace GRC.Models;
 
 /// <summary>
 /// AI 챗봇의 페르소나 및 세팅 값을 정의하는 객체
@@ -10,5 +10,6 @@ public record CharacterPreset(
     float Temperature = 1.0f,    // 창의성 수치
     int MaxOutputTokens = 4096,   // 한 번에 출력할 최대 토큰 수
     List<LorebookEntry>? Lorebooks = null,
-    Dictionary<string, string>? CustomStats = null
+    Dictionary<string, string>? CustomStats = null,
+    string StatusUpdateGuide = ""
 );

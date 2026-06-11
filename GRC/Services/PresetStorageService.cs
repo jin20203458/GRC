@@ -1,4 +1,4 @@
-﻿using GRC.Models;
+using GRC.Models;
 using System;
 using System.IO;
 using System.Text.Json;
@@ -80,7 +80,7 @@ public class PresetStorageService : IPresetStorageService
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[Preset Load Error]: {ex.Message}");
-            return new CharacterPreset("오류 복구용", "임시 세계관", "시스템 에러", 1.0f, 4096);
+            return new CharacterPreset("오류 복구용", "임시 세계관", "시스템 에러", 1.0f, 4096, StatusUpdateGuide: "");
         }
     }
 

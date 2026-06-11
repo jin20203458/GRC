@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -19,6 +19,7 @@ public partial class EditWorldviewWindow : Window
     }
 
     public string InputWorldview => WorldviewTextBox.Text;
+    public string InputStatusUpdateGuide => StatusUpdateGuideTextBox.Text;
 
     // 백엔드로 넘겨줄 문자열 형태 조립 (예: "체력: 100, 골드: 10")
     public string InputCustomStats
@@ -30,10 +31,11 @@ public partial class EditWorldviewWindow : Window
         }
     }
 
-    public EditWorldviewWindow(string currentWorldview, Dictionary<string, string>? currentStats, string currentScenario = "")
+    public EditWorldviewWindow(string currentWorldview, Dictionary<string, string>? currentStats, string currentScenario = "", string currentStatusUpdateGuide = "")
     {
         InitializeComponent();
         WorldviewTextBox.Text = currentWorldview;
+        StatusUpdateGuideTextBox.Text = currentStatusUpdateGuide;
         CustomStatsItemsControl.ItemsSource = StatItems;
         _currentInitialScenario = currentScenario; // 초기 시나리오 보관
 
