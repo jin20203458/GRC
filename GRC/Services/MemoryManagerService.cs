@@ -99,6 +99,14 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
 - 독백: 「 」
 - 상태창 수치(%, HP 분수, 골드 액수 등)나 시스템 용어를 서사에 날것으로 노출하지 말고, 신체 상태나 간접적인 묘사로 승화하십시오.
 </syntax_rules>
+
+<example>
+바람이 스산하게 창문을 두드렸다. 방 안은 기묘하리만치 조용했다.
+"누구 계신가요?"
+목소리가 허공에 흩어지자, 어둠이 더 짙어지는 기분이 들었다.
+「아무도 없는 건가.」
+조심스레 주변을 살피며 앞으로 발을 내디뎠다.
+</example>
 """;
 
 
