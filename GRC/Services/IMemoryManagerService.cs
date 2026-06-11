@@ -1,4 +1,4 @@
-﻿using GRC.Models;
+using GRC.Models;
 using System.Threading.Tasks;
 
 namespace GRC.Services;
@@ -6,9 +6,14 @@ namespace GRC.Services;
 public interface IMemoryManagerService
 {
     /// <summary>
-    /// 현재 유저 메시지와 프리셋, 그리고 기억된 문맥을 조합해 최종 API 요청 객체를 생성합니다.
+    /// 현재 유저 메시지와 프리셋, 그리고 기억된 문맥을 조합해 서사 전용 API 요청 객체를 생성합니다.
     /// </summary>
-    Task<GeminiRequest> BuildRequestAsync(ChatMessage userMessage, CharacterPreset preset, string? metaDirective = null);
+    Task<GeminiRequest> BuildNarrativeRequestAsync(ChatMessage userMessage, CharacterPreset preset, string? metaDirective = null);
+
+    /// <summary>
+    /// 방금 완료된 1턴의 대화와 이전 상태 스냅샷만으로 상태창 갱신 전용 경량 API 요청을 생성합니다.
+    /// </summary>
+    GeminiRequest BuildStatusRequest(string userAction, string modelNarrative, BlockThreshold safetyThreshold);
 
     /// <summary>
     /// 모델의 응답을 단기 기억에 추가합니다.

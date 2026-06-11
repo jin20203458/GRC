@@ -67,7 +67,7 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
         }
     }
 
-    public async Task<GeminiRequest> BuildRequestAsync(ChatMessage userMessage, CharacterPreset preset, string? metaDirective = null)
+    public async Task<GeminiRequest> BuildNarrativeRequestAsync(ChatMessage userMessage, CharacterPreset preset, string? metaDirective = null)
     {
         lock (_shortTermMemory)
         {
@@ -90,10 +90,10 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
         {
             _ = Task.Run(async () => await CompressToMediumTermAsync());
         }
+
         string formatRule = """
 <output_structure>
-1. 서사 전개 (최상단)
-2. <status> JSON 데이터 (최하단)
+서사 전개만 출력. 상태창(JSON)은 출력하지 마십시오.
 </output_structure>
 
 <syntax_rules>
@@ -108,32 +108,6 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
 "누구 계신가요?"
 「아무도 없는 건가.」
 </example>
-
-<status_protocol>
-<current_snapshot> 기반 상태 갱신 제약:
-- 수치형: "100/100" 형태는 [0~최대치] 이탈 불가(Clamping). 단일 숫자(예: 1000)는 무제한 연산.
-- 아이템: 명시적인 획득/소비 묘사가 발생할 때만 증감.
-
-[Output Schema]
-반드시 아래 TypeScript 타입을 준수하는 순수 JSON을 <status> 태그 내에 작성.
-(※ 주의: <status> 태그 내부에 마크다운 코드블록(```) 절대 금지)
-
-interface StatusWindow {
-  // Key:100% 유지. Value:상황에 맞게 갱신.
-  // Value가 숫자(예: 10, 100/100)면 산술 연산으로 증감.
-  // Value가 텍스트면 문맥에 맞게 상태 단어 갱신.
-  uiBadges: Record<string, string>; 
-
-  // NPC 상태 묘사 (부상, 감정 등)
-  // 예시: {"NPC": "오른팔 화상, 두려움"}
-  characterConditionDesc: Record<string, string>;
-
-  items: string[];
-
-  // 현재 위치나 환경
-  places: string[];
-}
-</status_protocol>
 """;
 
 
@@ -203,8 +177,7 @@ interface StatusWindow {
             </current_action>
             
             <final_instruction>
-            지시: 위 문맥을 바탕으로 유저의 <current_action>에 대한 서사적 묘사 즉각 진행. 
-            묘사가 끝난 직후, 현재 상태 데이터를 가감 계산하여 반드시 최하단에 <status> (순수 JSON) </status> 태그 출력.
+            지시: 위 문맥을 바탕으로 유저의 <current_action>에 대한 서사적 묘사를 즉각 진행하십시오.
             </final_instruction>
             """;
                 }
@@ -652,6 +625,81 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
                 _totalTurnCount = Math.Max(0, _totalTurnCount - 1);
             }
         }
+    }
+    /// <summary>
+    /// 방금 완료된 1턴의 대화와 이전 상태 스냅샷만으로 상태창 갱신 전용 경량 API 요청을 생성합니다.
+    /// 과거 대화 기록을 주지 않음으로써 맥락 간섭을 원천 차단합니다.
+    /// </summary>
+    public GeminiRequest BuildStatusRequest(string userAction, string modelNarrative, BlockThreshold safetyThreshold)
+    {
+        // 현재 상태 스냅샷 (이전 턴까지의 누적 상태)
+        string customStatsStr = _currentContext.CustomStats.Count > 0
+            ? string.Join(", ", _currentContext.CustomStats.Select(x => $"[{x.Key}]: {x.Value}"))
+            : "없음";
+        string charsStr = _currentContext.Chars.Count > 0
+            ? string.Join("\n  * ", _currentContext.Chars.Select(x => $"{x.Key}: {x.Value}"))
+            : "없음";
+        string itemsStr = _currentContext.Items.Count > 0
+            ? string.Join(", ", _currentContext.Items.Select(i => $"[{i}]"))
+            : "없음";
+        string placesStr = _currentContext.Places.Count > 0
+            ? string.Join(", ", _currentContext.Places.Select(p => $"[{p}]"))
+            : "없음";
+
+        string systemPrompt = """
+<role>상태창 갱신 전문가</role>
+<task>방금 완료된 1턴의 대화만을 분석하여 이전 상태 데이터를 정확히 갱신하십시오.</task>
+
+<rules>
+1. 오직 <latest_turn>에 묘사된 사건만 반영하십시오. 과거 대화나 추측은 절대 반영 금지.
+2. 수치형("100/100" 형태)은 [0~최대치] 범위 이탈 불가(Clamping). 단일 숫자(예: 1000)는 무제한 연산.
+3. 아이템: 명시적인 획득/소비 묘사가 <latest_turn>에 존재할 때만 증감.
+4. NPC 상태(characterConditionDesc): 부상, 감정 변화 등이 묘사된 경우에만 갱신.
+5. 변화가 없는 항목은 이전 값을 그대로 유지.
+6. uiBadges의 Key는 절대 추가/삭제하지 말 것. Value만 갱신.
+</rules>
+
+<output_format>
+반드시 아래 TypeScript 타입을 준수하는 순수 JSON만 출력하십시오.
+JSON 외의 텍스트, 설명, 마크다운을 절대 출력하지 마십시오.
+
+interface StatusWindow {
+  uiBadges: Record<string, string>;
+  characterConditionDesc: Record<string, string>;
+  items: string[];
+  places: string[];
+}
+</output_format>
+""";
+
+        string prompt = $"""
+<previous_state>
+[시스템 스탯] {customStatsStr}
+[NPC 상태] {charsStr}
+[인벤토리] {itemsStr}
+[위치] {placesStr}
+</previous_state>
+
+<latest_turn>
+[유저 행동] {userAction}
+[서사 묘사] {modelNarrative}
+</latest_turn>
+
+위 <latest_turn>의 내용만을 바탕으로 <previous_state>를 갱신한 JSON을 즉시 출력하십시오.
+""";
+
+        return new GeminiRequest(
+            SystemInstruction: new Content("system", [new Part(systemPrompt)]),
+            Contents: [new Content("user", [new Part(prompt)])],
+            SafetySettings: GetSafetySettings(safetyThreshold),
+            GenerationConfig: new GenerationConfig(
+                Temperature: 0.6f,
+                MaxOutputTokens: 1024,
+                ResponseMimeType: "application/json",
+                ResponseSchema: null,
+                ThinkingConfig: new ThinkingConfig(ThinkingLevel.low)
+            )
+        );
     }
 
     private List<SafetySetting> GetSafetySettings(BlockThreshold threshold) => [

@@ -107,7 +107,6 @@ public class ChatWorkflowService(
     {
         var result = new ChatStreamResult();
         StringBuilder fullResponse = new();
-        StringBuilder statusBuffer = new();
 
         var currentSettings = await appSettingsService.LoadSettingsAsync();
         int currentChatDelay = currentSettings.ChatDelay;
@@ -117,7 +116,8 @@ public class ChatWorkflowService(
 
         try
         {
-            var requestPayload = await memoryService.BuildRequestAsync(userMessage, preset, metaDirective);
+            // [호출 1] 서사 전용 API 요청 빌드 (Temperature=preset.Temperature, 서사만 출력)
+            var requestPayload = await memoryService.BuildNarrativeRequestAsync(userMessage, preset, metaDirective);
 
             if (memoryService.ConsumeAnchorFlag() && requestPayload.GenerationConfig != null)
             {
@@ -135,7 +135,7 @@ public class ChatWorkflowService(
                 {
                     onCharReceived?.Invoke(c);
 
-                    if (c == '"' || c == '“' || c == '”')
+                    if (c == '"' || c == '\u201c' || c == '\u201d')
                     {
                         uiIsDialogue = !uiIsDialogue;
                         if (!uiIsDialogue) // 대사가 끝나는 시점
@@ -171,13 +171,12 @@ public class ChatWorkflowService(
             }, cancellationToken);
 
             // ==============================================================
-            // [생산자]: 스트리밍 수신 및 버퍼 파싱 태스크 (빠르게 다운로드)
+            // [생산자]: 스트리밍 수신 태스크 (서사 텍스트 전체를 채널로 전달)
             // ==============================================================
             var producerTask = Task.Run(async () =>
             {
                 try
                 {
-                    bool isStatusTagStarted = false;
                     bool isDialogue = false;
                     bool isThought = false;
 
@@ -189,65 +188,41 @@ public class ChatWorkflowService(
                         foreach (char c in chunk)
                         {
                             fullResponse.Append(c);
-                            string currentFullText = fullResponse.ToString();
 
-                            // 상태창 태그 파싱
-                            if (!isStatusTagStarted && currentFullText.EndsWith("<status>"))
+                            // 모든 텍스트를 UI 채널로 전달 (서사 모델은 status 태그를 출력하지 않음)
+                            channel.Writer.TryWrite(c);
+
+                            if (c == '「' || c == '」')
                             {
-                                isStatusTagStarted = true;
-                                continue;
+                                isThought = !isThought;
                             }
-                            else if (isStatusTagStarted && currentFullText.EndsWith("</status>"))
+                            else if (c == '"' || c == '\u201c' || c == '\u201d')
                             {
-                                isStatusTagStarted = false;
-                                continue;
-                            }
+                                isDialogue = !isDialogue;
 
-                            if (isStatusTagStarted)
-                            {
-                                statusBuffer.Append(c);
-                                continue;
-                            }
-
-                            // 일반 텍스트 처리
-                            if (!isStatusTagStarted)
-                            {
-                                // 백그라운드에서 버퍼(채널)로 빛의 속도로 던짐 (UI 스레드 간섭 X)
-                                channel.Writer.TryWrite(c);
-
-                                if (c == '「' || c == '」')
+                                if (isDialogue)
                                 {
-                                    isThought = !isThought;
+                                    dialogueBuffer.Clear();
                                 }
-                                else if (c == '"' || c == '“' || c == '”')
+                                else
                                 {
-                                    isDialogue = !isDialogue;
+                                    string completedDialogue = dialogueBuffer.ToString().Trim();
+                                    string contextualNarration = narrationBuffer.ToString().Trim();
 
-                                    if (isDialogue)
+                                    if (!string.IsNullOrWhiteSpace(completedDialogue) && onDialoguePrefetch != null)
                                     {
-                                        dialogueBuffer.Clear();
+                                        prefetchTasks.Enqueue(onDialoguePrefetch(contextualNarration, completedDialogue));
                                     }
-                                    else
-                                    {
-                                        string completedDialogue = dialogueBuffer.ToString().Trim();
-                                        string contextualNarration = narrationBuffer.ToString().Trim();
-
-                                        // 💡 신버전 로직: 대사와 서사를 함께 TTS 엔진에 예약
-                                        if (!string.IsNullOrWhiteSpace(completedDialogue) && onDialoguePrefetch != null)
-                                        {
-                                            prefetchTasks.Enqueue(onDialoguePrefetch(contextualNarration, completedDialogue));
-                                        }
-                                        narrationBuffer.Clear();
-                                    }
+                                    narrationBuffer.Clear();
                                 }
-                                else if (isDialogue)
-                                {
-                                    dialogueBuffer.Append(c);
-                                }
-                                else if (!isThought && c != '\n' && c != '\r')
-                                {
-                                    narrationBuffer.Append(c);
-                                }
+                            }
+                            else if (isDialogue)
+                            {
+                                dialogueBuffer.Append(c);
+                            }
+                            else if (!isThought && c != '\n' && c != '\r')
+                            {
+                                narrationBuffer.Append(c);
                             }
                         }
                     }
@@ -261,48 +236,48 @@ public class ChatWorkflowService(
 
             await producerTask;
 
-            // 2. 다운로드가 끝났으므로 텍스트 정제 및 상태창 데이터 역직렬화를 미리 수행합니다.
+            // 서사 텍스트 정제 (마크다운 찌꺼기 제거)
             string responseText = fullResponse.ToString();
-            if (statusBuffer.Length > 0)
-            {
-                string? cleanJson = GRC.Helpers.LlmJsonParser.ExtractJson(statusBuffer.ToString());
-                if (!string.IsNullOrEmpty(cleanJson))
-                    result.StatusPayload = GRC.Helpers.LlmJsonParser.DeserializeSafe<StatusPayload>(cleanJson);
-            }
 
-            if (statusBuffer.Length > 0)
-            {
-                string? cleanJson = GRC.Helpers.LlmJsonParser.ExtractJson(statusBuffer.ToString());
-                if (!string.IsNullOrEmpty(cleanJson))
-                {
-                    result.StatusPayload = GRC.Helpers.LlmJsonParser.DeserializeSafe<StatusPayload>(cleanJson);
-                }
-            }
+            responseText = Regex.Replace(responseText, @"\*\*\s*([""「])", "$1");
+            responseText = Regex.Replace(responseText, @"([""」])\s*\*\*", "$1");
 
-            int statusStartIndex = responseText.IndexOf("<status>");
-            if (statusStartIndex != -1)
+            if (string.IsNullOrWhiteSpace(responseText))
             {
-                responseText = responseText.Substring(0, statusStartIndex).Trim();
+                responseText = "*(서사가 생성되었습니다)*";
             }
-            else
-            {
-                int lastBracket = responseText.LastIndexOf('<');
-                if (lastBracket != -1 && "<status>".StartsWith(responseText.Substring(lastBracket)))
-                {
-                    responseText = responseText.Substring(0, lastBracket).Trim();
-                }
-            }
-
-            if (string.IsNullOrEmpty(responseText))
-            {
-                responseText = "*(상태가 갱신되었습니다)*";
-            }
-
-            // 불필요한 마크다운 찌꺼기 제거
-            responseText = Regex.Replace(responseText, @"\*\*\s*([""“”「])", "$1");
-            responseText = Regex.Replace(responseText, @"([""“”」])\s*\*\*", "$1");
 
             result.FinalText = responseText;
+
+            // ==============================================================
+            // [호출 2] 상태창 갱신 API (Temperature=0.6, FlashLite, 방금 1턴 대화만 입력)
+            // 서사 스트리밍 완료 후 실행 — 과거 대화 기록 없이 현재 턴만 분석하여 정확도 극대화
+            // ==============================================================
+            if (!cancellationToken.IsCancellationRequested && !string.IsNullOrWhiteSpace(responseText))
+            {
+                try
+                {
+                    var statusRequest = memoryService.BuildStatusRequest(
+                        userMessage.Text, responseText, currentSettings.SafetyThreshold);
+
+                    string statusResponse = await apiService.SendMessageAsync(statusRequest, ModelTier.FlashLite);
+                    Debug.WriteLine($"[StatusAPI] 상태창 갱신 응답 수신 (앞 100자): {statusResponse?.Substring(0, Math.Min(100, statusResponse?.Length ?? 0))}");
+
+                    if (!string.IsNullOrWhiteSpace(statusResponse) && !statusResponse.StartsWith("[System"))
+                    {
+                        string? cleanJson = GRC.Helpers.LlmJsonParser.ExtractJson(statusResponse);
+                        if (!string.IsNullOrEmpty(cleanJson))
+                        {
+                            result.StatusPayload = GRC.Helpers.LlmJsonParser.DeserializeSafe<StatusPayload>(cleanJson);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // 상태 갱신 실패 시 서사는 정상 반환, 상태만 이전 값 유지 (Graceful Degradation)
+                    Debug.WriteLine($"[StatusAPI Error] 상태창 갱신 실패, 이전 상태 유지: {ex.Message}");
+                }
+            }
 
             if (onDownloadComplete != null && result.IsSuccess)
             {
