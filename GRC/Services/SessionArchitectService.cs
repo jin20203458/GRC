@@ -387,7 +387,7 @@ public class SessionArchitectService : ISessionArchitectService
         // 5. 초기 세션 구성
         var chapterContext = new ChapterContext
         {
-            Plot = session.GeneratedScenario ?? "새로운 모험이 시작됩니다.",
+            Plot = "[제 1장] 새로운 이야기가 시작되었습니다.",
             CustomStats = session.GeneratedStats ?? new()
         };
 
