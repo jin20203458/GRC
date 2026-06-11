@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -52,7 +52,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Config\google-credentials.json">
+    <Content Include="Config\google-credentials.json" Condition="Exists('Config\google-credentials.json')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

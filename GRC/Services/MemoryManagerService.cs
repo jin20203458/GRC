@@ -105,7 +105,6 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
 "누구 계신가요?"
 목소리가 허공에 흩어지자, 어둠이 더 짙어지는 기분이 들었다.
 「아무도 없는 건가.」
-조심스레 주변을 살피며 앞으로 발을 내디뎠다.
 </example>
 """;
 
