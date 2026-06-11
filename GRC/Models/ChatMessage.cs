@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.Text.Json.Serialization;
 using static System.Net.Mime.MediaTypeNames;
@@ -11,15 +11,19 @@ namespace GRC.Models;
 /// </summary>
 public partial class ChatMessage : ObservableObject
 {
-    public string Role { get; set; }
+    public string Role { get; set; } = "";
 
     [ObservableProperty]
-    private string _text;
+    private string _text = "";
 
     public DateTime Timestamp { get; set; }
 
     // JSON 파싱을 위한 기본 생성자
-    public ChatMessage() { }
+    public ChatMessage() 
+    { 
+        Role = "";
+        _text = "";
+    }
 
     [JsonConstructor]
     public ChatMessage(string role, string text, DateTime timestamp)

@@ -1,4 +1,4 @@
-﻿using GRC.Models;
+using GRC.Models;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -13,8 +13,8 @@ public partial class EditLorebookWindow : Window, INotifyPropertyChanged
     public ObservableCollection<EditableLorebookEntry> LorebookItems { get; set; } = new();
 
     // 현재 선택된 로어북 (우측 편집 영역에 바인딩됨)
-    private EditableLorebookEntry _selectedLorebook;
-    public EditableLorebookEntry SelectedLorebook
+    private EditableLorebookEntry? _selectedLorebook;
+    public EditableLorebookEntry? SelectedLorebook
     {
         get => _selectedLorebook;
         set

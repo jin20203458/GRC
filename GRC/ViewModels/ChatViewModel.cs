@@ -481,7 +481,7 @@ public partial class ChatViewModel : ObservableObject
                         // 방금 서버에서 받아온 AI의 답변을 임시 메모리에 덧붙임
                         tempMemory.Add(new ChatMessage("model", streamResult.FinalText, DateTime.Now));
 
-                        string currentContext = _memoryService.CurrentContext.ToPromptString();
+                        string currentContext = _memoryService.CurrentContext?.ToPromptString() ?? "";
 
                         // 백그라운드에서 추천 답변 생성
                         _prefetchedSuggestions = await _suggestionService.GenerateAsync(currentContext, tempMemory);

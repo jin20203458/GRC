@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -20,7 +20,7 @@ public class MessageRoleplayConverter : IMultiValueConverter
 
     private static readonly Regex _splitPattern = new(@"(「.*?(?:」|$)|[""“”].*?(?:[""“”]|$))", RegexOptions.Singleline | RegexOptions.Compiled);
 
-    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    public object? Convert(object[]? values, Type targetType, object? parameter, CultureInfo culture)
     {
         if (values == null || values.Length < 2) return null;
 

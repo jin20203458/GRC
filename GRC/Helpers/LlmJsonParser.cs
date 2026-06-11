@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text.Json;
 
 namespace GRC.Helpers 
@@ -60,7 +60,7 @@ namespace GRC.Helpers
         /// </summary>
         public static T? DeserializeSafe<T>(string rawResponse) where T : class
         {
-            string cleanJson = ExtractJson(rawResponse);
+            string? cleanJson = ExtractJson(rawResponse);
             if (cleanJson == null) return null;
 
             try
@@ -138,7 +138,7 @@ namespace GRC.Helpers
         /// </summary>
         public static T? DeserializeArraySafe<T>(string rawResponse) where T : class
         {
-            string cleanJson = ExtractJsonArray(rawResponse);
+            string? cleanJson = ExtractJsonArray(rawResponse);
             if (cleanJson == null) return null;
 
             try

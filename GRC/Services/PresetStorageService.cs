@@ -87,7 +87,7 @@ public class PresetStorageService : IPresetStorageService
     public async Task SavePresetAsync(string? sessionFileName, CharacterPreset preset)
     {
         string filePath = GetFilePath(sessionFileName);
-        string directory = Path.GetDirectoryName(filePath);
+        string? directory = Path.GetDirectoryName(filePath);
 
         if (directory != null && !Directory.Exists(directory))
         {

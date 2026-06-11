@@ -273,7 +273,7 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
                 // 4. 파싱: 기존 ParseLongTermSummary와 유사하게 <plot> 이후만 추출
                 string newPlot = ParseMediumTermPlot(response);
 
-                ChapterContext targetBufferForLongTerm = null;
+                ChapterContext? targetBufferForLongTerm = null;
                 lock (_shortTermMemory)
                 {
                     if (_shortTermVersion != expectedVersion) return;
