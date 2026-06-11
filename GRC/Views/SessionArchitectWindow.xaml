@@ -338,8 +338,43 @@
             </Border.Style>
             <StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                    <Ellipse Width="6" Height="6" Fill="#4DA6FF" VerticalAlignment="Center" />
-                    <TextBlock FontSize="11" Foreground="#4DA6FF" FontWeight="Bold" Margin="6,0,0,0" Text="🤖 AI가 답변을 구성하는 중..." />
+                    <TextBlock FontSize="11" Foreground="#AAB2C0" FontWeight="Bold" VerticalAlignment="Center" Text="AI가 답변을 구성하는 중" />
+                    <StackPanel Orientation="Horizontal" Margin="6,2,0,0" VerticalAlignment="Center">
+                        <Ellipse x:Name="Dot1" Width="3.5" Height="3.5" Margin="1.5,0" Fill="#AAB2C0" Opacity="0.3" />
+                        <Ellipse x:Name="Dot2" Width="3.5" Height="3.5" Margin="1.5,0" Fill="#AAB2C0" Opacity="0.3" />
+                        <Ellipse x:Name="Dot3" Width="3.5" Height="3.5" Margin="1.5,0" Fill="#AAB2C0" Opacity="0.3" />
+                        <StackPanel.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation
+                                            AutoReverse="True"
+                                            Storyboard.TargetName="Dot1"
+                                            Storyboard.TargetProperty="Opacity"
+                                            From="0.3"
+                                            To="1.0"
+                                            Duration="0:0:0.3" />
+                                        <DoubleAnimation
+                                            AutoReverse="True"
+                                            BeginTime="0:0:0.15"
+                                            Storyboard.TargetName="Dot2"
+                                            Storyboard.TargetProperty="Opacity"
+                                            From="0.3"
+                                            To="1.0"
+                                            Duration="0:0:0.3" />
+                                        <DoubleAnimation
+                                            AutoReverse="True"
+                                            BeginTime="0:0:0.3"
+                                            Storyboard.TargetName="Dot3"
+                                            Storyboard.TargetProperty="Opacity"
+                                            From="0.3"
+                                            To="1.0"
+                                            Duration="0:0:0.3" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </StackPanel.Triggers>
+                    </StackPanel>
                 </StackPanel>
                 <TextBlock
                     helpers:SimpleMarkdownHelper.Text="{Binding StreamingText}"
