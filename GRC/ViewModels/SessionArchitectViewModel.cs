@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -31,7 +32,13 @@ public partial class SessionArchitectViewModel : ObservableObject
     private string _streamingText = "";  // AI 실시간 타이핑 버퍼
 
     [ObservableProperty]
+    private string _busyMessage = "";  // 하단 스트리밍 영역에 표시할 동적 상태 문구
+
+    [ObservableProperty]
     private bool _editMode;  // 기존 세션 수정 모드 여부
+
+    [ObservableProperty]
+    private bool _isAutoMode;  // true: 완전 자율루프 / false: 휴먼루프(기존)
 
     [ObservableProperty]
     private AgentPlan? _plan; // 파싱된 전체 계획
@@ -53,7 +60,7 @@ public partial class SessionArchitectViewModel : ObservableObject
         Messages.Add(new ArchitectMessage
         {
             Role = "assistant",
-            Text = "안녕하세요! AI 세션 아키텍트입니다. 만들고 싶으신 TRPG 세션의 장르, 세계관, 분위기 등의 컨셉을 자유롭게 알려주세요. 제가 세션 기획안 수립부터 파일 생성까지 전 과정을 도와드리겠습니다.\n\n예: \"다크 판타지, 타락한 신전과 성녀, 고딕 분위기, 이단 심판관과 마녀 사냥\"",
+            Text = "안녕하세요! AI 세션 아키텍트입니다. 만들고 싶으신 TRPG 세션의 장르, 세계관, 분위기 등의 컨셉을 자유롭게 알려주세요. 제가 세션 기획안 수립부터 파일 생성까지 전 과정을 도와드리겠습니다.\n\n예: \"다크 판타지, 타락한 신전과 성녀, 고딕 분위기, 이단 심판관과 마녀 사냥\"\n\n↻ 하단의 **자동** 토글을 켜면 컨셉 입력만으로 6단계를 자동 완주합니다.",
             Timestamp = DateTime.Now
         });
     }
@@ -91,12 +98,33 @@ public partial class SessionArchitectViewModel : ObservableObject
             _cts.Cancel();
             IsBusy = false;
             StreamingText = "";
-            Messages.Add(new ArchitectMessage
+
+            // 자율 모드 중 중단 시 수동 모드로 전환하여 유저에게 제어권 반환 (A안)
+            if (IsAutoMode)
             {
-                Role = "system",
-                Text = "작업이 사용자에 의해 중단되었습니다.",
-                Timestamp = DateTime.Now
-            });
+                IsAutoMode = false;
+                Messages.Add(new ArchitectMessage
+                {
+                    Role = "system",
+                    Text = "자동 진행이 중단되었습니다. 수동 모드로 전환되었으며, 현재 단계부터 직접 검토하실 수 있습니다.",
+                    Timestamp = DateTime.Now
+                });
+
+                // 현재 생성 중이던 단계의 검토 상태로 전환하여 승인 버튼 노출
+                if (IsGenStep(CurrentStep))
+                {
+                    CurrentStep = GetReviewStepFromGen(CurrentStep);
+                }
+            }
+            else
+            {
+                Messages.Add(new ArchitectMessage
+                {
+                    Role = "system",
+                    Text = "작업이 사용자에 의해 중단되었습니다.",
+                    Timestamp = DateTime.Now
+                });
+            }
         }
     }
 
@@ -126,15 +154,13 @@ public partial class SessionArchitectViewModel : ObservableObject
                 // 1. 계획 설계 시작
                 CurrentStep = AgentStep.Planning;
                 StreamingText = "";
+                BusyMessage = GetBusyMessage(AgentStep.Planning);
 
                 var stream = _architectService.GeneratePlanAsync(userMsg, _session.ExistingPreset, _cts.Token);
-                await foreach (var chunk in stream)
-                {
-                    StreamingText += chunk;
-                }
+                var planText = await ConsumeStreamAsync(stream, _cts.Token);
 
                 // JSON 파싱 시도
-                var parsedPlan = _architectService.ParsePlan(StreamingText);
+                var parsedPlan = _architectService.ParsePlan(planText);
                 if (parsedPlan != null)
                 {
                     parsedPlan.Concept = userMsg; // 컨셉 보존
@@ -147,11 +173,17 @@ public partial class SessionArchitectViewModel : ObservableObject
                         Role = "assistant",
                         Text = GetPlanSummaryMarkdown(parsedPlan),
                         RelatedStep = AgentStep.PlanReview,
-                        HasActionButtons = true,
+                        HasActionButtons = !IsAutoMode, // 자율 모드에서는 승인 버튼 비노출
                         Timestamp = DateTime.Now
                     });
 
                     CurrentStep = AgentStep.PlanReview;
+
+                    // 자율 모드: 계획 수립 후 나머지 5단계를 자동 순회
+                    if (IsAutoMode)
+                    {
+                        await RunAutoLoopAsync();
+                    }
                 }
                 else
                 {
@@ -159,7 +191,7 @@ public partial class SessionArchitectViewModel : ObservableObject
                     Messages.Add(new ArchitectMessage
                     {
                         Role = "assistant",
-                        Text = $"계획 수립 형식 파싱에 실패했습니다. AI 응답:\n\n{StreamingText}\n\n다른 컨셉이나 명령을 다시 입력해 주세요.",
+                        Text = $"계획 수립 형식 파싱에 실패했습니다. AI 응답:\n\n{planText}\n\n다른 컨셉이나 명령을 다시 입력해 주세요.",
                         Timestamp = DateTime.Now
                     });
                     CurrentStep = AgentStep.Idle;
@@ -172,17 +204,15 @@ public partial class SessionArchitectViewModel : ObservableObject
                 AgentStep genStep = GetGenStepFromReview(originalStep);
                 CurrentStep = genStep;
                 StreamingText = "";
+                BusyMessage = GetBusyMessage(genStep);
 
                 string previousContent = GetCurrentStepContent(originalStep);
 
                 var stream = _architectService.ReviseContentAsync(originalStep, previousContent, userMsg, _session.Plan!, _cts.Token);
-                await foreach (var chunk in stream)
-                {
-                    StreamingText += chunk;
-                }
+                var revisedText = await ConsumeStreamAsync(stream, _cts.Token);
 
                 // 수정 내용 파싱 및 업데이트
-                bool success = ProcessStepContent(originalStep, StreamingText);
+                bool success = ProcessStepContent(originalStep, revisedText);
                 if (success)
                 {
                     // 기존 동일 단계에 속하는 메시지의 ActionButtons 비활성화 처리
@@ -249,6 +279,129 @@ public partial class SessionArchitectViewModel : ObservableObject
     private bool CanSend() => !IsBusy;
 
     /// <summary>
+    /// 자율 모드: PlanReview 상태에서 시작하여 나머지 5단계를 자동 순회합니다.
+    /// 중간에 중단(Cancel) 또는 파싱 실패 시 수동 모드로 자동 전환합니다.
+    /// </summary>
+    private async Task RunAutoLoopAsync(AgentStep startStep = AgentStep.WorldviewGen)
+    {
+        AgentStep[] autoSteps =
+        {
+            AgentStep.WorldviewGen,
+            AgentStep.LorebookGen,
+            AgentStep.StatusGen,
+            AgentStep.ScenarioGen,
+            AgentStep.PromptGen
+        };
+
+        var stepsToRun = autoSteps.SkipWhile(s => s != startStep).ToArray();
+
+        foreach (var genStep in stepsToRun)
+        {
+            if (_cts?.IsCancellationRequested == true) return;
+
+            CurrentStep = genStep;
+            StreamingText = "";
+            BusyMessage = GetBusyMessage(genStep);
+
+            try
+            {
+                var stream = _architectService.GenerateStepContentAsync(
+                    genStep, _session.Plan!, _session, null, _cts!.Token);
+
+                var stepContentText = await ConsumeStreamAsync(stream, _cts!.Token);
+
+                AgentStep reviewStep = GetReviewStepFromGen(genStep);
+                bool success = ProcessStepContent(reviewStep, stepContentText);
+
+                if (success)
+                {
+                    // ── 자가 검토 단계 ──
+                    BusyMessage = GetBusyMessage(reviewStep, isReviewing: true);
+                    StreamingText = ""; // 검토 중에는 타이핑 스트리밍 비우기
+
+                    var (pass, feedback) = await _architectService.ReviewStepContentAsync(
+                        reviewStep, GetCurrentStepContent(reviewStep),
+                        _session.Plan!, _session, _cts!.Token);
+
+                    if (!pass && feedback != null)
+                    {
+                        // 검토 실패: 시스템 메시지로 피드백 결과 표시
+                        Messages.Add(new ArchitectMessage
+                        {
+                            Role = "system",
+                            Text = $"↻ 자가 검토 결과 수정 필요: {feedback}",
+                            Timestamp = DateTime.Now
+                        });
+
+                        // 1회 자동 수정 (기존 ReviseContentAsync 재활용)
+                        BusyMessage = GetBusyMessage(reviewStep, isRevising: true);
+                        StreamingText = "";
+                        var reviseStream = _architectService.ReviseContentAsync(
+                            reviewStep, GetCurrentStepContent(reviewStep), feedback,
+                            _session.Plan!, _cts!.Token);
+
+                        var revisedContentText = await ConsumeStreamAsync(reviseStream, _cts!.Token);
+
+                        // 재파싱
+                        success = ProcessStepContent(reviewStep, revisedContentText);
+                        if (!success)
+                        {
+                            // 재수정 후에도 파싱 실패 → 수동 모드 전환
+                            IsAutoMode = false;
+                            CurrentStep = reviewStep;
+                            Messages.Add(new ArchitectMessage
+                            {
+                                Role = "system",
+                                Text = "자동 수정 후에도 형식 오류가 해결되지 않아 수동 모드로 전환합니다.",
+                                Timestamp = DateTime.Now
+                            });
+                            return;
+                        }
+                    }
+
+                // 카드 추가 및 다음 단계 진행
+                Messages.Add(new ArchitectMessage
+                {
+                    Role = "assistant",
+                    Text = GetStepDisplayContent(reviewStep),
+                    RelatedStep = reviewStep,
+                    HasActionButtons = false, // 자율 모드에서는 버튼 없음
+                    Timestamp = DateTime.Now
+                });
+                CurrentStep = reviewStep;
+            }
+            else
+            {
+                // 파싱 실패 → 수동 모드 전환하여 유저에게 제어권 반환
+                Messages.Add(new ArchitectMessage
+                {
+                    Role = "system",
+                    Text = $"자동 생성 중 파싱 오류가 발생하여 수동 모드로 전환합니다.\n\nAI 응답:\n{StreamingText}",
+                    Timestamp = DateTime.Now
+                });
+                IsAutoMode = false;
+                CurrentStep = reviewStep;
+                return;
+            }
+
+            }
+            catch (OperationCanceledException)
+            {
+                // 중단 시 Cancel()에서 이미 수동 전환 처리됨
+                return;
+            }
+
+            StreamingText = "";
+        }
+
+        // 6단계 모두 완료 → 세션 파일 적용
+        if (_cts?.IsCancellationRequested != true)
+        {
+            await ApplySessionAsync();
+        }
+    }
+
+    /// <summary>
     /// 현재 검토 중인 단계의 생성물을 확정하고 다음 단계 생성을 트리거합니다.
     /// </summary>
     [RelayCommand]
@@ -267,22 +420,45 @@ public partial class SessionArchitectViewModel : ObservableObject
         // ActionButtons 비활성화
         DisablePreviousActionButtons(CurrentStep);
 
+        _cts = new CancellationTokenSource();
+
+        if (IsAutoMode)
+        {
+            IsBusy = true;
+            try
+            {
+                await RunAutoLoopAsync(nextGenStep);
+            }
+            catch (Exception ex)
+            {
+                Messages.Add(new ArchitectMessage
+                {
+                    Role = "system",
+                    Text = $"에러 발생: {ex.Message}",
+                    Timestamp = DateTime.Now
+                });
+            }
+            finally
+            {
+                IsBusy = false;
+                _cts = null;
+            }
+            return;
+        }
+
         IsBusy = true;
         CurrentStep = nextGenStep;
         StreamingText = "";
-        _cts = new CancellationTokenSource();
+        BusyMessage = GetBusyMessage(nextGenStep);
 
         try
         {
             // 다음 단계 생성 시작
             var stream = _architectService.GenerateStepContentAsync(nextGenStep, _session.Plan!, _session, null, _cts.Token);
-            await foreach (var chunk in stream)
-            {
-                StreamingText += chunk;
-            }
+            var stepContentText = await ConsumeStreamAsync(stream, _cts.Token);
 
             AgentStep reviewStep = GetReviewStepFromGen(nextGenStep);
-            bool success = ProcessStepContent(reviewStep, StreamingText);
+            bool success = ProcessStepContent(reviewStep, stepContentText);
             if (success)
             {
                 Messages.Add(new ArchitectMessage
@@ -300,7 +476,7 @@ public partial class SessionArchitectViewModel : ObservableObject
                 Messages.Add(new ArchitectMessage
                 {
                     Role = "assistant",
-                    Text = $"컨텐츠 생성 파싱에 실패했습니다. AI 응답:\n\n{StreamingText}\n\n요구 사항을 다시 입력하거나 새로 시도해 주세요.",
+                    Text = $"컨텐츠 생성 파싱에 실패했습니다. AI 응답:\n\n{stepContentText}\n\n요구 사항을 다시 입력하거나 새로 시도해 주세요.",
                     Timestamp = DateTime.Now
                 });
                 // 이전 검토 단계로 롤백
@@ -338,6 +514,7 @@ public partial class SessionArchitectViewModel : ObservableObject
     {
         IsBusy = true;
         CurrentStep = AgentStep.Applying;
+        BusyMessage = GetBusyMessage(AgentStep.Applying);
 
         try
         {
@@ -591,6 +768,104 @@ public partial class SessionArchitectViewModel : ObservableObject
                 };
             }
         }
+    }
+
+    /// <summary>
+    /// 현재 동작에 맞는 하단 상태 문구를 반환합니다.
+    /// </summary>
+    private string GetBusyMessage(AgentStep step, bool isReviewing = false, bool isRevising = false) =>
+        (step, isReviewing, isRevising) switch
+        {
+            (_, _, true)                       => "AI가 검토 피드백을 바탕으로 수정하는 중",
+            (_, true, _)                       => "AI가 생성 결과를 자가 검토하는 중",
+            (AgentStep.Planning, _, _)         => "AI가 기획안 설계 계획을 수립하는 중",
+            (AgentStep.WorldviewGen, _, _)     => "AI가 세계관을 구성하는 중",
+            (AgentStep.LorebookGen, _, _)      => "AI가 로어북 데이터를 생성하는 중",
+            (AgentStep.StatusGen, _, _)        => "AI가 상태창을 설계하는 중",
+            (AgentStep.ScenarioGen, _, _)      => "AI가 초기 시나리오를 집필하는 중",
+            (AgentStep.PromptGen, _, _)        => "AI가 시스템 지시문을 작성하는 중",
+            (AgentStep.Applying, _, _)         => "세션 파일을 저장하고 적용하는 중",
+            _                                  => "AI가 답변을 구성하는 중"
+        };
+
+    /// <summary>
+    /// IAsyncEnumerable 스트리밍을 Channel을 사용하여 생산자-소비자 패턴으로 백그라운드에서 소비하고,
+    /// 큐 상태에 따라 유동적인 딜레이(Adaptive Delay)와 Dispatcher 스로틀링(Throttle)을 조절하며
+    /// UI 스레드에 실시간 타이핑 효과로 StreamingText를 업데이트합니다.
+    /// 최종 완성된 전체 텍스트를 반환합니다.
+    /// </summary>
+    private async Task<string> ConsumeStreamAsync(
+        IAsyncEnumerable<string> stream, CancellationToken ct)
+    {
+        var channel = Channel.CreateUnbounded<char>();
+        var sb = new StringBuilder();
+
+        // 1. [생산자]: API 스트림 수신 후 문자 단위로 쪼개어 채널에 쓰기
+        var producerTask = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var chunk in stream.WithCancellation(ct))
+                {
+                    foreach (var c in chunk)
+                    {
+                        await channel.Writer.WriteAsync(c, ct);
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Task 취소 등 예외 무시
+            }
+            finally
+            {
+                channel.Writer.Complete();
+            }
+        }, ct);
+
+        // 2. [소비자]: 문자를 하나씩 읽어 타이핑 효과를 주되 UI 갱신은 일정 주기로 스로틀링 (SimpleMarkdownHelper 렉 방지)
+        var consumerTask = Task.Run(async () =>
+        {
+            var lastUpdate = DateTime.UtcNow;
+            const int FlushIntervalMs = 30; // 30ms 주기로 UI 스레드에 전송 (렉 방지 및 60fps 수준의 부드러움)
+
+            await foreach (var c in channel.Reader.ReadAllAsync(ct))
+            {
+                sb.Append(c);
+
+                var now = DateTime.UtcNow;
+                int pendingCount = channel.Reader.Count;
+
+                // 30ms 경과했거나 대기 문자가 더 없으면 UI 반영
+                if ((now - lastUpdate).TotalMilliseconds >= FlushIntervalMs || pendingCount == 0)
+                {
+                    var snapshot = sb.ToString();
+                    await App.Current.Dispatcher.InvokeAsync(() => StreamingText = snapshot);
+                    lastUpdate = now;
+                }
+
+                // 가변 타이핑 속도 조절 (Adaptive Delay)
+                if (pendingCount > 150)
+                {
+                    await Task.Yield(); // 큐가 아주 많이 밀리면 딜레이 없이 즉시 진행
+                }
+                else if (pendingCount > 30)
+                {
+                    await Task.Delay(1, ct); // 중간 정도 밀리면 1ms 지연
+                }
+                else
+                {
+                    await Task.Delay(3, ct); // 기본 타이핑 효과 속도 (3ms 지연)
+                }
+            }
+
+            // 최종 텍스트 UI 동기화
+            var final = sb.ToString();
+            await App.Current.Dispatcher.InvokeAsync(() => StreamingText = final);
+        }, ct);
+
+        await Task.WhenAll(producerTask, consumerTask);
+        return sb.ToString();
     }
 
     #endregion

@@ -36,6 +36,18 @@ public interface ISessionArchitectService
     (Dictionary<string, string> Stats, string Guide)? ParseStatusDesign(string rawResponse);
     
     /// <summary>
+    /// 자율 모드에서 각 단계의 생성 결과물을 자가 검토합니다.
+    /// 계획서와의 일관성, JSON 구조 정합성, 내용 누락 여부를 빠르게 체크합니다.
+    /// </summary>
+    /// <returns>
+    /// (bool Pass, string? Feedback) - Pass=true면 통과, false면 Feedback에 문제점 기술
+    /// </returns>
+    Task<(bool Pass, string? Feedback)> ReviewStepContentAsync(
+        AgentStep reviewStep, string generatedContent,
+        AgentPlan plan, ArchitectSession session,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// 최종 결과물을 세션 파일로 적용합니다.
     /// </summary>
     Task<string> ApplyToNewSessionAsync(ArchitectSession session);

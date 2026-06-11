@@ -39,11 +39,6 @@ public partial class SessionArchitectWindow : Window
             // 백그라운드 스레드에서 변경되더라도 UI 스레드에서 동기화되도록 Dispatcher 사용
             Dispatcher.Invoke(() => UpdateProgressBar(_viewModel.CurrentStep));
         }
-        else if (e.PropertyName == nameof(SessionArchitectViewModel.StreamingText))
-        {
-            // 실시간 생성 시 아래로 스크롤
-            Dispatcher.Invoke(() => AutoScrollToBottom());
-        }
     }
 
     private void Messages_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -137,5 +132,12 @@ public partial class SessionArchitectWindow : Window
             border.Tag = "Pending";
             text.Tag = "Pending";
         }
+    }
+
+    private void AutoModeToggle_Click(object sender, RoutedEventArgs e)
+    {
+        // IsBusy 상태에서는 모드 전환 방지
+        if (_viewModel.IsBusy) return;
+        _viewModel.IsAutoMode = !_viewModel.IsAutoMode;
     }
 }

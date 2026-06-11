@@ -83,21 +83,35 @@ public static class SimpleMarkdownHelper
                     }
 
                     string value = match.Value;
-                    if (value.StartsWith("**") && value.EndsWith("**"))
+                    if (value.StartsWith("**") && value.EndsWith("**") && value.Length >= 4)
                     {
                         string content = value.Substring(2, value.Length - 4);
                         span.Inlines.Add(new Bold(new Run(content)));
                     }
-                    else if (value.StartsWith("*") && value.EndsWith("*"))
+                    else if (value.StartsWith("*") && value.EndsWith("*") && value.Length >= 2)
                     {
-                        string content = value.Substring(1, value.Length - 2);
-                        span.Inlines.Add(new Italic(new Run(content)));
+                        if (value == "**")
+                        {
+                            span.Inlines.Add(new Run(value));
+                        }
+                        else
+                        {
+                            string content = value.Substring(1, value.Length - 2);
+                            span.Inlines.Add(new Italic(new Run(content)));
+                        }
                     }
-                    else if (value.StartsWith("`") && value.EndsWith("`"))
+                    else if (value.StartsWith("`") && value.EndsWith("`") && value.Length >= 2)
                     {
-                        string content = value.Substring(1, value.Length - 2);
-                        var codeRun = new Run(content) { Foreground = new SolidColorBrush(Color.FromRgb(242, 108, 79)) };
-                        span.Inlines.Add(codeRun);
+                        if (value == "``")
+                        {
+                            span.Inlines.Add(new Run(value));
+                        }
+                        else
+                        {
+                            string content = value.Substring(1, value.Length - 2);
+                            var codeRun = new Run(content) { Foreground = new SolidColorBrush(Color.FromRgb(242, 108, 79)) };
+                            span.Inlines.Add(codeRun);
+                        }
                     }
 
                     lastIndex = match.Index + match.Length;

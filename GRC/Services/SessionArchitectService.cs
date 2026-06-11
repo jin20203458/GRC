@@ -358,6 +358,110 @@ public class SessionArchitectService : ISessionArchitectService
         return (result.Stats, result.Guide ?? "");
     }
 
+    private class ReviewResponse
+    {
+        public bool pass { get; set; }
+        public string? issues { get; set; }
+    }
+
+    public async Task<(bool Pass, string? Feedback)> ReviewStepContentAsync(
+        AgentStep reviewStep,
+        string generatedContent,
+        AgentPlan plan,
+        ArchitectSession session,
+        CancellationToken ct = default)
+    {
+        string prompt = "";
+        switch (reviewStep)
+        {
+            case AgentStep.WorldviewReview:
+                prompt = $@"당신은 TRPG 세계관 검수 전문가입니다. AI가 작성한 세계관이 아래의 설계 계획과 일치하는지 검수하십시오.
+특히 계획의 '세계관 개요' 테마가 잘 반영되었는지 확인하고, 빈 껍데기만 있는 설명이 아닌지 체크하십시오.
+
+[설계 계획 - 세계관 개요]
+{plan.WorldviewOutline}
+
+[검토할 세계관 설정]
+{generatedContent}";
+                break;
+
+            case AgentStep.LorebookReview:
+                prompt = $@"당신은 TRPG 로어북 검수 전문가입니다. 생성된 로어북 JSON 데이터를 검수하십시오.
+- 계획된 로어북 리스트({JsonSerializer.Serialize(plan.LorebookPlan)})의 핵심 항목들이 누락되지 않고 잘 구현되었는지 확인하세요.
+- JSON 형식이 완전히 유효한 배열 형태인지 검증하십시오.
+
+[검토할 로어북 JSON]
+{generatedContent}";
+                break;
+
+            case AgentStep.StatusReview:
+                prompt = $@"당신은 TRPG 상태창 검수 전문가입니다. 생성된 상태창과 갱신 가이드 JSON 데이터를 검수하십시오.
+- 계획된 스탯 목록({string.Join(", ", plan.StatsPlan)})이 누락 없이 stats 객체 내에 다 들어가 있는지 검수하십시오.
+- JSON 형식이 완전히 유효하며 stats와 guide 필드를 갖고 있는지 검증하십시오.
+
+[검토할 상태창 JSON]
+{generatedContent}";
+                break;
+
+            case AgentStep.ScenarioReview:
+                prompt = $@"당신은 TRPG 시나리오 검수 전문가입니다. 생성된 초기 상황 시나리오 오프닝을 검수하십시오.
+- 세계관과 모순이 없는지, 계획의 시나리오 개요({plan.ScenarioOutline})와 부합하는지 확인하십시오.
+- 글의 마지막이 주인공(플레이어)이 처한 긴박한 '직면 상황/선택의 순간'으로 끝나는지 확인하세요.
+
+[검토할 시나리오]
+{generatedContent}";
+                break;
+
+            case AgentStep.PromptReview:
+                prompt = $@"당신은 AI GM 프롬프트 엔지니어링 전문가입니다. 작성된 시스템 지시문(System Instruction)을 검수하십시오.
+- 핵심 지시(감각적 묘사, PC 통제 금지, 마이크로 템포, NPC 자율성, 상태창 업데이트 지침 준수 등)가 제대로 들어가 있는지 검수하십시오.
+- 전체가 `<system>` 및 `</system>` 태그로 제대로 감싸져 있는지 확인하십시오.
+
+[검토할 시스템 지시문]
+{generatedContent}";
+                break;
+
+            default:
+                return (true, null);
+        }
+
+        string systemInstruction = @"당신은 생성된 TRPG 구성 요소 데이터를 치명적 오류나 정합성 측면에서 엄격하게 검증하는 AI 감사관입니다.
+검증 결과를 분석하여 반드시 다음 JSON 스키마로만 대답하십시오. JSON 외 다른 텍스트는 절대 포함하지 마십시오.
+
+출력 JSON 스키마:
+{
+  ""pass"": true 또는 false,
+  ""issues"": ""검증 실패 시 지적 사항과 구체적인 피드백 내용 (pass가 true인 경우 null)""
+}";
+
+        var si = new Content("system", [new Part(systemInstruction)]);
+        var contents = new List<Content> { new Content("user", [new Part(prompt)]) };
+        var config = new GenerationConfig(1.0f, 4096, "application/json");
+
+        var request = new GeminiRequest(si, contents, null, config);
+
+        try
+        {
+            string fullResponse = "";
+            await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash35, ct))
+            {
+                fullResponse += chunk;
+            }
+
+            var reviewResult = LlmJsonParser.DeserializeSafe<ReviewResponse>(fullResponse);
+            if (reviewResult == null)
+            {
+                return (true, null);
+            }
+
+            return (reviewResult.pass, reviewResult.issues);
+        }
+        catch
+        {
+            return (true, null);
+        }
+    }
+
     public async Task<string> ApplyToNewSessionAsync(ArchitectSession session)
     {
         if (session.Plan == null)

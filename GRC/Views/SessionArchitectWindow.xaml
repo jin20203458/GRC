@@ -307,81 +307,56 @@
             </StackPanel>
         </ScrollViewer>
 
-        <!-- 3: 실시간 스트리밍 중인 텍스트 표시 영역 -->
+        <!-- 3: 실시간 진행 상태 표시 영역 (실시간 JSON/마크다운 텍스트 출력을 숨김) -->
         <Border
             Grid.Row="3"
             Margin="15,0,15,10"
-            Padding="14,10"
+            Padding="14,8"
             Background="#111317"
             BorderBrush="#252932"
             BorderThickness="1"
             CornerRadius="8"
             HorizontalAlignment="Left"
-            MaxWidth="800">
-            <!-- StreamingText가 있을 때만 보이도록 트리거 작동시킬 예정. WPF의 Visibility 바인딩 처리를 위해 Style Triggers 사용 -->
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="Visibility" Value="Collapsed" />
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding StreamingText}" Value="">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding StreamingText, Converter={x:Null}}" Value="{x:Null}">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                        </DataTrigger>
-                        <!-- StreamingText가 비어있지 않으면 Visible -->
-                        <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                            <Setter Property="Visibility" Value="Visible" />
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
-            <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                    <TextBlock FontSize="11" Foreground="#AAB2C0" FontWeight="Bold" VerticalAlignment="Center" Text="AI가 답변을 구성하는 중" />
-                    <StackPanel Orientation="Horizontal" Margin="6,2,0,0" VerticalAlignment="Center">
-                        <Ellipse x:Name="Dot1" Width="3.5" Height="3.5" Margin="1.5,0" Fill="#AAB2C0" Opacity="0.3" />
-                        <Ellipse x:Name="Dot2" Width="3.5" Height="3.5" Margin="1.5,0" Fill="#AAB2C0" Opacity="0.3" />
-                        <Ellipse x:Name="Dot3" Width="3.5" Height="3.5" Margin="1.5,0" Fill="#AAB2C0" Opacity="0.3" />
-                        <StackPanel.Triggers>
-                            <EventTrigger RoutedEvent="Loaded">
-                                <BeginStoryboard>
-                                    <Storyboard RepeatBehavior="Forever">
-                                        <DoubleAnimation
-                                            AutoReverse="True"
-                                            Storyboard.TargetName="Dot1"
-                                            Storyboard.TargetProperty="Opacity"
-                                            From="0.3"
-                                            To="1.0"
-                                            Duration="0:0:0.3" />
-                                        <DoubleAnimation
-                                            AutoReverse="True"
-                                            BeginTime="0:0:0.15"
-                                            Storyboard.TargetName="Dot2"
-                                            Storyboard.TargetProperty="Opacity"
-                                            From="0.3"
-                                            To="1.0"
-                                            Duration="0:0:0.3" />
-                                        <DoubleAnimation
-                                            AutoReverse="True"
-                                            BeginTime="0:0:0.3"
-                                            Storyboard.TargetName="Dot3"
-                                            Storyboard.TargetProperty="Opacity"
-                                            From="0.3"
-                                            To="1.0"
-                                            Duration="0:0:0.3" />
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                        </StackPanel.Triggers>
-                    </StackPanel>
+            MaxWidth="800"
+            Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock FontSize="11" Foreground="#AAB2C0" FontWeight="Bold" VerticalAlignment="Center" Text="{Binding BusyMessage}" />
+                <StackPanel Orientation="Horizontal" Margin="6,2,0,0" VerticalAlignment="Center">
+                    <Ellipse x:Name="Dot1" Width="3.5" Height="3.5" Margin="1.5,0" Fill="#AAB2C0" Opacity="0.3" />
+                    <Ellipse x:Name="Dot2" Width="3.5" Height="3.5" Margin="1.5,0" Fill="#AAB2C0" Opacity="0.3" />
+                    <Ellipse x:Name="Dot3" Width="3.5" Height="3.5" Margin="1.5,0" Fill="#AAB2C0" Opacity="0.3" />
+                    <StackPanel.Triggers>
+                        <EventTrigger RoutedEvent="Loaded">
+                            <BeginStoryboard>
+                                <Storyboard RepeatBehavior="Forever">
+                                    <DoubleAnimation
+                                        AutoReverse="True"
+                                        Storyboard.TargetName="Dot1"
+                                        Storyboard.TargetProperty="Opacity"
+                                        From="0.3"
+                                        To="1.0"
+                                        Duration="0:0:0.3" />
+                                    <DoubleAnimation
+                                        AutoReverse="True"
+                                        BeginTime="0:0:0.15"
+                                        Storyboard.TargetName="Dot2"
+                                        Storyboard.TargetProperty="Opacity"
+                                        From="0.3"
+                                        To="1.0"
+                                        Duration="0:0:0.3" />
+                                    <DoubleAnimation
+                                        AutoReverse="True"
+                                        BeginTime="0:0:0.3"
+                                        Storyboard.TargetName="Dot3"
+                                        Storyboard.TargetProperty="Opacity"
+                                        From="0.3"
+                                        To="1.0"
+                                        Duration="0:0:0.3" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </StackPanel.Triggers>
                 </StackPanel>
-                <TextBlock
-                    helpers:SimpleMarkdownHelper.Text="{Binding StreamingText}"
-                    FontSize="14"
-                    Foreground="#D1D1D1"
-                    LineHeight="22"
-                    TextWrapping="Wrap" />
             </StackPanel>
         </Border>
 
@@ -395,6 +370,7 @@
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
@@ -497,6 +473,47 @@
                                         FontWeight="Bold"
                                         Foreground="#FFFFFF"
                                         Text="전송" />
+                                </Button>
+
+                                <!-- ↻ 자동/수동 모드 토글 버튼 -->
+                                <Button
+                                    x:Name="AutoModeToggle"
+                                    Grid.Column="3"
+                                    Margin="8,0,0,0"
+                                    Height="36"
+                                    Command="{x:Null}"
+                                    Click="AutoModeToggle_Click"
+                                    Cursor="Hand"
+                                    Style="{StaticResource HeaderActionButton}">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border
+                                                x:Name="ToggleBorder"
+                                                Padding="10,6"
+                                                CornerRadius="8"
+                                                BorderThickness="1"
+                                                Background="#0AFFFFFF"
+                                                BorderBrush="#2D3139">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="ToggleIcon" Text="↻" FontSize="13" VerticalAlignment="Center" Foreground="#66FFFFFF" />
+                                                    <TextBlock x:Name="ToggleText" Text="자동" FontSize="12" FontWeight="SemiBold" Margin="4,0,0,0" VerticalAlignment="Center" Foreground="#66FFFFFF" />
+                                                </StackPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <!-- IsAutoMode ON 상태: 청록색 활성화 -->
+                                                <DataTrigger Binding="{Binding IsAutoMode}" Value="True">
+                                                    <Setter TargetName="ToggleBorder" Property="Background" Value="#1A008B99" />
+                                                    <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="#008B99" />
+                                                    <Setter TargetName="ToggleIcon" Property="Foreground" Value="#008B99" />
+                                                    <Setter TargetName="ToggleText" Property="Foreground" Value="#008B99" />
+                                                </DataTrigger>
+                                                <!-- 호버 시 은은하게 밝아지는 효과 -->
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="#44FFFFFF" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
                                 </Button>
             </Grid>
         </Border>
