@@ -76,7 +76,7 @@ public class DialogService : IDialogService
         RunOnUIThread(() =>
         {
             var windowsToClose = Application.Current.Windows.OfType<Window>()
-                .Where(w => w is StatusWindow || w is StoryHistoryWindow)
+                .Where(w => w is StatusWindow || w is StoryHistoryWindow || w is SessionArchitectWindow)
                 .ToList();
 
             foreach (var w in windowsToClose) w.Close();

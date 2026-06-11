@@ -72,6 +72,7 @@ public partial class App : Application
         services.AddSingleton<IChatWorkflowService, ChatWorkflowService>();
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IDialogService, DialogService>();
+        services.AddSingleton<ISessionArchitectService, SessionArchitectService>();
         services.AddHttpClient<IGoogleTtsService, GeminiTtsService>();
         // ==================================================
         // 2. ViewModels 계층 등록 (UI와 로직의 연결고리)
@@ -83,6 +84,7 @@ public partial class App : Application
         services.AddSingleton<MainViewModel>();
         services.AddTransient<SessionListViewModel>();
         services.AddTransient<ChatViewModel>();
+        services.AddTransient<SessionArchitectViewModel>();
         services.AddTransient<SettingsViewModel>();
         // 뷰모델과 서비스 조립 완료 후 반환
         return services.BuildServiceProvider();

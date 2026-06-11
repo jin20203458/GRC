@@ -567,6 +567,38 @@ public partial class ChatViewModel : ObservableObject
     [RelayCommand]
     private void OpenStoryHistoryWindow() => _dialogService.ShowStoryHistoryWindow(this);
 
+    [RelayCommand]
+    private void OpenArchitectForEdit()
+    {
+        if (CurrentPreset == null || string.IsNullOrEmpty(_currentFileName)) return;
+        var vm = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<SessionArchitectViewModel>(App.Current.Services);
+        vm.InitializeForEdit(_currentFileName, CurrentPreset);
+        var window = new Views.SessionArchitectWindow(vm);
+        window.Owner = System.Windows.Application.Current.MainWindow;
+        vm.SessionCreated += async (fileName) =>
+        {
+            window.Close();
+            // 프리셋 재로드 및 UI 반영
+            CurrentPreset = await _presetService.LoadPresetAsync(_currentFileName);
+            
+            // 세션 리로드
+            var session = await _sessionService.LoadSessionAsync(_currentFileName);
+            if (session != null)
+            {
+                _memoryService.RestoreSession(session);
+                ChatHistory.Clear();
+                foreach (var msg in session.History)
+                {
+                    ChatHistory.Add(msg);
+                }
+                CurrentTurn = session.TotalTurnCount;
+            }
+
+            ChatHistory.Add(new ChatMessage("system", "AI 세션 아키텍트에 의해 세계관/로어북/상태창/시나리오가 업데이트되었습니다.", DateTime.Now));
+        };
+        window.ShowDialog();
+    }
+
 
     [RelayCommand]
     private async Task DeleteMessageAsync(ChatMessage message)

@@ -1,4 +1,4 @@
-﻿
+
 <UserControl
     x:Class="GRC.Views.SessionListView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -43,6 +43,23 @@
                                 FontWeight="Bold"
                                 Text="+" />
                             <TextBlock VerticalAlignment="Center" Text="새 대화 시작" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        Margin="10,0,0,0"
+                        Padding="12,6"
+                        Command="{Binding OpenArchitectCommand}"
+                        Style="{StaticResource HeaderActionButton}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path
+                                Width="14"
+                                Height="14"
+                                Margin="0,0,6,0"
+                                Data="M12,2L14.6,8.6L21,11L14.6,13.4L12,20L9.4,13.4L3,11L9.4,8.6L12,2M20.5,17L21.4,19.3L24,20L21.4,20.7L20.5,23L19.6,20.7L17,20L19.6,19.3L20.5,17"
+                                Fill="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                                Stretch="Uniform"
+                                VerticalAlignment="Center" />
+                            <TextBlock VerticalAlignment="Center" Text="AI 세션 아키텍트" />
                         </StackPanel>
                     </Button>
                     <Button

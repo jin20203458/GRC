@@ -159,4 +159,21 @@ public partial class SessionListViewModel : ObservableObject
     {
         SettingsRequested?.Invoke();
     }
+
+    /// <summary>
+    /// 'AI 세션 아키텍트' 버튼 클릭 시
+    /// </summary>
+    [RelayCommand]
+    private void OpenArchitect()
+    {
+        var vm = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<SessionArchitectViewModel>(App.Current.Services);
+        var window = new Views.SessionArchitectWindow(vm);
+        window.Owner = Application.Current.MainWindow;
+        vm.SessionCreated += (fileName) =>
+        {
+            window.Close();
+            SessionSelected?.Invoke(fileName, null, null, null, null, null);
+        };
+        window.ShowDialog();
+    }
 }

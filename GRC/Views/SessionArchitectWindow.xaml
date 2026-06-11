@@ -1,0 +1,542 @@
+<Window
+    x:Class="GRC.Views.SessionArchitectWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:helpers="clr-namespace:GRC.Helpers"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="clr-namespace:GRC.Models"
+    xmlns:vm="clr-namespace:GRC.ViewModels"
+    Title="AI 세션 아키텍트"
+    Width="900"
+    Height="750"
+    MinWidth="750"
+    MinHeight="600"
+    helpers:WindowTitleBarBehavior.EnableDarkTitleBar="True"
+    Background="#0F1115"
+    FontFamily="Malgun Gothic"
+    Icon="/Resources/GRC.ico"
+    WindowStartupLocation="CenterOwner"
+    mc:Ignorable="d">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Themes/ModernStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+            <!-- 진행 상태 표시용 색상 컨버팅 DataTriggers -->
+            <Style x:Key="ProgressDotStyle" TargetType="Ellipse">
+                <Setter Property="Width" Value="10" />
+                <Setter Property="Height" Value="10" />
+                <Setter Property="Fill" Value="#444E5D" />
+                <Style.Triggers>
+                    <!-- 완료된 상태 (초록) -->
+                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=Tag}" Value="Done">
+                        <Setter Property="Fill" Value="#2C8D6C" />
+                    </DataTrigger>
+                    <!-- 진행 중인 상태 (파랑) -->
+                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=Tag}" Value="Active">
+                        <Setter Property="Fill" Value="#4DA6FF" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="ProgressTextStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Foreground" Value="#7E8A9B" />
+                <Setter Property="FontWeight" Value="Normal" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=Tag}" Value="Done">
+                        <Setter Property="Foreground" Value="#2C8D6C" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=Tag}" Value="Active">
+                        <Setter Property="Foreground" Value="#4DA6FF" />
+                        <Setter Property="FontWeight" Value="Bold" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- 0: 타이틀 및 헤더 -->
+            <RowDefinition Height="Auto" />
+            <!-- 1: 단계별 진행률 바 -->
+            <RowDefinition Height="Auto" />
+            <!-- 2: 대화 및 생성물 영역 -->
+            <RowDefinition Height="*" />
+            <!-- 3: 실시간 스트리밍 중인 텍스트 표시 -->
+            <RowDefinition Height="Auto" />
+            <!-- 4: 입력창 영역 -->
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 0: 타이틀 헤더 -->
+        <Border
+            Grid.Row="0"
+            Background="#16181D"
+            BorderBrush="#22FFFFFF"
+            BorderThickness="0,0,0,1"
+            Padding="15,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Path
+                        Width="16"
+                        Height="16"
+                        Margin="0,0,6,0"
+                        Data="M12,2L14.6,8.6L21,11L14.6,13.4L12,20L9.4,13.4L3,11L9.4,8.6L12,2M20.5,17L21.4,19.3L24,20L21.4,20.7L20.5,23L19.6,20.7L17,20L19.6,19.3L20.5,17"
+                        Fill="#008B99"
+                        Stretch="Uniform"
+                        VerticalAlignment="Center" />
+                    <TextBlock
+                        FontSize="16"
+                        FontWeight="Bold"
+                        Foreground="#EAEAEA"
+                        VerticalAlignment="Center"
+                        Text="AI 세션 아키텍트" />
+                    <Border
+                        Margin="10,0,0,0"
+                        Padding="6,2"
+                        Background="#1A2F4A"
+                        BorderBrush="#4DA6FF"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        VerticalAlignment="Center">
+                        <TextBlock
+                            FontSize="10"
+                            FontWeight="Bold"
+                            Foreground="#4DA6FF"
+                            Text="AGENT WORKFLOW" />
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 1: 진행 바 (State Machine Indicator) -->
+        <Border
+            Grid.Row="1"
+            Background="#121418"
+            BorderBrush="#1AFFFFFF"
+            BorderThickness="0,0,0,1"
+            Padding="15,10">
+            <Grid HorizontalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <!-- 단계별 컬럼 정의 -->
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="30" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="30" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="30" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="30" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="30" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- 1단계: 계획 수립 -->
+                <StackPanel
+                    Grid.Column="0"
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal">
+                    <Ellipse
+                        x:Name="DotStep1"
+                        Style="{StaticResource ProgressDotStyle}"
+                        VerticalAlignment="Center" />
+                    <TextBlock
+                        x:Name="TextStep1"
+                        Margin="6,0,0,0"
+                        Style="{StaticResource ProgressTextStyle}"
+                        Text="계획 수립" />
+                </StackPanel>
+                <Line
+                    Grid.Column="1"
+                    Stroke="#22FFFFFF"
+                    StrokeThickness="1"
+                    VerticalAlignment="Center"
+                    X1="0"
+                    X2="30"
+                    Y1="0"
+                    Y2="0" />
+
+                <!-- 2단계: 세계관 -->
+                <StackPanel
+                    Grid.Column="2"
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal">
+                    <Ellipse
+                        x:Name="DotStep2"
+                        Style="{StaticResource ProgressDotStyle}"
+                        VerticalAlignment="Center" />
+                    <TextBlock
+                        x:Name="TextStep2"
+                        Margin="6,0,0,0"
+                        Style="{StaticResource ProgressTextStyle}"
+                        Text="세계관" />
+                </StackPanel>
+                <Line
+                    Grid.Column="3"
+                    Stroke="#22FFFFFF"
+                    StrokeThickness="1"
+                    VerticalAlignment="Center"
+                    X1="0"
+                    X2="30"
+                    Y1="0"
+                    Y2="0" />
+
+                <!-- 3단계: 로어북 -->
+                <StackPanel
+                    Grid.Column="4"
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal">
+                    <Ellipse
+                        x:Name="DotStep3"
+                        Style="{StaticResource ProgressDotStyle}"
+                        VerticalAlignment="Center" />
+                    <TextBlock
+                        x:Name="TextStep3"
+                        Margin="6,0,0,0"
+                        Style="{StaticResource ProgressTextStyle}"
+                        Text="로어북" />
+                </StackPanel>
+                <Line
+                    Grid.Column="5"
+                    Stroke="#22FFFFFF"
+                    StrokeThickness="1"
+                    VerticalAlignment="Center"
+                    X1="0"
+                    X2="30"
+                    Y1="0"
+                    Y2="0" />
+
+                <!-- 4단계: 상태창 -->
+                <StackPanel
+                    Grid.Column="6"
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal">
+                    <Ellipse
+                        x:Name="DotStep4"
+                        Style="{StaticResource ProgressDotStyle}"
+                        VerticalAlignment="Center" />
+                    <TextBlock
+                        x:Name="TextStep4"
+                        Margin="6,0,0,0"
+                        Style="{StaticResource ProgressTextStyle}"
+                        Text="상태창" />
+                </StackPanel>
+                <Line
+                    Grid.Column="7"
+                    Stroke="#22FFFFFF"
+                    StrokeThickness="1"
+                    VerticalAlignment="Center"
+                    X1="0"
+                    X2="30"
+                    Y1="0"
+                    Y2="0" />
+
+                <!-- 5단계: 시나리오 -->
+                <StackPanel
+                    Grid.Column="8"
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal">
+                    <Ellipse
+                        x:Name="DotStep5"
+                        Style="{StaticResource ProgressDotStyle}"
+                        VerticalAlignment="Center" />
+                    <TextBlock
+                        x:Name="TextStep5"
+                        Margin="6,0,0,0"
+                        Style="{StaticResource ProgressTextStyle}"
+                        Text="시나리오" />
+                </StackPanel>
+                <Line
+                    Grid.Column="9"
+                    Stroke="#22FFFFFF"
+                    StrokeThickness="1"
+                    VerticalAlignment="Center"
+                    X1="0"
+                    X2="30"
+                    Y1="0"
+                    Y2="0" />
+
+                <!-- 6단계: 프롬프트 -->
+                <StackPanel
+                    Grid.Column="10"
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal">
+                    <Ellipse
+                        x:Name="DotStep6"
+                        Style="{StaticResource ProgressDotStyle}"
+                        VerticalAlignment="Center" />
+                    <TextBlock
+                        x:Name="TextStep6"
+                        Margin="6,0,0,0"
+                        Style="{StaticResource ProgressTextStyle}"
+                        Text="시스템 지시" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 2: 대화 및 메시지 리스트 영역 -->
+        <ScrollViewer
+            Grid.Row="2"
+            x:Name="ChatScrollViewer"
+            Padding="15"
+            VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <ItemsControl ItemsSource="{Binding Messages}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:ArchitectMessage}">
+                            <Grid Margin="0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- 말풍선 컨테이너 -->
+                                <Border
+                                    x:Name="BubbleBorder"
+                                    MaxWidth="780"
+                                    Padding="16,12"
+                                    CornerRadius="12"
+                                    BorderThickness="1">
+                                    <StackPanel>
+                                        <!-- 메시지 텍스트 (SimpleMarkdownHelper로 마크다운 렌더링 지원) -->
+                                        <TextBlock
+                                            x:Name="MessageText"
+                                            helpers:SimpleMarkdownHelper.Text="{Binding Text}"
+                                            FontSize="14.5"
+                                            LineHeight="23"
+                                            TextWrapping="Wrap" />
+
+                                        <!-- 액션 버튼 패널 (HasActionButtons가 True일 때 보임) -->
+                                        <StackPanel
+                                            x:Name="ActionPanel"
+                                            Margin="0,12,0,0"
+                                            HorizontalAlignment="Right"
+                                            Orientation="Horizontal"
+                                            Visibility="Collapsed">
+
+                                            <Button
+                                                Padding="14,6"
+                                                Background="#142F24"
+                                                BorderBrush="#2C8D6C"
+                                                BorderThickness="1"
+                                                Command="{Binding DataContext.ApproveAndProceedCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                Cursor="Hand"
+                                                Style="{StaticResource HeaderActionButton}">
+                                                <TextBlock
+                                                    FontSize="12"
+                                                    FontWeight="SemiBold"
+                                                    Foreground="#A2E2C8"
+                                                    Text="▶ 승인, 다음 단계" />
+                                            </Button>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <!-- 역할별 말풍선 스타일 트리거 -->
+                            <DataTemplate.Triggers>
+                                <!-- AI 메시지 -->
+                                <DataTrigger Binding="{Binding Role}" Value="assistant">
+                                    <Setter TargetName="BubbleBorder" Property="HorizontalAlignment" Value="Left" />
+                                    <Setter TargetName="BubbleBorder" Property="Background" Value="#66050505" />
+                                    <Setter TargetName="BubbleBorder" Property="BorderBrush" Value="#22FFFFFF" />
+                                    <Setter TargetName="BubbleBorder" Property="CornerRadius" Value="4,20,20,20" />
+                                    <Setter TargetName="MessageText" Property="Foreground" Value="#F2F2F2" />
+                                </DataTrigger>
+
+                                <!-- 유저 메시지 -->
+                                <DataTrigger Binding="{Binding Role}" Value="user">
+                                    <Setter TargetName="BubbleBorder" Property="HorizontalAlignment" Value="Right" />
+                                    <Setter TargetName="BubbleBorder" Property="Background" Value="#660B192C" />
+                                    <Setter TargetName="BubbleBorder" Property="BorderBrush" Value="#2E4A73" />
+                                    <Setter TargetName="BubbleBorder" Property="CornerRadius" Value="20,4,20,20" />
+                                    <Setter TargetName="MessageText" Property="Foreground" Value="#EAEAEA" />
+                                </DataTrigger>
+
+                                <!-- 시스템 메시지 -->
+                                <DataTrigger Binding="{Binding Role}" Value="system">
+                                    <Setter TargetName="BubbleBorder" Property="HorizontalAlignment" Value="Center" />
+                                    <Setter TargetName="BubbleBorder" Property="Background" Value="#1A2F4A" />
+                                    <Setter TargetName="BubbleBorder" Property="BorderBrush" Value="#2E4A73" />
+                                    <Setter TargetName="BubbleBorder" Property="CornerRadius" Value="8" />
+                                    <Setter TargetName="MessageText" Property="Foreground" Value="#4DA6FF" />
+                                    <Setter TargetName="MessageText" Property="FontWeight" Value="SemiBold" />
+                                </DataTrigger>
+
+                                <!-- 액션 버튼 가시성 제어 -->
+                                <DataTrigger Binding="{Binding HasActionButtons}" Value="True">
+                                    <Setter TargetName="ActionPanel" Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 3: 실시간 스트리밍 중인 텍스트 표시 영역 -->
+        <Border
+            Grid.Row="3"
+            Margin="15,0,15,10"
+            Padding="14,10"
+            Background="#111317"
+            BorderBrush="#252932"
+            BorderThickness="1"
+            CornerRadius="8"
+            HorizontalAlignment="Left"
+            MaxWidth="800">
+            <!-- StreamingText가 있을 때만 보이도록 트리거 작동시킬 예정. WPF의 Visibility 바인딩 처리를 위해 Style Triggers 사용 -->
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding StreamingText}" Value="">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding StreamingText, Converter={x:Null}}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                        <!-- StreamingText가 비어있지 않으면 Visible -->
+                        <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <Ellipse Width="6" Height="6" Fill="#4DA6FF" VerticalAlignment="Center" />
+                    <TextBlock FontSize="11" Foreground="#4DA6FF" FontWeight="Bold" Margin="6,0,0,0" Text="🤖 AI가 답변을 구성하는 중..." />
+                </StackPanel>
+                <TextBlock
+                    helpers:SimpleMarkdownHelper.Text="{Binding StreamingText}"
+                    FontSize="14"
+                    Foreground="#D1D1D1"
+                    LineHeight="22"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- 4: 하단 입력창 및 전송 컨트롤 영역 -->
+        <Border
+            Grid.Row="4"
+            Background="#121418"
+            BorderBrush="#22FFFFFF"
+            BorderThickness="0,1,0,0"
+            Padding="15,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- 텍스트 입력 TextBox -->
+                <Border
+                    x:Name="InputBorder"
+                    Grid.Column="0"
+                    Padding="10,2"
+                    Background="#880B192C"
+                    CornerRadius="16">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="BorderBrush" Value="#2A2A2A" />
+                            <Setter Property="BorderThickness" Value="1" />
+                            <Style.Triggers>
+                                <!--  입력창을 클릭(Focus)했을 때  -->
+                                <DataTrigger Binding="{Binding IsFocused, ElementName=InputTextBox}" Value="True">
+                                    <Setter Property="BorderBrush" Value="#88008B99" />
+                                    <Setter Property="BorderThickness" Value="1.2" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <TextBox
+                            x:Name="InputTextBox"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            CaretBrush="White"
+                            FontSize="15"
+                            Foreground="#EAEAEA"
+                            Padding="5"
+                            Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}"
+                            TextWrapping="Wrap"
+                            VerticalAlignment="Center">
+                            <TextBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding SendCommand}" />
+                            </TextBox.InputBindings>
+                        </TextBox>
+                        <TextBlock
+                            IsHitTestVisible="False"
+                            Margin="8,6"
+                            VerticalAlignment="Center"
+                            FontSize="13"
+                            Foreground="#5E687A"
+                            Text="컨셉 또는 수정 요청 지시를 여기에 작성하세요...">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Text, ElementName=InputTextBox}" Value="">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Border>
+
+                <!-- 취소 버튼 (생성 중 중단용) -->
+                <Button
+                    Grid.Column="1"
+                    Margin="10,0,0,0"
+                    Width="60"
+                    Height="36"
+                    Background="#421A1A"
+                    BorderBrush="#9E3A3A"
+                    BorderThickness="1"
+                    Command="{Binding CancelCommand}"
+                    Style="{StaticResource HeaderActionButton}"
+                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+                    <TextBlock
+                        FontSize="13"
+                        FontWeight="Bold"
+                        Foreground="#E29494"
+                        Text="중단" />
+                </Button>
+
+                <!-- 전송 버튼 -->
+                <Button
+                    Grid.Column="2"
+                    Margin="10,0,0,0"
+                    Width="80"
+                    Height="36"
+                    Background="#1A2B4C"
+                    BorderBrush="#2E4A73"
+                    BorderThickness="1"
+                    Command="{Binding SendCommand}"
+                    Style="{StaticResource HeaderActionButton}">
+                    <TextBlock
+                        FontSize="13"
+                        FontWeight="Bold"
+                        Foreground="#FFFFFF"
+                        Text="전송" />
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
