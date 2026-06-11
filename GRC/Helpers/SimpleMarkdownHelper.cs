@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -20,8 +20,51 @@ public static class SimpleMarkdownHelper
         {
             tb.Inlines.Clear();
             string text = (string)e.NewValue ?? string.Empty;
+            if (string.IsNullOrEmpty(text)) return;
 
-            tb.Inlines.Add(new Run(text));
+            // **bold**, *italic*, `code`, \n(줄바꿈)을 추출하는 정규식
+            var regex = new Regex(@"(\*\*.*?\*\*)|(\*.*?\*)|(`.*?`)|(\r?\n)");
+            int lastIndex = 0;
+
+            foreach (Match match in regex.Matches(text))
+            {
+                // 이전 일반 텍스트 추가
+                if (match.Index > lastIndex)
+                {
+                    string plainText = text.Substring(lastIndex, match.Index - lastIndex);
+                    tb.Inlines.Add(new Run(plainText));
+                }
+
+                string value = match.Value;
+                if (value.StartsWith("**") && value.EndsWith("**"))
+                {
+                    string content = value.Substring(2, value.Length - 4);
+                    tb.Inlines.Add(new Bold(new Run(content)));
+                }
+                else if (value.StartsWith("*") && value.EndsWith("*"))
+                {
+                    string content = value.Substring(1, value.Length - 2);
+                    tb.Inlines.Add(new Italic(new Run(content)));
+                }
+                else if (value.StartsWith("`") && value.EndsWith("`"))
+                {
+                    string content = value.Substring(1, value.Length - 2);
+                    var codeRun = new Run(content) { Foreground = new SolidColorBrush(Color.FromRgb(242, 108, 79)) };
+                    tb.Inlines.Add(codeRun);
+                }
+                else if (value.Contains("\n"))
+                {
+                    tb.Inlines.Add(new LineBreak());
+                }
+
+                lastIndex = match.Index + match.Length;
+            }
+
+            // 남은 일반 텍스트 추가
+            if (lastIndex < text.Length)
+            {
+                tb.Inlines.Add(new Run(text.Substring(lastIndex)));
+            }
         }
     }
 
