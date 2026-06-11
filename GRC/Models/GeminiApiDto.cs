@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace GRC.Models;
@@ -38,7 +38,8 @@ public enum ModelTier
 {
     Pro,        // 최고 성능 (복잡한 추론)
     Flash,      // 가성비 메인 (일반 대화)
-    FlashLite   // 초가성비 (백그라운드 요약)
+    FlashLite,  // 초가성비 (백그라운드 요약)
+    FlashPreview // gemini-3-flash-preview
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
