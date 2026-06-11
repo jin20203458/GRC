@@ -76,7 +76,7 @@ public class GeminiTtsService(HttpClient httpClient, IAppSettingsService appSett
 연기할 대사 ({targetLanguage}):
 {text}";
 
-        Debug.WriteLine($"[GeminiTTS] 🧩 조립된 동적 지시문:\n{dynamicPrompt}");
+        //Debug.WriteLine($"[GeminiTTS] 🧩 조립된 동적 지시문:\n{dynamicPrompt}");
         // 2. 페이로드 생성 (하드코딩 해제 및 동적 지시문 삽입)
         var payload = new
         {
