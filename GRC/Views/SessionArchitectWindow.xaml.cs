@@ -110,31 +110,31 @@ public partial class SessionArchitectWindow : Window
                 break;
         }
 
-        SetStepState(DotStep1, TextStep1, 1, currentStepIndex);
-        SetStepState(DotStep2, TextStep2, 2, currentStepIndex);
-        SetStepState(DotStep3, TextStep3, 3, currentStepIndex);
-        SetStepState(DotStep4, TextStep4, 4, currentStepIndex);
-        SetStepState(DotStep5, TextStep5, 5, currentStepIndex);
-        SetStepState(DotStep6, TextStep6, 6, currentStepIndex);
+        SetStepState(Step1Border, TextStep1, 1, currentStepIndex);
+        SetStepState(Step2Border, TextStep2, 2, currentStepIndex);
+        SetStepState(Step3Border, TextStep3, 3, currentStepIndex);
+        SetStepState(Step4Border, TextStep4, 4, currentStepIndex);
+        SetStepState(Step5Border, TextStep5, 5, currentStepIndex);
+        SetStepState(Step6Border, TextStep6, 6, currentStepIndex);
     }
 
-    private void SetStepState(System.Windows.Shapes.Ellipse dot, TextBlock text, int stepNum, int currentStepIndex)
+    private void SetStepState(Border border, TextBlock text, int stepNum, int currentStepIndex)
     {
-        if (dot == null || text == null) return;
+        if (border == null || text == null) return;
 
         if (stepNum < currentStepIndex)
         {
-            dot.Tag = "Done";
+            border.Tag = "Done";
             text.Tag = "Done";
         }
         else if (stepNum == currentStepIndex)
         {
-            dot.Tag = "Active";
+            border.Tag = "Active";
             text.Tag = "Active";
         }
         else
         {
-            dot.Tag = "Pending";
+            border.Tag = "Pending";
             text.Tag = "Pending";
         }
     }
