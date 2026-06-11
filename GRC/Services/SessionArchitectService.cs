@@ -402,7 +402,7 @@ public class SessionArchitectService : ISessionArchitectService
             History: history,
             CurrentContext: chapterContext,
             PrevContexts: new List<ChapterContext>(),
-            LongTermSummary: session.GeneratedScenario ?? "새로운 모험이 시작됩니다.",
+            LongTermSummary: "아직 요약된 줄거리가 없습니다.",
             ChapterCount: 1,
             TotalTurnCount: 0,
             MediumTermUpdateCount: 0

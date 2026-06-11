@@ -10,7 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Config\google-credentials.json" />
     <None Remove="Resources\bg1.png" />
     <None Remove="Resources\bg10.PNG" />
     <None Remove="Resources\bg11.PNG" />
