@@ -394,7 +394,8 @@ public class SessionArchitectService : ISessionArchitectService
         var history = new List<ChatMessage>();
         if (!string.IsNullOrWhiteSpace(session.GeneratedScenario))
         {
-            history.Add(new ChatMessage("user", $"[초기 상황]\n{session.GeneratedScenario}", DateTime.Now));
+            history.Add(new ChatMessage("user", $"[초기 상황 설정]\n{session.GeneratedScenario}", DateTime.Now));
+            history.Add(new ChatMessage("model", "[시스템: 해당 세계관과 초기 상황을 완벽히 인지했습니다. 페르소나를 유지하며 롤플레잉을 대기합니다.]", DateTime.Now.AddSeconds(1)));
         }
 
         var chatSession = new ChatSession(
