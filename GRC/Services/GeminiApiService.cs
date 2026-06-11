@@ -26,18 +26,18 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
     private string GetModelName(ModelTier tier) => tier switch
     {
         ModelTier.Pro => "models/gemini-3.1-pro-preview",
-        ModelTier.Flash => "models/gemini-3.5-flash", 
+        ModelTier.Flash35 => "models/gemini-3.5-flash", 
         ModelTier.FlashLite => "models/gemini-3.1-flash-lite-preview",
-        ModelTier.FlashPreview => "models/gemini-3-flash-preview",
+        ModelTier.Flash3 => "models/gemini-3-flash-preview",
         _ => "models/gemini-3.5-flash" 
     };
 
     private string GetVertexModelName(ModelTier tier) => tier switch
     {
         ModelTier.Pro => "gemini-3.1-pro-preview",
-        ModelTier.Flash => "gemini-3.5-flash", 
+        ModelTier.Flash35 => "gemini-3.5-flash", 
         ModelTier.FlashLite => "gemini-3.1-flash-lite-preview",
-        ModelTier.FlashPreview => "gemini-3-flash-preview",
+        ModelTier.Flash3 => "gemini-3-flash-preview",
         _ => "gemini-3.5-flash"
     };
 

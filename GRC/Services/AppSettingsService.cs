@@ -1,4 +1,4 @@
-﻿using GRC.Models;
+using GRC.Models;
 using System;
 using System.IO;
 using System.Text.Json;
@@ -21,7 +21,7 @@ public class AppSettingsService : IAppSettingsService
       ProjectId: "",
       Location: "asia-northeast3",
       UseVertexAI: true,
-      SelectedModel: ModelTier.Flash,
+      SelectedModel: ModelTier.Flash35,
       SafetyThreshold: BlockThreshold.BLOCK_NONE
   );
 

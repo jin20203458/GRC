@@ -1,4 +1,4 @@
-﻿using GRC.Models;
+using GRC.Models;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -170,7 +170,7 @@ public class LorebookService(IGeminiApiService apiService) : ILorebookService
         try
         {
             // 1. API 통신 시도 (현재 프로젝트 설정에 맞게 FlashLite 또는 Flash 사용)
-            string jsonResponse = await apiService.SendMessageAsync(req, ModelTier.Flash);
+            string jsonResponse = await apiService.SendMessageAsync(req, ModelTier.Flash35);
 
             // 2. API 또는 시스템 에러 감지 (GeminiApiService의 에러 반환 규격 확인)
             if (jsonResponse.StartsWith("[System", StringComparison.OrdinalIgnoreCase))

@@ -1,4 +1,4 @@
-﻿using GRC.Helpers;
+using GRC.Helpers;
 using GRC.Models;
 using System;
 using System.Collections.Generic;
@@ -71,7 +71,7 @@ public class ReplySuggestionService(IGeminiApiService apiService) : IReplySugges
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
             //  Task.WhenAny 경합을 없애고, apiService에 토큰을 직접 넘겨 30초 초과 시 통신 스레드 자체가 파괴되도록 설정
-            string jsonResponse = await apiService.SendMessageAsync(req, ModelTier.Flash, cts.Token);
+            string jsonResponse = await apiService.SendMessageAsync(req, ModelTier.Flash35, cts.Token);
 
             if (!string.IsNullOrWhiteSpace(jsonResponse))
             {

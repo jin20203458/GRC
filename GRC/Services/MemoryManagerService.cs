@@ -1,4 +1,4 @@
-﻿using GRC.Helpers;
+using GRC.Helpers;
 using GRC.Models;
 using System.Text.RegularExpressions;
 
@@ -302,7 +302,7 @@ interface StatusWindow {
             var summaryReq = CreateInternalRequest(prompt, summarySystemPrompt, "text/plain", null, ThinkingLevel.high);
 
             //LogRequestJson("중기 기억 모델 (Medium)", summaryReq);
-            string response = await apiService.SendMessageAsync(summaryReq, ModelTier.Flash);
+            string response = await apiService.SendMessageAsync(summaryReq, ModelTier.Flash35);
 
             if (!string.IsNullOrWhiteSpace(response) && !response.StartsWith("[System"))
             {
