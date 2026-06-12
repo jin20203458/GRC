@@ -706,11 +706,12 @@ public partial class SessionArchitectViewModel : ObservableObject
     {
         var sb = new StringBuilder();
         sb.AppendLine("### 생성된 로어북 데이터 세트");
-        sb.AppendLine($"*총 **{lorebooks.Count}**개의 백과사전 항목이 생성되었습니다.*\n");
+        sb.AppendLine($"총 **{lorebooks.Count}**개의 백과사전 항목이 생성되었습니다.\n");
         foreach (var item in lorebooks)
         {
-            sb.AppendLine($"<details><summary><b>{item.Name}</b> ({item.Category}) - 키워드: {string.Join(", ", item.Keywords)}</summary>");
-            sb.AppendLine($"\n{item.Content}\n</details>");
+            sb.AppendLine($"#### {item.Name} ({item.Category})");
+            sb.AppendLine($"- **키워드:** {string.Join(", ", item.Keywords)}");
+            sb.AppendLine($"{item.Content}\n");
         }
         return sb.ToString();
     }
