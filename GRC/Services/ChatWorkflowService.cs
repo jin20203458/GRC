@@ -280,13 +280,13 @@ public class ChatWorkflowService(
                         }
                         else
                         {
-                            //Debug.WriteLine($"[StatusAPI Error - BG] 상태창 API 비정상 응답: {statusResponse}");
+                            Debug.WriteLine($"[StatusAPI Error - BG] 상태창 API 비정상 응답: {statusResponse}");
                         }
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
                         // 상태 갱신 실패 시 로그만 남기고 이전 상태 유지 (Graceful Degradation)
-                        //Debug.WriteLine($"[StatusAPI Error - BG] 상태창 백그라운드 갱신 실패: {ex.Message}");
+                        Debug.WriteLine($"[StatusAPI Error - BG] 상태창 백그라운드 갱신 실패: {ex.Message}");
                     }
                 });
             }

@@ -114,7 +114,7 @@ public class LorebookService(IGeminiApiService apiService) : ILorebookService
             // 3. 만약 이 로어북을 추가했을 때 최대 허용 길이를 초과한다면?
             if (currentTotalLength + formattedContent.Length > MaxLorebookLength)
             {
-                //System.Diagnostics.Debug.WriteLine($"[Lorebook Cut-off] '{lore.Name}'(우선순위:{lore.Priority})가 텍스트 한도 초과로 제외되었습니다.");
+                System.Diagnostics.Debug.WriteLine($"[Lorebook Cut-off] '{lore.Name}'(우선순위:{lore.Priority})가 텍스트 한도 초과로 제외되었습니다.");
                 continue;
             }
 
