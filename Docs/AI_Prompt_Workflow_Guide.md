@@ -31,17 +31,17 @@
 프롬프트를 실제 LLM(Gemini 등)에 돌려본 후, 결과에 문제가 발생했다면 증상에 따라 두 문서를 교차하여 처방을 내립니다.
 
 ### 증상 A: 모델이 지시를 무시하거나 환각(Hallucination)을 보일 때
-> **💡 처방 가이드:** Anti-Patterns 가이드라인을 다시 확인합니다.
+> **💡 처방 가이드:** `AI_Prompt_AntiPatterns_Guidelines.md` 가이드라인을 다시 확인합니다.
 - "내가 혹시 부정 지시문(~하지 마)을 남겨 두었나?"
 - "가장 중요한 지시가 긴 컨텍스트 윈도우 중간에 끼어 있지는 않은가?"
 
 ### 증상 B: 출력 포맷(JSON 등)이 깨지거나 일관성이 없을 때
-> **💡 처방 가이드:** Engineering 가이드라인을 다시 확인합니다.
+> **💡 처방 가이드:** `AI_Prompt_Engineering_Guidelines.md` 가이드라인을 다시 확인합니다.
 - "내가 제공한 Few-shot(예시)의 질이 너무 떨어지거나 개수가 부족한가?"
 - "유저 데이터와 시스템 규칙 격리가 허술해서 모델이 사용자의 말을 시스템 명령으로 착각했는가?"
 
 ---
 
 **관련 문서 목록:**
-- 설계 지침: `Docs/AI_Prompt_Engineering_Guidelines.md`
-- 위험 회피: `Docs/AI_Prompt_AntiPatterns_Guidelines.md`
+- 설계 지침: `AI_Prompt_Engineering_Guidelines.md`
+- 위험 회피: `AI_Prompt_AntiPatterns_Guidelines.md`
