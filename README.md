@@ -50,15 +50,24 @@ GRC는 Google Gemini API를 활용하여 고도로 몰입감 있고 생동감 �
 * **평행세계 분기**: 과거 대화 로그 중 특정 시점의 대화 카드를 마우스 우클릭하여 해당 순간을 기준으로 완전히 독립된 별도의 평행세계 세션 파일(`.json`)로 분기할 수 있습니다.
 * **추천 선택지**: AI의 대답이 텍스트로 타이핑되는 동안, 플레이어가 취할 수 있는 3종의 다채로운 대사/행동 선택지(수용/반발/제3의 행동)를 백그라운드에서 미리 예측 생성하여 대사가 끝나는 즉시 유저에게 제시합니다.
 
+### 6. AI 세션 아키텍트 (AI Session Architect)
+사용자가 제시한 아주 짤막한 컨셉 한 줄(예: *사이버펑크 하수구 아포칼립스*)만을 바탕으로, 즉시 플레이 가능한 풍부한 분량의 TRPG 세션 기획 및 리소스를 알아서 설계하고 빌드해 주는 자율 코딩 에이전트 스타일의 빌더입니다.
+* **6단계 에이전트 상태 기계 (State Machine)**: 기획 수립(Planning) ➡️ 상세 세계관(Worldview) ➡️ 로어북(Lorebook) ➡️ 캐릭터 스탯창(Status) ➡️ 초기 오프닝 시나리오(Scenario) ➡️ AI GM 지시문(System Prompt)으로 이어지는 체계화된 빌드 단계로 진행됩니다.
+* **자가 검수(Self-Review) 및 자율 자동화 루프**: **"↻ 자동"** 모드를 활성화하면, 각 단계 생성 완료 시 백그라운드에서 AI 감사관이 기획 내용 및 JSON 문법을 스스로 검증하여 승인(`pass`) 또는 수정 요구(`issues`)를 판단하며 다음 단계 전이와 최종 세션 적용까지 사람의 개입 없이 원스톱 자율 진행됩니다.
+* **생산자-소비자 기반 스로틀 스트리밍**: LLM 스트리밍이 생성될 때 WPF UI 스레드가 마크다운 파싱 렌더링으로 인해 멈추는 렉을 없애기 위해 **`System.Threading.Channels`** 버퍼와 30ms 단위 스로틀링(Throttling) 및 가변 지연(Adaptive Delay)을 적용하여, 부하를 원천 차단하면서 극도로 부드러운 타이핑 애니메이션을 실현했습니다.
+* **가벼운 정규식 기반 마크다운 렌더러**: 윈도우 내부에 자체 제작된 `SimpleMarkdownHelper`가 다단계 제목(`##`), 볼드(`**`), 이탤릭(`*`), 인라인 코드(`` ` ``) 등을 빠른 성능으로 파싱하여 청록색 테마와 조화로운 마크다운 문서를 렌더링합니다.
+
 ---
 
 ## 🛠 기술 스택 (Tech Stack)
 
 * **UI Framework**: Windows Presentation Foundation (WPF) / .NET 8.0
-* **State & MVVM**: `CommunityToolkit.Mvvm` (Microsoft MVVM Toolkit)
-* **Dependency Injection**: `Microsoft.Extensions.DependencyInjection`
-* **Authentication**: `Google.Apis.Auth` (Vertex AI OAuth2 토큰 발급)
-* **Media & Audio**: `System.Windows.Media.MediaPlayer` (BGM, 효과음, TTS 오디오 제어)
+* **State & MVVM**: `CommunityToolkit.Mvvm` (Microsoft MVVM Toolkit 8.4)
+* **Dependency Injection**: `Microsoft.Extensions.DependencyInjection` (DI 컨테이너)
+* **Authentication**: `Google.Apis.Auth` (Vertex AI 서비스 계정 OAuth2 연동)
+* **API Streaming & Buffering**: `System.Threading.Channels` (생산자-소비자 패턴 기반 비동기 채널)
+* **HTTP Client Management**: `Microsoft.Extensions.Http` (HttpClientFactory 활용)
+* **Media & Audio**: `System.Windows.Media.MediaPlayer` & `Google.Cloud.TextToSpeech.V1` (BGM, 타이핑 효과음 및 성우 멀티모달 TTS 제어)
 * **JSON Serialization**: `System.Text.Json`
 
 ---
@@ -87,6 +96,10 @@ dotnet run --project GRC/GRC.csproj
 GRC는 **Google AI Studio**와 **Google Cloud Vertex AI** 두 가지 연동 방식을 지원합니다.
 
 ### 방법 1. Google AI Studio API 키 사용 (권장 - 가장 간편함)
+
+> [!WARNING]
+> **제약 사항**: Google AI Studio API 키만 단독으로 사용하는 경우, 성우 멀티모달 TTS(오디오 대사 낭독) 기능은 연동 문제로 인해 지원되지 않습니다. 감정 연기 TTS 기능을 완벽하게 활성화하시려면 아래의 **방법 2 (Google Cloud Vertex AI)** 연동을 권장합니다.
+
 1. 앱을 실행한 후 우측 하단의 **설정(Settings)** 메뉴로 이동합니다.
 2. 발급받은 Google AI Studio API Key를 입력창에 넣고 저장합니다.
 3. 또는 프로젝트 빌드 출력 디렉토리의 `AppSettings.json` 파일에 직접 설정할 수도 있습니다:
@@ -141,7 +154,7 @@ flowchart TD
     
     API1 -->|5. 스트리밍 문자 수신| WF
     
-    subgraph ProducerConsumer [프로듀서-컨슈머 파이프라인]
+    subgraph ProducerConsumer [플레이어 대화창 프로듀서-컨슈머]
         WF -->|6. 생산자: 문자 주입| Ch
         Ch -->|7. 소비자: 문자 인출| WF
     end
@@ -181,17 +194,37 @@ flowchart TD
 
 ```bash
 GRC
-├─Config/               # 구글 클라우드 자격증명 설정 (.json)
-├─Helpers/              # UI 유틸리티 및 오디오/대화 관련 백엔드 헬퍼
-│  ├─LlmJsonParser.cs       # LLM 출력 내 JSON 데이터 추출 파서
-│  └─TokenLogger.cs         # 대화별 토큰 소모량 추적 로거
-├─Models/               # 데이터 구조 및 모델 명세 (Settings, Session, Lorebook 등)
-├─Services/             # 비즈니스 로직 및 API 연동 서비스
-│  ├─GeminiApiService.cs    # Gemini API 통신 제어
-│  └─LorebookService.cs     # 재귀적 로어북 및 키워드 매칭
-├─Themes/               # 애플리케이션 공통 스타일 및 테마 리소스
-├─ViewModels/           # 뷰와 비즈니스 로직을 연결하는 뷰모델
-└─Views/                # XAML 화면 구성 및 비하인드 코드
+├─Config/                   # 구글 클라우드 자격증명 및 API 설정 폴더
+├─Helpers/                  # UI 유틸리티 및 백엔드 렌더링 헬퍼
+│  ├─LlmJsonParser.cs           # LLM 출력에서 JSON 데이터(스탯/로어북 등)를 추출/파싱하는 유틸리티
+│  ├─SimpleMarkdownHelper.cs    # 헤더 및 굵게/기울임꼴을 텍스트블록에 렌더링하는 경량 마크다운 헬퍼 [UPDATED]
+│  ├─StatefulStreamingHelper.cs # 대화 실시간 출력을 위해 스무스 타이핑 배칭 처리를 담당하는 WPF Attached Property
+│  ├─AutoScrollHelper.cs        # 리스트 아이템 추가 시 자동으로 하단 스크롤을 제어해주는 헬퍼
+│  └─TokenLogger.cs             # Gemini API 호출당 토큰 소모량을 정밀 분석/기록하는 로거
+├─Models/                   # 데이터 구조 및 명세 정의 (Model 계층)
+│  ├─ChapterContext.cs          # 중기 플롯 줄거리 및 현재 세션 스탯 상태 데이터
+│  ├─CharacterPreset.cs         # 세계관, 로어북, 시스템 지시문, 기본 스탯 명세 구조체
+│  ├─ChatSession.cs             # 단기/중기/장기 메모리 요약 상태, 대화 진행 턴 추적용 모델
+│  └─SessionArchitectModels.cs  # AI 아키텍트의 설계 계획 및 상태 추적을 위한 전용 모델 [NEW]
+├─Services/                 # 비즈니스 로직 및 외부 API 통신 제어 (Service 계층)
+│  ├─ChatWorkflowService.cs     # 1차 서사 생성 및 2차 상태창 갱신, TTS 프리페칭을 조율하는 핵심 워크플로우 서비스
+│  ├─GeminiApiService.cs        # Gemini LLM API와의 직접적인 HTTP 통신 및 스트리밍 제어
+│  ├─GeminiTtsService.cs        # gemini-3.1-flash-tts 모델의 오디오 모달리티를 이용한 감정 연기 TTS 서비스
+│  ├─MemoryManagerService.cs    # 단기(Raw) ➡️ 중기(Chapter) ➡️ 장기(Chronicle)로 메모리를 요약 및 융합 제어
+│  ├─LorebookService.cs         # 재귀적으로 키워드를 검출하여 세력/인물 설정을 연쇄 주입하는 로어북 관리자
+│  ├─ReplySuggestionService.cs  # 유저 턴 대기 시 백그라운드에서 플레이어용 3지선다 선택지를 선제 예측/생성하는 서비스
+│  └─SessionArchitectService.cs # AI 아키텍트의 6단계 자동 설계 및 감사관 자가검수(Self-Review) 빌더 서비스 [NEW]
+├─Themes/                   # 다크/반투명 테마 및 Glow 컨트롤 공통 스타일 XAML 리소스
+├─ViewModels/               # 뷰와 비즈니스 로직을 연결하는 뷰모델 계층 (ViewModel 계층)
+│  ├─ChatViewModel.cs           # 롤플레이 진행, 메타 개입 및 평행세계 분기 등의 유저 액션을 제어하는 메인 대화방 뷰모델
+│  ├─SessionListViewModel.cs    # 저장된 세션 파일 검색/나열 및 AI 아키텍트 창 오픈 제어
+│  └─SessionArchitectViewModel.cs # AI 세션 아키텍트 UI 상태기계 및 자동 루프 제어를 담당하는 뷰모델 [NEW]
+└─Views/                    # WPF UI 레이아웃 및 비하인드 코드 (View 계층)
+   ├─ChatView.xaml              # 플레이어 대화 및 메타 개입 입력이 일어나는 메인 채팅방 화면
+   ├─StatusWindow.xaml          # 백그라운드 스레드 격리로 0초 지연 갱신되는 캐릭터 상태창 모달 윈도우
+   ├─SessionListView.xaml       # 로컬에 세이브된 평행세계 세션 리스트 뷰
+   ├─EditLorebookWindow.xaml    # 수동 로어북 관리 및 키워드 추가/삭제 에디터
+   └─SessionArchitectWindow.xaml # AI 아키텍트 6단계 시각화 상태바 및 자동 모드 토글이 위치한 윈도우 [NEW]
 ```
 
 ---
