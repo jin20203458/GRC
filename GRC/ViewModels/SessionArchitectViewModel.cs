@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -27,9 +26,6 @@ public partial class SessionArchitectViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isBusy;
-
-    [ObservableProperty]
-    private string _streamingText = "";  // AI 실시간 타이핑 버퍼
 
     [ObservableProperty]
     private string _busyMessage = "";  // 하단 스트리밍 영역에 표시할 동적 상태 문구
@@ -97,7 +93,6 @@ public partial class SessionArchitectViewModel : ObservableObject
         {
             _cts.Cancel();
             IsBusy = false;
-            StreamingText = "";
 
             // 자율 모드 중 중단 시 수동 모드로 전환하여 유저에게 제어권 반환 (A안)
             if (IsAutoMode)
@@ -153,7 +148,6 @@ public partial class SessionArchitectViewModel : ObservableObject
             {
                 // 1. 계획 설계 시작
                 CurrentStep = AgentStep.Planning;
-                StreamingText = "";
                 BusyMessage = GetBusyMessage(AgentStep.Planning);
 
                 var stream = _architectService.GeneratePlanAsync(userMsg, _session.ExistingPreset, _cts.Token);
@@ -203,7 +197,6 @@ public partial class SessionArchitectViewModel : ObservableObject
                 AgentStep originalStep = CurrentStep;
                 AgentStep genStep = GetGenStepFromReview(originalStep);
                 CurrentStep = genStep;
-                StreamingText = "";
                 BusyMessage = GetBusyMessage(genStep);
 
                 string previousContent = GetCurrentStepContent(originalStep);
@@ -232,7 +225,7 @@ public partial class SessionArchitectViewModel : ObservableObject
                     Messages.Add(new ArchitectMessage
                     {
                         Role = "assistant",
-                        Text = $"수정 사항을 파싱하거나 저장하는 데 실패했습니다. AI 응답:\n\n{StreamingText}",
+                        Text = $"수정 사항을 파싱하거나 저장하는 데 실패했습니다. AI 응답:\n\n{revisedText}",
                         Timestamp = DateTime.Now
                     });
                 }
@@ -270,7 +263,6 @@ public partial class SessionArchitectViewModel : ObservableObject
         }
         finally
         {
-            StreamingText = "";
             IsBusy = false;
             _cts = null;
         }
@@ -300,7 +292,6 @@ public partial class SessionArchitectViewModel : ObservableObject
             if (_cts?.IsCancellationRequested == true) return;
 
             CurrentStep = genStep;
-            StreamingText = "";
             BusyMessage = GetBusyMessage(genStep);
 
             try
@@ -317,7 +308,6 @@ public partial class SessionArchitectViewModel : ObservableObject
                 {
                     // ── 자가 검토 단계 ──
                     BusyMessage = GetBusyMessage(reviewStep, isReviewing: true);
-                    StreamingText = ""; // 검토 중에는 타이핑 스트리밍 비우기
 
                     var (pass, feedback) = await _architectService.ReviewStepContentAsync(
                         reviewStep, GetCurrentStepContent(reviewStep),
@@ -335,7 +325,6 @@ public partial class SessionArchitectViewModel : ObservableObject
 
                         // 1회 자동 수정 (기존 ReviseContentAsync 재활용)
                         BusyMessage = GetBusyMessage(reviewStep, isRevising: true);
-                        StreamingText = "";
                         var reviseStream = _architectService.ReviseContentAsync(
                             reviewStep, GetCurrentStepContent(reviewStep), feedback,
                             _session.Plan!, _cts!.Token);
@@ -376,7 +365,7 @@ public partial class SessionArchitectViewModel : ObservableObject
                 Messages.Add(new ArchitectMessage
                 {
                     Role = "system",
-                    Text = $"자동 생성 중 파싱 오류가 발생하여 수동 모드로 전환합니다.\n\nAI 응답:\n{StreamingText}",
+                    Text = $"자동 생성 중 파싱 오류가 발생하여 수동 모드로 전환합니다.\n\nAI 응답:\n{stepContentText}",
                     Timestamp = DateTime.Now
                 });
                 IsAutoMode = false;
@@ -390,8 +379,6 @@ public partial class SessionArchitectViewModel : ObservableObject
                 // 중단 시 Cancel()에서 이미 수동 전환 처리됨
                 return;
             }
-
-            StreamingText = "";
         }
 
         // 6단계 모두 완료 → 세션 파일 적용
@@ -448,7 +435,6 @@ public partial class SessionArchitectViewModel : ObservableObject
 
         IsBusy = true;
         CurrentStep = nextGenStep;
-        StreamingText = "";
         BusyMessage = GetBusyMessage(nextGenStep);
 
         try
@@ -501,7 +487,6 @@ public partial class SessionArchitectViewModel : ObservableObject
         }
         finally
         {
-            StreamingText = "";
             IsBusy = false;
             _cts = null;
         }
@@ -692,36 +677,36 @@ public partial class SessionArchitectViewModel : ObservableObject
     private string GetStepDisplayContent(AgentStep reviewStep) => reviewStep switch
     {
         AgentStep.PlanReview => GetPlanSummaryMarkdown(_session.Plan!),
-        AgentStep.WorldviewReview => $"### 🌍 생성된 세계관 설정\n\n{_session.GeneratedWorldview}",
+        AgentStep.WorldviewReview => $"### 세계관 설정 구성\n\n{_session.GeneratedWorldview}",
         AgentStep.LorebookReview => GetLorebookSummaryMarkdown(_session.GeneratedLorebooks!),
         AgentStep.StatusReview => GetStatusSummaryMarkdown(_session.GeneratedStats!, _session.GeneratedStatusGuide!),
-        AgentStep.ScenarioReview => $"### 📖 초기 시나리오 오프닝\n\n{_session.GeneratedScenario}",
-        AgentStep.PromptReview => $"### ⚙️ 시스템 지시문 (System Instruction)\n\n```xml\n{_session.GeneratedSystemPrompt}\n```",
+        AgentStep.ScenarioReview => $"### 초기 시나리오 오프닝\n\n{_session.GeneratedScenario}",
+        AgentStep.PromptReview => $"### 시스템 지시문 (System Instruction)\n\n```xml\n{_session.GeneratedSystemPrompt}\n```",
         _ => ""
     };
 
     private string GetPlanSummaryMarkdown(AgentPlan plan)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("### 📋 AI 설계 계획안 수립 완료");
-        sb.AppendLine($"**테마/개요:** {plan.WorldviewOutline}\n");
-        sb.AppendLine("#### 👥 생성 예정 로어북 항목:");
+        sb.AppendLine("### AI 설계 계획안");
+        sb.AppendLine($"**테마 및 개요:** {plan.WorldviewOutline}\n");
+        sb.AppendLine("#### 생성 예정 로어북 항목");
         foreach (var item in plan.LorebookPlan)
         {
             sb.AppendLine($"- **{item.Name}** ({item.Category}): {item.Brief}");
         }
-        sb.AppendLine("\n#### 📊 설계 예정 스탯창 구성:");
+        sb.AppendLine("\n#### 설계 예정 스탯창 구성");
         sb.AppendLine(string.Join(", ", plan.StatsPlan.Select(s => $"`{s}`")));
-        sb.AppendLine($"\n#### 📖 시나리오 방향성: {plan.ScenarioOutline}");
-        sb.AppendLine($"#### ⚙️ 시스템 프롬프트 구성: {plan.PromptOutline}");
+        sb.AppendLine($"\n#### 시나리오 방향성: {plan.ScenarioOutline}");
+        sb.AppendLine($"#### 시스템 프롬프트 구성: {plan.PromptOutline}");
         return sb.ToString();
     }
 
     private string GetLorebookSummaryMarkdown(List<LorebookEntry> lorebooks)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("### 👥 생성된 로어북 데이터 세트");
-        sb.AppendLine($"총 **{lorebooks.Count}**개의 백과사전 항목이 생성되었습니다.\n");
+        sb.AppendLine("### 생성된 로어북 데이터 세트");
+        sb.AppendLine($"*총 **{lorebooks.Count}**개의 백과사전 항목이 생성되었습니다.*\n");
         foreach (var item in lorebooks)
         {
             sb.AppendLine($"<details><summary><b>{item.Name}</b> ({item.Category}) - 키워드: {string.Join(", ", item.Keywords)}</summary>");
@@ -733,7 +718,7 @@ public partial class SessionArchitectViewModel : ObservableObject
     private string GetStatusSummaryMarkdown(Dictionary<string, string> stats, string guide)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("### 📊 상태창 스탯 및 변동 규칙 설계");
+        sb.AppendLine("### 상태창 스탯 및 변동 규칙 설계");
         sb.AppendLine("#### [초기 스탯]");
         foreach (var stat in stats)
         {
@@ -789,83 +774,32 @@ public partial class SessionArchitectViewModel : ObservableObject
         };
 
     /// <summary>
-    /// IAsyncEnumerable 스트리밍을 Channel을 사용하여 생산자-소비자 패턴으로 백그라운드에서 소비하고,
-    /// 큐 상태에 따라 유동적인 딜레이(Adaptive Delay)와 Dispatcher 스로틀링(Throttle)을 조절하며
-    /// UI 스레드에 실시간 타이핑 효과로 StreamingText를 업데이트합니다.
-    /// 최종 완성된 전체 텍스트를 반환합니다.
+    /// IAsyncEnumerable 스트리밍을 소비하여 최종 완성된 전체 텍스트를 반환합니다.
+    /// (실시간 타이핑 UI가 제거됨에 따라 단순 문자열 결합으로 최적화 및 백그라운드 스레드 격리)
     /// </summary>
     private async Task<string> ConsumeStreamAsync(
         IAsyncEnumerable<string> stream, CancellationToken ct)
     {
-        var channel = Channel.CreateUnbounded<char>();
-        var sb = new StringBuilder();
-
-        // 1. [생산자]: API 스트림 수신 후 문자 단위로 쪼개어 채널에 쓰기
-        var producerTask = Task.Run(async () =>
+        // UI 스레드 프리징 방지를 위해 백그라운드 스레드에서 스트림 수신 및 문자열 조립 수행
+        return await Task.Run(async () =>
         {
+            var sb = new StringBuilder();
+
             try
             {
-                await foreach (var chunk in stream.WithCancellation(ct))
+                // ConfigureAwait(false)를 통해 이후 반복도 메인 스레드 컨텍스트를 강제하지 않음
+                await foreach (var chunk in stream.WithCancellation(ct).ConfigureAwait(false))
                 {
-                    foreach (var c in chunk)
-                    {
-                        await channel.Writer.WriteAsync(c, ct);
-                    }
+                    sb.Append(chunk);
                 }
             }
-            catch (Exception)
+            catch (OperationCanceledException)
             {
-                // Task 취소 등 예외 무시
+                // 취소 시 무시
             }
-            finally
-            {
-                channel.Writer.Complete();
-            }
+
+            return sb.ToString();
         }, ct);
-
-        // 2. [소비자]: 문자를 하나씩 읽어 타이핑 효과를 주되 UI 갱신은 일정 주기로 스로틀링 (SimpleMarkdownHelper 렉 방지)
-        var consumerTask = Task.Run(async () =>
-        {
-            var lastUpdate = DateTime.UtcNow;
-            const int FlushIntervalMs = 30; // 30ms 주기로 UI 스레드에 전송 (렉 방지 및 60fps 수준의 부드러움)
-
-            await foreach (var c in channel.Reader.ReadAllAsync(ct))
-            {
-                sb.Append(c);
-
-                var now = DateTime.UtcNow;
-                int pendingCount = channel.Reader.Count;
-
-                // 30ms 경과했거나 대기 문자가 더 없으면 UI 반영
-                if ((now - lastUpdate).TotalMilliseconds >= FlushIntervalMs || pendingCount == 0)
-                {
-                    var snapshot = sb.ToString();
-                    await App.Current.Dispatcher.InvokeAsync(() => StreamingText = snapshot);
-                    lastUpdate = now;
-                }
-
-                // 가변 타이핑 속도 조절 (Adaptive Delay)
-                if (pendingCount > 150)
-                {
-                    await Task.Yield(); // 큐가 아주 많이 밀리면 딜레이 없이 즉시 진행
-                }
-                else if (pendingCount > 30)
-                {
-                    await Task.Delay(1, ct); // 중간 정도 밀리면 1ms 지연
-                }
-                else
-                {
-                    await Task.Delay(3, ct); // 기본 타이핑 효과 속도 (3ms 지연)
-                }
-            }
-
-            // 최종 텍스트 UI 동기화
-            var final = sb.ToString();
-            await App.Current.Dispatcher.InvokeAsync(() => StreamingText = final);
-        }, ct);
-
-        await Task.WhenAll(producerTask, consumerTask);
-        return sb.ToString();
     }
 
     #endregion
