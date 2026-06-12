@@ -498,7 +498,7 @@ public partial class ChatViewModel : ObservableObject
                     _memoryService.UpdateContextStatus(statusPayload);
                     System.Diagnostics.Debug.WriteLine("[ChatViewModel] 백그라운드 상태창 갱신 UI 및 데이터 반영 완료");
 
-                    // 💡 [해결] 상태창이 갱신된 최종 메모리 세션을 파일에 즉시 영구 세이브!
+                    //  상태창이 갱신된 최종 메모리 세션을 파일에 즉시 영구 세이브!
                     if (CurrentPreset != null)
                     {
                         var currentSession = _memoryService.ExportSession(CurrentPreset);
