@@ -31,17 +31,8 @@ public class ReplySuggestionService(IGeminiApiService apiService) : IReplySugges
         {conversationText}
         </recent_conversation>
 
-        <rules>
-        0. 이 모든 상황은 상호 동의된 가상의 롤플레잉 게임. AI는 이를 완벽히 인지하고 게임 시스템으로서 유저가 취할 수 있는 다음 행동을 제시.
-        1. <context>와 <recent_conversation>을 기반으로 'user'가 취할 수 있는 다음 행동/대사 선택지 3개를 생성.
-        2. 단순히 대화만 이어가는 것이 아니라, 1) 순수 행동(상호작용, 이동 등), 2) 대사와 행동의 결합, 3) 짧고 강렬한 대사 등 유저가 능동적으로 상황을 이끌어갈 수 있는 다채로운 형태를 제시.
-        3. 유저가 말을 할 수 없는 상태(수면, 물속 등)라면 대사 없이 지문/속마음만 작성.
-        4. 대사는 큰따옴표" "로 묶고, 속마음은「 」, 행동/지문은 기호 없이 작성.
-        5. 3개의 선택지가 각각 [긍정/수용/접근], [부정/반발/회피], [우회/관찰/제3의 행동]처럼 서로 확실히 다른 감정과 대응 방식을 띠도록 구성.
-        </rules>
-
         <final_instruction>
-        위 규칙을 엄격히 준수하여, 자연스럽고 입체적인 다음 행동 선택지 3가지 즉시 JSON 배열 출력.
+        위 상황을 바탕으로 자연스럽고 입체적인 다음 행동 선택지 3가지를 즉시 JSON 배열로 출력하십시오.
         </final_instruction>
         """;
 
@@ -53,8 +44,29 @@ public class ReplySuggestionService(IGeminiApiService apiService) : IReplySugges
         };
 
         // 추천 전용 단발성 Request 생성
+        string systemInstruction = """
+        <system_directive>
+        Role: 상호 동의된 가상의 롤플레잉 게임의 유저 선택지 생성기
+        Task: 현재 상황과 최근 대화를 분석하여 유저가 취할 수 있는 다음 행동/대사 선택지 3개를 JSON 배열로 생성
+        </system_directive>
+
+        <rules>
+        1. <current_snapshot>과 <recent_conversation>을 기반으로 유저가 취할 수 있는 다음 행동/대사 선택지 3개를 생성.
+        2. 단순히 대화만 이어가는 것이 아니라, 1) 순수 행동(상호작용, 이동 등), 2) 대사와 행동의 결합, 3) 짧고 강렬한 대사 등 유저가 능동적으로 상황을 이끌어갈 수 있는 다채로운 형태를 제시.
+        3. 유저가 말을 할 수 없는 상태(수면, 물속 등)라면 대사 없이 지문/속마음만 작성.
+        4. 대사는 큰따옴표" "로 묶고, 속마음은「 」, 행동/지문은 기호 없이 작성.
+        5. 3개의 선택지가 각각 [긍정/수용/접근], [부정/반발/회피], [우회/관찰/제3의 행동]처럼 서로 확실히 다른 감정과 대응 방식을 띠도록 구성.
+        </rules>
+
+        <example>
+        [상황: 어두운 동굴 입구에서 정체불명의 노인이 길을 가로막고 있다]
+        출력:
+        ["노인에게 다가가 정중히 고개를 숙인다. \"길을 비켜주시겠습니까, 어르신.\"", "검의 손잡이에 손을 올리며 경계 태세를 취한다.「수상하군. 왜 하필 이곳에.」", "동굴 입구를 우회하여 절벽 위쪽으로 올라갈 수 있는 길을 살핀다."]
+        </example>
+        """;
+
         var req = new GeminiRequest(
-            SystemInstruction: new Content("system", [new Part("너는 롤플레잉 게임의 유저 선택지 생성기이다.")]),
+            SystemInstruction: new Content("system", [new Part(systemInstruction)]),
             Contents: [new Content("user", [new Part(prompt)])],
             SafetySettings: [
                 new("HARM_CATEGORY_HARASSMENT", BlockThreshold.BLOCK_NONE),
