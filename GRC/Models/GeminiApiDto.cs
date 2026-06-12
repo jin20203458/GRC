@@ -61,7 +61,7 @@ public record SafetySetting(
 );
 
 public record GenerationConfig(
-    [property: JsonPropertyName("temperature")] float Temperature,
+    [property: JsonPropertyName("temperature")] float? Temperature,
     [property: JsonPropertyName("maxOutputTokens")] int MaxOutputTokens,
     [property: JsonPropertyName("responseMimeType")] string? ResponseMimeType = "text/plain",
     [property: JsonPropertyName("responseSchema")] object? ResponseSchema = null,

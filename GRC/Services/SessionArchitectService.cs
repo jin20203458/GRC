@@ -70,7 +70,7 @@ public class SessionArchitectService : ISessionArchitectService
         }
 
         var contents = new List<Content> { new Content("user", [new Part(userPrompt)]) };
-        var generationConfig = new GenerationConfig(1.0f, 4096, "application/json");
+        var generationConfig = new GenerationConfig(null, 4096, "application/json");
 
         var request = new GeminiRequest(systemInstruction, contents, null, generationConfig);
 
@@ -249,7 +249,7 @@ public class SessionArchitectService : ISessionArchitectService
 
         var systemInstruction = new Content("system", [new Part(systemInstructionText)]);
         var contents = new List<Content> { new Content("user", [new Part(userPrompt)]) };
-        var generationConfig = new GenerationConfig(1.0f, 8192, responseMimeType);
+        var generationConfig = new GenerationConfig(null, 8192, responseMimeType);
 
         var request = new GeminiRequest(systemInstruction, contents, null, generationConfig);
 
@@ -330,7 +330,7 @@ public class SessionArchitectService : ISessionArchitectService
 """;
 
         var contents = new List<Content> { new Content("user", [new Part(userPrompt)]) };
-        var generationConfig = new GenerationConfig(1.0f, 8192, responseMimeType);
+        var generationConfig = new GenerationConfig(null, 8192, responseMimeType);
 
         var request = new GeminiRequest(systemInstruction, contents, null, generationConfig);
 
@@ -441,7 +441,7 @@ public class SessionArchitectService : ISessionArchitectService
 
         var si = new Content("system", [new Part(systemInstruction)]);
         var contents = new List<Content> { new Content("user", [new Part(prompt)]) };
-        var config = new GenerationConfig(1.0f, 4096, "application/json");
+        var config = new GenerationConfig(null, 4096, "application/json");
 
         var request = new GeminiRequest(si, contents, null, config);
 
@@ -480,7 +480,7 @@ public class SessionArchitectService : ISessionArchitectService
             Name: sessionName,
             Worldview: session.GeneratedWorldview ?? "",
             SystemPrompt: session.GeneratedSystemPrompt ?? "",
-            Temperature: 1.0f,
+            Temperature: null,
             MaxOutputTokens: 8192,
             Lorebooks: session.GeneratedLorebooks ?? new(),
             CustomStats: session.GeneratedStats ?? new(),

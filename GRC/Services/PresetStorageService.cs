@@ -56,7 +56,7 @@ public class PresetStorageService : IPresetStorageService
 4. [NPC 자율성] 유저 행동의 무조건적 성공 보장 불가. 개연성 및 NPC 성향에 어긋날 시 단호한 거절이나 적대적 반응 필수.
 </system>
 """,
-                    Temperature: 1.0f,
+                    Temperature: null,
                     MaxOutputTokens: 8192
                 );
 
@@ -80,7 +80,7 @@ public class PresetStorageService : IPresetStorageService
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[Preset Load Error]: {ex.Message}");
-            return new CharacterPreset("오류 복구용", "임시 세계관", "시스템 에러", 1.0f, 4096, StatusUpdateGuide: "");
+            return new CharacterPreset("오류 복구용", "임시 세계관", "시스템 에러", null, 4096, StatusUpdateGuide: "");
         }
     }
 

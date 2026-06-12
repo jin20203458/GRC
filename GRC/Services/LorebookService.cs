@@ -164,7 +164,7 @@ public class LorebookService(IGeminiApiService apiService) : ILorebookService
          SystemInstruction: systemInstruction,
          Contents: [new Content("user", [new Part(prompt)])],
          SafetySettings: null,
-         GenerationConfig: new GenerationConfig(1.0f, 2048, "application/json", null, new ThinkingConfig(ThinkingLevel.medium))
+         GenerationConfig: new GenerationConfig(null, 2048, "application/json", null, new ThinkingConfig(ThinkingLevel.medium))
      );
 
         try

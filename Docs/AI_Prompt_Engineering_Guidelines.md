@@ -1,8 +1,9 @@
 # AI 프롬프트 엔지니어링 지침서 (GRC Project)
 # AI Prompt Engineering Guidelines
 # 
-# 최종 갱신일: 2026-06-12
+# 최종 갱신일: 2026-06-12 (검증 완료)
 # 근거: 2024~2026년 최신 학술 논문 18편 및 Google/Anthropic/OpenAI 공식 가이드라인 기반
+# 검증: 전체 인용 출처 18건 웹 검증 완료 (2026-06-12)
 #
 # 본 문서는 GRC 프로젝트의 모든 AI 프롬프트 작성 시 참조해야 할 핵심 원칙과 실전 규칙을 정리합니다.
 
@@ -42,8 +43,9 @@ XML 태그를 사용하여 프롬프트의 각 구성 요소(지시문, 데이�
 ### 근거
 - [Source] "Defense Against Prompt Injection Attack" (ACL 2025, 44회 인용)
   → OWASP LLM 보안 위협 1위. 근본 원인 = 지시문과 데이터 사이의 분리 부재.
-- [Source] "How Not to Detect Prompt Injections with an LLM" (ACM, 2025.12)
-  → LLM 기반 인젝션 탐지는 근본적으로 신뢰 불가. 아키텍처적 분리만이 유효.
+- [Source] "How Not to Detect Prompt Injections with an LLM" (ACM AISec 2025 Workshop, 2025.10)
+  → LLM 기반 인젝션 탐지(KAD)는 구조적 취약점 존재. DataFlip 공격으로 탐지율 0% 달성 가능.
+  → 아키텍처적 분리만이 근본적으로 유효한 방어 전략.
 
 ### 실전 규칙
 - 사용자 입력 데이터는 반드시 <user_input> 또는 <context> 태그로 감싸서 격리
@@ -63,9 +65,11 @@ XML 태그를 사용하여 프롬프트의 각 구성 요소(지시문, 데이�
 ### 근거
 - [Source] "Software Engineering for Prompt-Enabled Systems" (arXiv:2503.02400, 2025-2026)
   → 프롬프트를 타입 기반 인터페이스(typed interface)로 취급. 계약 기반 설계(contract-driven).
-- [Source] "JSONSchemaBench" (OpenReview, 2025)
-  → 프롬프트만으로 JSON 유도 시 5~15% 스키마 위반 실패율.
-     문법 기반 제약 디코딩 시 거의 100% 달성.
+- [Source] "JSONSchemaBench: A Rigorous Benchmark of Structured Outputs for Language Models" 
+  (arXiv:2501.10868, ICML 2025 ES-FoMo Workshop)
+  → 프롬프트만으로 JSON 유도 시 스키마 복잡도에 따라 실패율 급증 (단순: ~14%, 복잡: 최대 91%).
+     문법 기반 제약 디코딩(Guidance, XGrammar 등)으로 단순 스키마에서 거의 100% 달성 가능하나,
+     복잡한 재귀/중첩 스키마에서는 프레임워크별 편차 큼.
 - [Source] "Chain-of-Collaboration Prompting Framework" (arXiv, 2025.05)
   → 멀티 에이전트 간 출력은 파싱 가능하고 검증된 형식이어야 함.
 
@@ -90,10 +94,16 @@ LLM은 산술 연산에서 체계적 오류(2~15%)를 범한다.
 수치를 다루는 프롬프트에는 반드시 유효 범위(Clamping)와 이탈 시 처리 규칙을 명시한다.
 
 ### 근거
-- [Source] "LLM CodeSteer" (ICLR 2025, 31회 인용)
-  → LLM의 텍스트 추론 기반 산술에서 체계적 오류 발생. 코드 기반 도구 사용을 권장.
-- [Source] "Demystifying Errors in LLM Reasoning Traces" (2026.04)
-  → 최첨단 추론 모델 4종 평가. 계산 오류가 가장 빈발하는 오류 유형 중 하나.
+- [Source] "Steering Large Language Models between Code Execution and Textual Reasoning" 
+  (ICLR 2025, CodeSteer)
+  → LLM이 코드 실행 대신 텍스트 추론을 선호하는 경향이 있으며, 이 경우 산술 오류 발생.
+     코드 기반 도구 사용(Code Interpreter) 시 100% 성공률 달성 가능한 과제에서도
+     텍스트 추론 시 성능 저하. 모델/과제 복잡도 증가 시 역스케일링 관찰.
+- [Source] "Demystifying Errors in LLM Reasoning Traces: An Empirical Study of Code Execution Simulation" 
+  (ACM TOSEM, 2026 / arXiv:2512.00215, 2025.11)
+  → 최첨단 추론 모델 4종(Claude 4, DeepSeek R1, Gemini, GPT-4o) 평가.
+     9가지 오류 유형 분류 중 Computation Error가 가장 빈발.
+     도구 보강(calculator 플러그인) 시 계산 오류의 58% 교정 가능.
 
 ### 실전 규칙
 - "100/100" 같은 범위형 스탯: [0~최대치] 이탈 불가 명시 (Clamping)
@@ -160,14 +170,14 @@ Few-shot 예시는 항상 포함하되, 2~4개가 최적이며 형식 일관성�
 ## 7. Temperature 및 Generation Config 최적화
 
 ### 원칙
-과제 유형에 따라 Temperature를 조절하되, Gemini 3.x에서는 기본값 유지가 권장된다.
+Gemini 3.x 모델 제품군에서는 Temperature를 비롯한 샘플링 매개변수(top_p, top_k)를 명시적으로 조작하지 않고 생략(Omit/Null)하여 API 기본값(Default = 1.0)으로 구동한다.
 
 ### 근거
-- [Source] Google 공식 문서 (Gemini 3, 2026.06)
-  → ⚠️ "Gemini 3.x 모델에서는 temperature, top_p, top_k를 기본값으로 유지할 것을 
-     강력히 권장. 변경 시 루핑이나 성능 저하 등 예기치 못한 동작이 발생할 수 있음."
+- [Source] Google 공식 문서 (Gemini 3.5 Flash & 3.1 Pro 개발자 가이드, 2026.06 검증 완료)
+  → ⚠️ "Gemini 3.x 모델에서는 temperature, top_p, top_k를 기본값으로 유지할 것을 강력히 권장. 변경 시 루핑(동일 문장 반복 출력)이나 성능 저하 등 예기치 못한 동작이 발생할 수 있음."
+  → 특히 정밀 JSON 구조화 출력이나 코드 생성 등의 과제에서도 온도를 임의로 낮추는 대신, System Instruction의 규칙 정의 및 Response Schema(Structured Output)를 활용해 일관성을 제어하도록 설계됨.
 
-### Temperature 가이드라인 (Gemini 2.x 이하 또는 타 모델)
+### Temperature 가이드라인 (Gemini 2.x 이하 또는 타사 모델 참고용)
 | 과제 유형             | 권장 Temperature |
 |----------------------|------------------|
 | JSON/구조화 출력      | 0.0 ~ 0.2       |
@@ -178,13 +188,11 @@ Few-shot 예시는 항상 포함하되, 2~4개가 최적이며 형식 일관성�
 | 창작/서사             | 0.7 ~ 1.0       |
 | 브레인스토밍          | 0.8 ~ 1.2       |
 
-### 실전 규칙 (GRC 적용)
-- 현재 에이전트(SessionArchitect): Temperature 1.0 고정
-  → Gemini 3.5 Flash 사용 시 기본값 유지 전략과 부합 ✅
-- 현재 상태창 갱신(StatusAPI): Temperature 0.6
-  → JSON 정밀 출력 과제이므로 적절한 수준 ✅
-- 중기/장기 서사 요약: Temperature 명시 없음 (기본값 사용)
-  → 적절 ✅
+### 실전 규칙 (GRC 적용 상태)
+- **모든 API 호출부 일괄 적용**: `GenerationConfig` 내 `Temperature` 프로퍼티를 nullable(`float?`)로 변환하고 `null`로 지정하여 API 요청 시 필드 자체가 전송되지 않도록(Omit) 구성 완료.
+- **에이전트(SessionArchitect)**: `null` 적용 (기본값 구동) ✅
+- **상태창 갱신(StatusAPI)**: `null` 적용 (JSON 출력 작업이지만 무한 루프 예방을 위해 기존 `0.6`에서 기본값으로 전환 완료) ✅
+- **중기/장기 서사 요약 및 일어 번역**: `null` 적용 (기본값 구동) ✅
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -200,8 +208,9 @@ Thinking이 내장된 모델(Gemini 2.5/3, Claude Extended Thinking)에게는
      응답에서 추론 단계를 설명하도록 하는 것은 일반적으로 불필요."
   → "복잡한 문제에 'Think very hard before answering'이라고 하면 성능 향상 가능."
 - [Source] OpenAI 공식 문서 (2026)
-  → "추론 모델은 시니어 동료와 같다. 목표만 주고 세부사항은 맡겨라."
-  → "GPT 모델은 주니어 동료와 같다. 명시적 지시가 필요하다."
+  → 추론 모델(o-시리즈): CoT 지시 불필요. 간결하고 직접적인 목표 제시가 최적.
+     Developer 메시지에 핵심 지시를 배치하고, 프로세스 세부사항은 모델에 위임.
+  → 표준 GPT 모델: 명시적이고 단계적인 지시가 효과적. 구조화된 프롬프트 필수.
 
 ### Thinking Level 가이드라인 (Gemini 3)
 | 과제 복잡도          | 권장 ThinkingLevel |
@@ -225,11 +234,14 @@ Thinking이 내장된 모델(Gemini 2.5/3, Claude Extended Thinking)에게는
 핵심 정보는 프롬프트의 시작과 끝에 배치하고, 중간 영역은 피한다.
 
 ### 근거
-- [Source] "Lost in the Middle" (Liu et al., TACL 2024, 4625회 인용)
+- [Source] "Lost in the Middle: How Language Models Use Long Contexts" (Liu et al., TACL 2024)
   → LLM은 긴 컨텍스트의 중간에 있는 정보에 주의를 기울이지 못함.
      시작과 끝에 있는 정보가 가장 잘 활용됨.
-- [Source] "Diminishing Returns from Long Prompts" (arXiv:2505.14880, 2025.05)
-  → "토큰 사용량 증가는 급격히 체감하는 성능 수익을 가져온다."
+     장기 컨텍스트 전용 모델에서도 이 현상 관찰.
+- [Source] "Incorporating Token Usage into Prompting Strategy Evaluation" (arXiv:2505.14880, 2025.05)
+  → 토큰 사용량 증가는 급격히 체감하는 성능 수익을 가져온다.
+     Few-shot 예시 3개→8개 시 Token Cost가 10배 이상 증가하나 성능 향상은 미미.
+     Big-Otok 프레임워크 제안: 효율성 인식(efficiency-aware) 프롬프트 평가 필요.
 
 ### 실전 규칙
 - 핵심 지시문: 프롬프트 최상단에 배치
@@ -269,10 +281,13 @@ CJK 언어(한/중/일)는 토큰화 차이로 인해 같은 의미의 텍스트
 영어 대비 2~3배의 토큰을 소비한다. 구조적 마커를 더 명시적으로 사용해야 한다.
 
 ### 근거
-- [Source] "Multilingual Prompt Engineering in LLMs" (arXiv:2505.11665, 2025.05)
-  → 영어 중심으로 개발된 구조적 프롬프팅 기법이 다른 언어에도 전이되나, 
-     효과는 언어별로 상당히 다름. 한국어의 SOV 어순은 영어 SVO와 다르므로 
-     더 명시적인 구조적 마커 필요.
+- [Source] "Multilingual Prompt Engineering in Large Language Models: A Survey Across NLP Tasks" 
+  (arXiv:2505.11665, 2025.05)
+  → 36개 논문, 39개 프롬프팅 기법, 250개 언어 대상 서베이.
+     고자원 언어(영어, 중국어 등)와 저자원 언어 간 LLM 성능 격차가 큼.
+     프롬프트 적응(Prompt Adaptation), 번역 기반 프롬프팅, 교차 언어 Few-shot 등
+     다양한 완화 전략 분석. 한국어 등 SOV 어순 언어에서는 
+     더 명시적인 구조적 마커와 프롬프트 적응 전략이 필요.
 
 ### 실전 규칙 (GRC 적용)
 - System Instruction의 역할/규칙 정의: 한국어 사용 ✅ (사용자 대상 프로젝트)
@@ -302,21 +317,21 @@ Anthropic이 공식 권장하는 가장 일반적인 에이전트 체이닝 패�
 
 ## 참고 문헌 (References)
 
- 1. "XML Prompting as Grammar-Constrained Interaction" (arXiv:2509.08182, 2025.09)
- 2. Anthropic Official Docs - Prompting Best Practices (2024-2025, 지속 업데이트)
- 3. "The PICCO Framework for LLM Prompting" (arXiv:2604.14197, 2026)
- 4. "Software Engineering for Prompt-Enabled Systems" (arXiv:2503.02400, 2025-2026)
- 5. "Defense Against Prompt Injection Attack" (ACL 2025, 44회 인용)
- 6. "JSONSchemaBench: Evaluating Constrained Decoding" (OpenReview, 2025)
- 7. "LLM CodeSteer" (ICLR 2025, 31회 인용)
- 8. "How Not to Detect Prompt Injections with an LLM" (ACM, 2025.12)
- 9. "Chain-of-Collaboration Prompting Framework" (arXiv, 2025.05)
-10. "Demystifying Errors in LLM Reasoning Traces" (ResearchGate, 2026.04)
-11. "LLM Shots: Best Fired at System or User Prompts?" (Huawei Research, 2025)
-12. Google AI Official - Gemini Prompting Strategies (2026.06)
-13. OpenAI Official - Prompt Engineering Guide (2026)
-14. Google AI Official - Gemini Thinking (2026.06.04)
-15. "Lost in the Middle" (Liu et al., TACL 2024, 4625회 인용)
-16. "Diminishing Returns from Long Prompts" (arXiv:2505.14880, 2025.05)
-17. "Multilingual Prompt Engineering in LLMs" (arXiv:2505.11665, 2025.05)
-18. "Few-shot prompting effectiveness" (arXiv:2502.04134, 2025.05, 18회 인용)
+ 1. "XML Prompting as Grammar-Constrained Interaction" — Alpay & Alpay (arXiv:2509.08182, 2025.09)
+ 2. Anthropic Official Docs — Prompting Best Practices (2024-2026, 지속 업데이트)
+ 3. "The PICCO Framework for LLM Prompting" — Cook (arXiv:2604.14197, 2026.04)
+ 4. "Promptware Engineering: Software Engineering for Prompt-Enabled Systems" — Chen et al. (arXiv:2503.02400, ACM TOSEM, 2025)
+ 5. "Defense Against Prompt Injection Attack by Leveraging Attack Techniques" — Chen et al. (ACL 2025)
+ 6. "JSONSchemaBench: A Rigorous Benchmark of Structured Outputs for Language Models" — Geng et al. (arXiv:2501.10868, ICML 2025 ES-FoMo)
+ 7. "Steering Large Language Models between Code Execution and Textual Reasoning" — CodeSteer (ICLR 2025)
+ 8. "How Not to Detect Prompt Injections with an LLM" — Choudhary et al. (ACM AISec 2025 Workshop, 2025.10)
+ 9. "Connecting the Dots: A Chain-of-Collaboration Prompting Framework" — Zhao et al. (arXiv:2505.10936, 2025.05)
+10. "Demystifying Errors in LLM Reasoning Traces" — Abdollahi et al. (ACM TOSEM, 2026 / arXiv:2512.00215)
+11. "LLM Shots: Best Fired at System or User Prompts?" — Halil et al. (ACM WWW '25 / Huawei Research, 2025)
+12. Google AI Official — Gemini Prompting Strategies (2026.06)
+13. OpenAI Official — Prompt Engineering Guide (2026)
+14. Google AI Official — Gemini Thinking (2026.06)
+15. "Lost in the Middle: How Language Models Use Long Contexts" — Liu et al. (TACL 2024)
+16. "Incorporating Token Usage into Prompting Strategy Evaluation" (arXiv:2505.14880, 2025.05)
+17. "Multilingual Prompt Engineering in Large Language Models: A Survey Across NLP Tasks" — Vatsal et al. (arXiv:2505.11665, 2025.05)
+18. "The Order Effect: Investigating Prompt Sensitivity to Input Order in LLMs" (arXiv:2502.04134, 2025)

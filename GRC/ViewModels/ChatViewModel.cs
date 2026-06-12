@@ -435,7 +435,7 @@ public partial class ChatViewModel : ObservableObject
         new("HARM_CATEGORY_SEXUALLY_EXPLICIT", BlockThreshold.BLOCK_NONE),
         new("HARM_CATEGORY_DANGEROUS_CONTENT", BlockThreshold.BLOCK_NONE)
        ],
-       GenerationConfig: new GenerationConfig(Temperature: 0.7f, MaxOutputTokens: 1024, ResponseMimeType: "text/plain")
+       GenerationConfig: new GenerationConfig(Temperature: null, MaxOutputTokens: 1024, ResponseMimeType: "text/plain")
    );
 
                      // FlashLite 모델을 사용해 백그라운드에서 신속하게 번역 (비동기)

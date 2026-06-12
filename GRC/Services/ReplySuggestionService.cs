@@ -62,7 +62,7 @@ public class ReplySuggestionService(IGeminiApiService apiService) : IReplySugges
                 new("HARM_CATEGORY_SEXUALLY_EXPLICIT", BlockThreshold.BLOCK_NONE),
                 new("HARM_CATEGORY_DANGEROUS_CONTENT", BlockThreshold.BLOCK_NONE)
             ],
-            GenerationConfig: new GenerationConfig(1.0f, 8192, "application/json", suggestionSchema, new ThinkingConfig(ThinkingLevel.low))
+            GenerationConfig: new GenerationConfig(null, 8192, "application/json", suggestionSchema, new ThinkingConfig(ThinkingLevel.low))
         );
 
         try

@@ -525,7 +525,7 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
             SystemInstruction: new Content("system", [new Part(systemMsg)]),
             Contents: [new Content("user", [new Part(prompt)])],
             SafetySettings: GetSafetySettings(BlockThreshold.BLOCK_NONE),
-            GenerationConfig: new GenerationConfig(1.0f, 8192, mimeType, schema, new ThinkingConfig(thinkingLevel))
+            GenerationConfig: new GenerationConfig(null, 8192, mimeType, schema, new ThinkingConfig(thinkingLevel))
         );
     }
     public void InjectInitialScenario(string scenarioText)
@@ -697,7 +697,7 @@ interface StatusWindow {
             Contents: [new Content("user", [new Part(prompt)])],
             SafetySettings: GetSafetySettings(safetyThreshold),
             GenerationConfig: new GenerationConfig(
-                Temperature: 0.6f,
+                Temperature: null,
                 MaxOutputTokens: 8192,
                 ResponseMimeType: "application/json",
                 ResponseSchema: null,
