@@ -264,7 +264,7 @@ public class ChatWorkflowService(
                             userMessage.Text, responseText, preset.StatusUpdateGuide, currentSettings.SafetyThreshold);
 
                         string statusResponse = await apiService.SendMessageAsync(statusRequest, ModelTier.FlashLite);
-                        Debug.WriteLine($"[StatusAPI - BG] 상태창 갱신 응답 수신 (앞 100자): {statusResponse?.Substring(0, Math.Min(100, statusResponse?.Length ?? 0))}");
+                        //Debug.WriteLine($"[StatusAPI - BG] 상태창 갱신 응답 수신 (앞 100자): {statusResponse?.Substring(0, Math.Min(100, statusResponse?.Length ?? 0))}");
 
                         if (!string.IsNullOrWhiteSpace(statusResponse) && !statusResponse.StartsWith("[System"))
                         {
@@ -280,13 +280,13 @@ public class ChatWorkflowService(
                         }
                         else
                         {
-                            Debug.WriteLine($"[StatusAPI Error - BG] 상태창 API 비정상 응답: {statusResponse}");
+                            //Debug.WriteLine($"[StatusAPI Error - BG] 상태창 API 비정상 응답: {statusResponse}");
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
                         // 상태 갱신 실패 시 로그만 남기고 이전 상태 유지 (Graceful Degradation)
-                        Debug.WriteLine($"[StatusAPI Error - BG] 상태창 백그라운드 갱신 실패: {ex.Message}");
+                        //Debug.WriteLine($"[StatusAPI Error - BG] 상태창 백그라운드 갱신 실패: {ex.Message}");
                     }
                 });
             }
