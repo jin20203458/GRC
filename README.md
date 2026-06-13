@@ -54,7 +54,8 @@ GRC는 Google Gemini API를 활용하여 고도로 몰입감 있고 생동감 �
 사용자가 제시한 아주 짤막한 컨셉 한 줄(예: *사이버펑크 하수구 아포칼립스*)만을 바탕으로, 즉시 플레이 가능한 풍부한 분량의 TRPG 세션 기획 및 리소스를 알아서 설계하고 빌드해 주는 자율 코딩 에이전트 스타일의 빌더입니다.
 * **6단계 에이전트 상태 기계 (State Machine)**: 기획 수립(Planning) ➡️ 상세 세계관(Worldview) ➡️ 로어북(Lorebook) ➡️ 캐릭터 스탯창(Status) ➡️ 초기 오프닝 시나리오(Scenario) ➡️ AI GM 지시문(System Prompt)으로 이어지는 체계화된 빌드 단계로 진행됩니다.
 * **자가 검수(Self-Review) 및 자율 자동화 루프**: **"↻ 자동"** 모드를 활성화하면, 각 단계 생성 완료 시 백그라운드에서 AI 감사관이 기획 내용 및 JSON 문법을 스스로 검증하여 승인(`pass`) 또는 수정 요구(`issues`)를 판단하며 다음 단계 전이와 최종 세션 적용까지 사람의 개입 없이 원스톱 자율 진행됩니다.
-* **생산자-소비자 기반 스로틀 스트리밍**: LLM 스트리밍이 생성될 때 WPF UI 스레드가 마크다운 파싱 렌더링으로 인해 멈추는 렉을 없애기 위해 **`System.Threading.Channels`** 버퍼와 30ms 단위 스로틀링(Throttling) 및 가변 지연(Adaptive Delay)을 적용하여, 부하를 원천 차단하면서 극도로 부드러운 타이핑 애니메이션을 실현했습니다.
+* **수동-자동 심리스(Seamless) 주행 전환**: 사용자가 수동 모드로 단계를 밟아가며 리뷰하다가도, 언제든지 자동 토글을 켜고 "승인 및 다음 단계"를 누르면 그 즉시 자율 엔진이 바통을 이어받아 남은 최종 단계들까지 일괄 자동화로 완주합니다.
+* **생산자-소비자 기반 비동기 스트리밍 & UX 최적화**: LLM 스트리밍이 생성될 때 UI 멈춤을 완벽 차단하기 위해 **`System.Threading.Channels`** 버퍼와 30ms 단위 스로틀링 및 가변 지연(Adaptive Delay)을 적용했습니다. 또한, 미완성 상태의 날것(Raw)의 JSON 데이터가 노출되는 UI 지저분함을 방지하기 위해 실시간 문자 렌더링을 가리고 세련된 도트 스피너 진행바로 단순화하여 시각적 고급스러움과 성능 향상을 동시 달성했습니다.
 * **가벼운 정규식 기반 마크다운 렌더러**: 윈도우 내부에 자체 제작된 `SimpleMarkdownHelper`가 다단계 제목(`##`), 볼드(`**`), 이탤릭(`*`), 인라인 코드(`` ` ``) 등을 빠른 성능으로 파싱하여 청록색 테마와 조화로운 마크다운 문서를 렌더링합니다.
 
 ---
@@ -193,38 +194,43 @@ flowchart TD
 본 프로젝트는 의존성 주입(DI)이 적용된 **MVVM (Model-View-ViewModel)** 패턴으로 구성되어 있습니다.
 
 ```bash
-GRC
-├─Config/                   # 구글 클라우드 자격증명 및 API 설정 폴더
-├─Helpers/                  # UI 유틸리티 및 백엔드 렌더링 헬퍼
-│  ├─LlmJsonParser.cs           # LLM 출력에서 JSON 데이터(스탯/로어북 등)를 추출/파싱하는 유틸리티
-│  ├─SimpleMarkdownHelper.cs    # 헤더 및 굵게/기울임꼴을 텍스트블록에 렌더링하는 경량 마크다운 헬퍼 [UPDATED]
-│  ├─StatefulStreamingHelper.cs # 대화 실시간 출력을 위해 스무스 타이핑 배칭 처리를 담당하는 WPF Attached Property
-│  ├─AutoScrollHelper.cs        # 리스트 아이템 추가 시 자동으로 하단 스크롤을 제어해주는 헬퍼
-│  └─TokenLogger.cs             # Gemini API 호출당 토큰 소모량을 정밀 분석/기록하는 로거
-├─Models/                   # 데이터 구조 및 명세 정의 (Model 계층)
-│  ├─ChapterContext.cs          # 중기 플롯 줄거리 및 현재 세션 스탯 상태 데이터
-│  ├─CharacterPreset.cs         # 세계관, 로어북, 시스템 지시문, 기본 스탯 명세 구조체
-│  ├─ChatSession.cs             # 단기/중기/장기 메모리 요약 상태, 대화 진행 턴 추적용 모델
-│  └─SessionArchitectModels.cs  # AI 아키텍트의 설계 계획 및 상태 추적을 위한 전용 모델 [NEW]
-├─Services/                 # 비즈니스 로직 및 외부 API 통신 제어 (Service 계층)
-│  ├─ChatWorkflowService.cs     # 1차 서사 생성 및 2차 상태창 갱신, TTS 프리페칭을 조율하는 핵심 워크플로우 서비스
-│  ├─GeminiApiService.cs        # Gemini LLM API와의 직접적인 HTTP 통신 및 스트리밍 제어
-│  ├─GeminiTtsService.cs        # gemini-3.1-flash-tts 모델의 오디오 모달리티를 이용한 감정 연기 TTS 서비스
-│  ├─MemoryManagerService.cs    # 단기(Raw) ➡️ 중기(Chapter) ➡️ 장기(Chronicle)로 메모리를 요약 및 융합 제어
-│  ├─LorebookService.cs         # 재귀적으로 키워드를 검출하여 세력/인물 설정을 연쇄 주입하는 로어북 관리자
-│  ├─ReplySuggestionService.cs  # 유저 턴 대기 시 백그라운드에서 플레이어용 3지선다 선택지를 선제 예측/생성하는 서비스
-│  └─SessionArchitectService.cs # AI 아키텍트의 6단계 자동 설계 및 감사관 자가검수(Self-Review) 빌더 서비스 [NEW]
-├─Themes/                   # 다크/반투명 테마 및 Glow 컨트롤 공통 스타일 XAML 리소스
-├─ViewModels/               # 뷰와 비즈니스 로직을 연결하는 뷰모델 계층 (ViewModel 계층)
-│  ├─ChatViewModel.cs           # 롤플레이 진행, 메타 개입 및 평행세계 분기 등의 유저 액션을 제어하는 메인 대화방 뷰모델
-│  ├─SessionListViewModel.cs    # 저장된 세션 파일 검색/나열 및 AI 아키텍트 창 오픈 제어
-│  └─SessionArchitectViewModel.cs # AI 세션 아키텍트 UI 상태기계 및 자동 루프 제어를 담당하는 뷰모델 [NEW]
-└─Views/                    # WPF UI 레이아웃 및 비하인드 코드 (View 계층)
-   ├─ChatView.xaml              # 플레이어 대화 및 메타 개입 입력이 일어나는 메인 채팅방 화면
-   ├─StatusWindow.xaml          # 백그라운드 스레드 격리로 0초 지연 갱신되는 캐릭터 상태창 모달 윈도우
-   ├─SessionListView.xaml       # 로컬에 세이브된 평행세계 세션 리스트 뷰
-   ├─EditLorebookWindow.xaml    # 수동 로어북 관리 및 키워드 추가/삭제 에디터
-   └─SessionArchitectWindow.xaml # AI 아키텍트 6단계 시각화 상태바 및 자동 모드 토글이 위치한 윈도우 [NEW]
+GRC (Repository Root)
+├─Docs/                     # 학술 논문 및 공식 가이드라인 기반 AI 프롬프트 설계 지침서 [NEW]
+│  ├─AI_Prompt_Engineering_Guidelines.md # 최신 Prompt Engineering 핵심 원칙 및 실전 규칙
+│  ├─AI_Prompt_AntiPatterns_Guidelines.md# 프롬프트 작성 시 피해야 할 안티패턴 정리
+│  └─AI_Prompt_Workflow_Guide.md         # 증상별 프롬프트 검토 및 최적화 워크플로우 가이드
+└─GRC/                      # 클라이언트 소스코드 루트 폴더
+   ├─Config/                # 구글 클라우드 자격증명 및 AppSettings 설정 폴더
+   ├─Helpers/               # UI 유틸리티 및 마크다운/스트리밍 렌더링 헬퍼
+   │  ├─LlmJsonParser.cs           # LLM 출력에서 JSON 데이터(스탯/로어북 등)를 추출/파싱하는 유틸리티
+   │  ├─SimpleMarkdownHelper.cs    # 헤더 및 굵게/기울임꼴을 텍스트블록에 렌더링하는 경량 마크다운 헬퍼 [UPDATED]
+   │  ├─StatefulStreamingHelper.cs # 대화 실시간 출력을 위해 스무스 타이핑 배칭 처리를 담당하는 WPF Attached Property
+   │  ├─AutoScrollHelper.cs        # 리스트 아이템 추가 시 자동으로 하단 스크롤을 제어해주는 헬퍼
+   │  └─TokenLogger.cs             # Gemini API 호출당 토큰 소모량을 정밀 분석/기록하는 로거
+   ├─Models/                # 데이터 구조 및 명세 정의 (Model 계층)
+   │  ├─ChapterContext.cs          # 중기 플롯 줄거리 및 현재 세션 스탯 상태 데이터
+   │  ├─CharacterPreset.cs         # 세계관, 로어북, 시스템 지시문, 기본 스탯 명세 구조체
+   │  ├─ChatSession.cs             # 단기/중기/장기 메모리 요약 상태, 대화 진행 턴 추적용 모델
+   │  └─SessionArchitectModels.cs  # AI 아키텍트의 설계 계획 및 상태 추적을 위한 전용 모델 [NEW]
+   ├─Services/              # 비즈니스 로직 및 외부 API 통신 제어 (Service 계층)
+   │  ├─ChatWorkflowService.cs     # 1차 서사 생성 및 2차 상태창 갱신, TTS 프리페칭을 조율하는 핵심 워크플로우 서비스
+   │  ├─GeminiApiService.cs        # Gemini LLM API와의 직접적인 HTTP 통신 및 스트리밍 제어
+   │  ├─GeminiTtsService.cs        # gemini-3.1-flash-tts 모델의 오디오 모달리티를 이용한 감정 연기 TTS 서비스
+   │  ├─MemoryManagerService.cs    # 단기(Raw) ➡️ 중기(Chapter) ➡️ 장기(Chronicle)로 메모리를 요약 및 융합 제어
+   │  ├─LorebookService.cs         # 재귀적으로 키워드를 검출하여 세력/인물 설정을 연쇄 주입하는 로어북 관리자
+   │  ├─ReplySuggestionService.cs  # 유저 턴 대기 시 백그라운드에서 플레이어용 3지선다 선택지를 선제 예측/생성하는 서비스
+   │  └─SessionArchitectService.cs # AI 아키텍트의 6단계 자동 설계 및 감사관 자가검수(Self-Review) 빌더 서비스 [NEW]
+   ├─Themes/                # 다크/반투명 테마 및 Glow 컨트롤 공통 스타일 XAML 리소스
+   ├─ViewModels/            # 뷰와 비즈니스 로직을 연결하는 뷰모델 계층 (ViewModel 계층)
+   │  ├─ChatViewModel.cs           # 롤플레이 진행, 메타 개입 및 평행세계 분기 등의 유저 액션을 제어하는 메인 대화방 뷰모델
+   │  ├─SessionListViewModel.cs    # 저장된 세션 파일 검색/나열 및 AI 아키텍트 창 오픈 제어
+   │  └─SessionArchitectViewModel.cs # AI 세션 아키텍트 UI 상태기계 및 자동 루프 제어를 담당하는 뷰모델 [NEW]
+   └─Views/                 # WPF UI 레이아웃 및 비하인드 코드 (View 계층)
+      ├─ChatView.xaml              # 플레이어 대화 및 메타 개입 입력이 일어나는 메인 채팅방 화면
+      ├─StatusWindow.xaml          # 백그라운드 스레드 격리로 0초 지연 갱신되는 캐릭터 상태창 모달 윈도우
+      ├─SessionListView.xaml       # 로컬에 세이브된 평행세계 세션 리스트 뷰
+      ├─EditLorebookWindow.xaml    # 수동 로어북 관리 및 키워드 추가/삭제 에디터
+      └─SessionArchitectWindow.xaml # AI 아키텍트 6단계 시각화 상태바 및 자동 모드 토글이 위치한 윈도우 [NEW]
 ```
 
 ---
