@@ -52,7 +52,12 @@ GRC는 Google Gemini API를 활용하여 고도로 몰입감 있고 생동감 �
 * **평행세계 분기**: 과거 대화 로그 중 특정 시점의 대화 카드를 마우스 우클릭하여 해당 순간을 기준으로 완전히 독립된 별도의 평행세계 세션 파일(`.json`)로 분기할 수 있습니다.
 * **추천 선택지**: AI의 대답이 텍스트로 타이핑되는 동안, 플레이어가 취할 수 있는 3종의 다채로운 대사/행동 선택지(수용/반발/제3의 행동)를 백그라운드에서 미리 예측 생성하여 대사가 끝나는 즉시 유저에게 제시합니다.
 
-### 6. AI 세션 아키텍트 (AI Session Architect)
+### 6. 실시간 토큰 및 기억 버퍼 로그 모니터링 (Token & Memory Monitoring)
+어플리케이션 실행 파일이 위치한 폴더의 `Sessions` 디렉토리 하위에 실시간으로 토큰 사용량과 기억 처리 현황이 기록되어 언제든 확인할 수 있습니다.
+* **실시간 토큰 사용 로그 (`*_TokenLog.csv`)**: [TokenLogger.cs](file:///c:/Users/adg01/Documents/GitHub/GRC/GRC/Helpers/TokenLogger.cs)가 매 API 요청(서사 출력, 상태창 갱신 등)마다 사용된 `PromptTokens`, `CandidateTokens`, `ThoughtsTokens` 및 `TotalTokens`를 타임스탬프와 함께 로깅하여, 모델별 토큰 사용 추이와 비용 효율을 한눈에 추적할 수 있습니다.
+* **기억 장치 이벤트 로그 (`*_MemoryLog.txt`)**: [MemoryEventLogger.cs](file:///c:/Users/adg01/Documents/GitHub/GRC/GRC/Helpers/MemoryEventLogger.cs)가 백그라운드에서 실시간으로 작동하며, 3단계 메모리 요약 메커니즘이 동작할 때(단기 기억 포화 ➡️ 중기 플롯 요약 및 융합 ➡️ 장기 연대기 기록 등)의 시점과 요약 결과를 상세히 기록하여 LLM의 기억 동작 상태를 투명하게 모니터링할 수 있도록 돕습니다.
+
+### 7. AI 세션 아키텍트 (AI Session Architect)
 사용자가 제시한 아주 짤막한 컨셉 한 줄(예: *사이버펑크 하수구 아포칼립스*)만을 바탕으로, 즉시 플레이 가능한 풍부한 분량의 TRPG 세션 기획 및 리소스를 알아서 설계하고 빌드해 주는 자율 코딩 에이전트 스타일의 빌더입니다.
 
 <img width="800" alt="Session Architect Demo" src="session_architect.gif" />
