@@ -131,17 +131,17 @@ flowchart TD
     classDef llm fill:#7E57C2,stroke:#5E35B1,stroke-width:2px,color:#fff;
     classDef helper fill:#D84315,stroke:#AD1457,stroke-width:2px,color:#fff;
 
-    User([유저 입력 및 전송]):::ui
+    User(["유저 입력 및 전송"]):::ui
     VM[ChatViewModel]:::ui
     Helper[StatefulStreamingHelper]:::ui
     
     WF[ChatWorkflowService]:::workflow
-    Ch{Channel < char >}:::workflow
+    Ch{"Channel < char >"}:::workflow
     
     Mem[MemoryManagerService]:::memory
     
-    API1[1차 서사 API: Gemini Pro/Flash]:::llm
-    API2[2차 상태창 API: Gemini FlashLite]:::llm
+    API1["1차 서사 API: Gemini Pro/Flash"]:::llm
+    API2["2차 상태창 API: Gemini FlashLite"]:::llm
     TTS[Gemini TTS API]:::llm
     
     Logger[FullHistoryLogger]:::helper
@@ -149,39 +149,39 @@ flowchart TD
     Audio[AudioService]:::helper
 
     User --> VM
-    VM -->|1. 세이프가드 대기 검사| VM
-    VM -->|2. 대화 기록 전송| WF
+    VM -->|"1. 세이프가드 대기 검사"| VM
+    VM -->|"2. 대화 기록 전송"| WF
     
-    WF -->|3. 컨텍스트 조립 요청| Mem
-    Mem -->|단기/중기/장기 메모리 융합| WF
-    WF -->|4. 서사 요청| API1
+    WF -->|"3. 컨텍스트 조립 요청"| Mem
+    Mem -->|"단기/중기/장기 메모리 융합"| WF
+    WF -->|"4. 서사 요청"| API1
     
-    API1 -->|5. 스트리밍 문자 수신| WF
+    API1 -->|"5. 스트리밍 문자 수신"| WF
     
     subgraph ProducerConsumer [플레이어 대화창 프로듀서-컨슈머]
-        WF -->|6. 생산자: 문자 주입| Ch
-        Ch -->|7. 소비자: 문자 인출| WF
+        WF -->|"6. 생산자: 문자 주입"| Ch
+        Ch -->|"7. 소비자: 문자 인출"| WF
     end
     
-    WF -->|8. onCharReceived 콜백| VM
-    VM -->|9. Attached Property| Helper
-    Helper -->|10. 16ms 배칭 렌더링| UI_Screen[WPF 대화방 화면]:::ui
+    WF -->|"8. onCharReceived 콜백"| VM
+    VM -->|"9. Attached Property"| Helper
+    Helper -->|"10. 16ms 배칭 렌더링"| UI_Screen["WPF 대화방 화면"]:::ui
     
-    WF -->|11. 대사 시작시 Prefetch 요청| Audio
-    Audio -->|12. 오디오 비동기 다운로드| TTS
-    WF -->|13. 닫는 따옴표 발견시 재생| Audio
+    WF -->|"11. 대사 시작시 Prefetch 요청"| Audio
+    Audio -->|"12. 오디오 비동기 다운로드"| TTS
+    WF -->|"13. 닫는 따옴표 발견시 재생"| Audio
     
-    API1 -.->|14. 서사 수신 완료| VM
-    VM -->|15. 입력창 해제| UI_Screen
+    API1 -.->|"14. 서사 수신 완료"| VM
+    VM -->|"15. 입력창 해제"| UI_Screen
     
-    WF -->|16. 백그라운드 격리 호출 Task.Run| API2
-    Mem -.->|동적 갱신가이드 Replace| API2
-    API2 -->|17. 상태창 JSON 반환| WF
-    WF -->|18. onStatusUpdated 콜백| VM
-    VM -->|19. 스레드 마샬링 Dispatcher| VM
-    VM -->|20. 상태 데이터 갱신| Mem
-    VM -->|21. 최종 디스크 세이브| Session
-    VM -->|22. 대화 로그 파일 기록| Logger
+    WF -->|"16. 백그라운드 격리 호출 Task.Run"| API2
+    Mem -.->|"동적 갱신가이드 Replace"| API2
+    API2 -->|"17. 상태창 JSON 반환"| WF
+    WF -->|"18. onStatusUpdated 콜백"| VM
+    VM -->|"19. 스레드 마샬링 Dispatcher"| VM
+    VM -->|"20. 상태 데이터 갱신"| Mem
+    VM -->|"21. 최종 디스크 세이브"| Session
+    VM -->|"22. 대화 로그 파일 기록"| Logger
 
     class VM,Helper,UI_Screen ui;
     class WF,Ch workflow;
