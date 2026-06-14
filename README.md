@@ -55,7 +55,38 @@ GRC는 Google Gemini API를 활용하여 고도로 몰입감 있고 생동감 �
 
 <img width="800" alt="Session Architect Demo" src="session_architect.gif" />
 
-* **6단계 에이전트 상태 기계 (State Machine)**: 기획 수립(Planning) ➡️ 상세 세계관(Worldview) ➡️ 로어북(Lorebook) ➡️ 캐릭터 스탯창(Status) ➡️ 초기 오프닝 시나리오(Scenario) ➡️ AI GM 지시문(System Prompt)으로 이어지는 체계화된 빌드 단계로 진행됩니다.
+#### ⚙️ 세션 아키텍트 빌드 워크플로우 (Session Architect Workflow)
+
+```mermaid
+flowchart TD
+    %% 노드 스타일 지정
+    classDef startEnd fill:#4A5A80,stroke:#2C3E50,stroke-width:2px,color:#fff;
+    classDef process fill:#2C8D6C,stroke:#1A5F45,stroke-width:2px,color:#fff;
+    classDef check fill:#E09025,stroke:#9E6514,stroke-width:2px,color:#fff;
+    
+    Start["사용자 입력 (장르, 키워드, 로그라인 등)"]:::startEnd -->|"빌드 시작"| Step1["① Plan 단계 (세션 상세 기획서 자동 작성)"]:::process
+    
+    %% 자동화 루프
+    Step1 --> Step2["② Worldview 단계 (기본 세계관 및 룰 세팅)"]:::process
+    Step2 --> Step3["③ Lorebook 단계 (주요 인물 및 용어 사전 정의)"]:::process
+    Step3 --> Step4["④ Status 단계 (플레이어 캐릭터 스테이터스 설계)"]:::process
+    Step4 --> Step5["⑤ Scenario 단계 (시작 시나리오 및 주요 이벤트 구성)"]:::process
+    Step5 --> Step6["⑥ Prompt 단계 (시뮬레이터용 프롬프트 빌딩 완료)"]:::process
+    
+    %% 자율 검증 및 에이전트 피드백 루프
+    Step6 --> Auditor{"AI Auditor (자율 검증 단계)"}:::check
+    Auditor -->|"자가 검증 실패 / 보완 필요"| Recorrect["AI Self-Correction (이전 단계 피드백 및 보정)"]:::process
+    Recorrect -.->|"자동 재작성"| Step1
+    
+    %% 사용자 개입 분기 (수동 제어 및 상호작용)
+    Auditor -->|"자가 검증 통과"| UserIntervene{"사용자 실시간 개입 (Manual Mode)"}:::check
+    UserIntervene -->|"수동 편집 및 수정"| Modify["컨텐츠 수동 커스텀 및 수정"]:::process
+    Modify -->|"수정 사항 반영"| UserIntervene
+    
+    UserIntervene -->|"최종 컨텐츠 승인"| FinalSession["완성된 TRPG 런타임 세션 빌드"]:::startEnd
+```
+
+* **6단계 에이전트 상태 기계 (State Machine)**: 기획 수립(Planning) ➡️ 세계관(Worldview) ➡️ 로어북(Lorebook) ➡️ 캐릭터 스탯창(Status) ➡️ 초기 오프닝 시나리오(Scenario) ➡️ AI GM 지시문(System Prompt)으로 이어지는 체계화된 빌드 단계로 진행됩니다.
 * **자가 검수(Self-Review) 및 자율 자동화 루프**: **"↻ 자동"** 모드를 활성화하면, 각 단계 생성 완료 시 백그라운드에서 AI 감사관이 기획 내용 및 JSON 문법을 스스로 검증하여 승인(`pass`) 또는 수정 요구(`issues`)를 판단하며 다음 단계 전이와 최종 세션 적용까지 사람의 개입 없이 원스톱 자율 진행됩니다.
 * **수동-자동 심리스(Seamless) 주행 전환**: 사용자가 수동 모드로 단계를 밟아가며 리뷰하다가도, 언제든지 자동 토글을 켜고 "승인 및 다음 단계"를 누르면 그 즉시 자율 엔진이 바통을 이어받아 남은 최종 단계들까지 일괄 자동화로 완주합니다.
 * **생산자-소비자 기반 비동기 스트리밍 & UX 최적화**: LLM 스트리밍이 생성될 때 UI 멈춤을 완벽 차단하기 위해 **`System.Threading.Channels`** 버퍼와 30ms 단위 스로틀링 및 가변 지연(Adaptive Delay)을 적용했습니다. 또한, 미완성 상태의 날것(Raw)의 JSON 데이터가 노출되는 UI 지저분함을 방지하기 위해 실시간 문자 렌더링을 가리고 세련된 도트 스피너 진행바로 단순화하여 시각적 고급스러움과 성능 향상을 동시 달성했습니다.
