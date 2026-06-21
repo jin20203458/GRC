@@ -1,4 +1,4 @@
-# GRC (GenAI Roleplay Chat)
+# GRC (Gemini Roleplay Chat)
 
 [![NET Version](https://img.shields.io/badge/.NET-8.0-blue.svg)](https://dotnet.microsoft.com/download/dotnet/8.0)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)](#)
