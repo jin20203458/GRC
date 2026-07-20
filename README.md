@@ -16,8 +16,8 @@ GRC는 Google Gemini API를 활용하여 캐릭터 롤플레잉 및 소설 창�
 
 프로젝트 전체 아키텍처 및 상세 구현 명세는 `Obsidian.Agent` 저장소에 중앙 집중화되어 관리됩니다. 아래 문서들은 개발자와 코딩 에이전트 모두가 참조하는 단일 진실의 원천(Single Source of Truth)입니다.
 
-- [00_project_overview.md](../Obsidian.Agent/GRC/docs/00_project_overview.md): GRC 프로젝트 정체성, 비전 및 계층 구조 개요
-- [01_grc_architecture.md](../Obsidian.Agent/GRC/docs/01_grc_architecture.md): 3단계 메모리 파이프라인, O(1) 파일 로거, 비차단 스트리밍 및 동기화 구현 명세
+- [00_project_overview.md](https://github.com/jin20203458/Obsidian.Agent/blob/main/GRC/docs/00_project_overview.md): GRC 프로젝트 정체성, 비전 및 계층 구조 개요
+- [01_grc_architecture.md](https://github.com/jin20203458/Obsidian.Agent/blob/main/GRC/docs/01_grc_architecture.md): 3단계 메모리 파이프라인, O(1) 파일 로거, 비차단 스트리밍 및 동기화 구현 명세
 
 ---
 
