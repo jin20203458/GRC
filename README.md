@@ -91,8 +91,9 @@ GRC는 Google AI Studio와 Google Cloud Vertex AI 연동을 지원합니다.
    ```
 
 ### 방법 2. Google Cloud Vertex AI 사용
-1. Google Cloud 콘솔에서 Vertex AI API가 활성화된 프로젝트의 서비스 계정 키 파일(`.json`)을 다운로드합니다.
-2. 앱 실행 후 설정(⚙) 메뉴에서 **[서비스 계정 키 파일 선택]** 버튼을 통해 다운로드한 키 파일을 선택하여 등록합니다. (또는 `Config/google-credentials.json`에 직접 배치)
+1. Google Cloud 콘솔 IAM 및 행정 메뉴에서 서비스 계정을 생성하고 키 파일(`.json`)을 다운로드합니다.
+   * **권장 역할(Role)**: `Vertex AI 사용자` (Vertex AI User) 및 `Cloud Text-to-Speech API 사용자` (또는 `편집자`)
+2. 앱 실행 후 설정 메뉴에서 **[서비스 계정 키 파일 선택]** 버튼을 통해 다운로드한 키 파일을 선택하여 등록합니다. (또는 `Config/google-credentials.json`에 직접 배치)
 3. 구글 클라우드 **Project ID**를 입력합니다.
 4. **주의**: **Location(리전) 필드는 반드시 비워두셔야(Empty/Global) 합니다.** Gemini 3.6 Flash 모델은 글로벌 전용 엔드포인트에서 작동합니다.
 5. `AppSettings.json` 직접 편집 시 예시:
