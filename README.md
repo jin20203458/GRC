@@ -12,6 +12,22 @@ GRC는 Google Gemini API를 활용하여 캐릭터 롤플레잉 및 소설 창�
 
 ---
 
+## 🚀 일반 사용자 무설치 다운로드 (Download)
+
+> **개발 환경(.NET SDK) 설치 없이 바로 실행하고 싶으신가요?**
+
+[![Download Latest Portable Release](https://img.shields.io/badge/Download-Latest_Portable_Release-brightgreen?style=for-the-badge&logo=github)](https://github.com/jin20203458/GRC/releases/latest)
+
+1. 위 다운로드 버튼을 클릭하여 `GRC_v1.0.0_Portable.zip` 파일을 다운로드합니다.
+2. 다운로드한 ZIP 파일의 압축을 원하시는 폴더에 풀어줍니다.
+3. 압축이 해제된 폴더에서 **`GRC.exe`**를 더블 클릭하여 실행합니다.
+4. 초동 실행 안내 및 상세 사용 방법은 압축 파일 내 동봉된 `QUICK_START.txt`를 참조하세요.
+
+> ⚠️ **Windows SmartScreen 경고 안내**
+> 개인 오픈소스 소프트웨어 특성상 첫 실행 시 *"Windows가 PC를 보호했습니다"* 경고창이 나타날 수 있습니다. **'추가 정보'** ➔ **'실행'** 버튼을 클릭하시면 정상 실행됩니다. (GRC는 안전한 오픈소스 프로젝트입니다.)
+
+---
+
 ## 기술 문서 (Documentation)
 
 프로젝트 전체 아키텍처 및 상세 구현 명세는 `Obsidian.Agent` 저장소에 중앙 집중화되어 관리됩니다. 아래 문서들은 개발자와 코딩 에이전트 모두가 참조하는 단일 진실의 원천(Single Source of Truth)입니다.
@@ -34,7 +50,7 @@ GRC는 Google Gemini API를 활용하여 캐릭터 롤플레잉 및 소설 창�
 
 ---
 
-## 시작 가이드 (Getting Started)
+## 개발자용 시작 가이드 (Developer Guide)
 
 ### 요구 사항 (Prerequisites)
 * Windows OS
@@ -49,6 +65,9 @@ dotnet build
 
 # 애플리케이션 실행
 dotnet run --project GRC/GRC.csproj
+
+# 포터블 배포판 자동 빌드 및 ZIP 패키징
+powershell -ExecutionPolicy Bypass -File .\build_release.ps1
 ```
 
 ---

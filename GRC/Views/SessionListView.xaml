@@ -75,8 +75,72 @@
 
         <!--  [수정된 카드 리스트 영역]  -->
         <ScrollViewer Grid.Row="1" Margin="0,10,0,0">
-            <ItemsControl Margin="15,0" ItemsSource="{Binding Sessions}">
-                <ItemsControl.ItemTemplate>
+            <Grid>
+                <!--  세션이 0개일 때 나타나는 웰컴 온보딩 카드  -->
+                <Border
+                    Margin="30,40"
+                    Padding="30"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="#18181A"
+                    BorderBrush="#2A2A2D"
+                    BorderThickness="1"
+                    CornerRadius="16"
+                    Visibility="{Binding HasNoSessions, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel MaxWidth="450" HorizontalAlignment="Center">
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            FontSize="28"
+                            Text="🎭" />
+                        <TextBlock
+                            Margin="0,10,0,10"
+                            HorizontalAlignment="Center"
+                            FontSize="20"
+                            FontWeight="Bold"
+                            Foreground="White"
+                            Text="GRC에 오신 것을 환영합니다!" />
+                        <TextBlock
+                            Margin="0,0,0,25"
+                            HorizontalAlignment="Center"
+                            FontSize="13"
+                            Foreground="#A0A0A0"
+                            Text="한 줄의 키워드로 당신만의 AI 롤플레잉 서사를 만들어보세요."
+                            TextWrapping="Wrap" />
+
+                        <!--  상태별 안내 버튼  -->
+                        <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+                            <Button
+                                Padding="16,10"
+                                Background="#3B82F6"
+                                BorderThickness="0"
+                                Command="{Binding OpenSettingsCommand}"
+                                Cursor="Hand"
+                                Foreground="White">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Margin="0,0,6,0" Text="⚙" />
+                                    <TextBlock FontWeight="Bold" Text="API 키 설정하기" />
+                                </StackPanel>
+                            </Button>
+                            <Button
+                                Margin="12,0,0,0"
+                                Padding="16,10"
+                                Background="#10B981"
+                                BorderThickness="0"
+                                Command="{Binding OpenArchitectCommand}"
+                                Cursor="Hand"
+                                Foreground="White">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Margin="0,0,6,0" Text="✨" />
+                                    <TextBlock FontWeight="Bold" Text="AI 세션 만들기" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!--  기존 세션 리스트  -->
+                <ItemsControl Margin="15,0" ItemsSource="{Binding Sessions}">
+                    <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:SessionSummary}">
                         <Button
                             Margin="0,8"
@@ -161,6 +225,7 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            </Grid>
         </ScrollViewer>
 
         <!--  로딩 오버레이 (기존 유지)  -->

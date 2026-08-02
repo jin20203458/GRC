@@ -5,6 +5,8 @@
 [Dd]ebugPublic/
 [Rr]elease/
 [Re]leases/
+[Dd]ist/
+dist/
 x64/
 x86/
 [Aa]rm/

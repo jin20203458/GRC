@@ -16,6 +16,8 @@ public class AppSettingsService : IAppSettingsService
     };
     public async Task<AppSettings> LoadSettingsAsync()
     {
+        EnsureDirectoriesExist();
+
         var defaultSettings = new AppSettings(
       ApiKey: "",
       ProjectId: "",
@@ -48,7 +50,46 @@ public class AppSettingsService : IAppSettingsService
 
     public async Task SaveSettingsAsync(AppSettings settings)
     {
+        EnsureDirectoriesExist();
         string jsonString = JsonSerializer.Serialize(settings, _options);
         await File.WriteAllTextAsync(_filePath, jsonString);
+    }
+
+    public bool IsCredentialFileExists()
+    {
+        string credentialPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config", "google-credentials.json");
+        return File.Exists(credentialPath);
+    }
+
+    public async Task<bool> CopyCredentialFileAsync(string sourceFilePath)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(sourceFilePath) || !File.Exists(sourceFilePath))
+                return false;
+
+            EnsureDirectoriesExist();
+            string targetPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config", "google-credentials.json");
+            
+            // 기존 파일이 열려있거나 읽기 전용인 경우에 대비하여 복사
+            byte[] bytes = await File.ReadAllBytesAsync(sourceFilePath);
+            await File.WriteAllBytesAsync(targetPath, bytes);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Credential Copy Error]: {ex.Message}");
+            return false;
+        }
+    }
+
+    private void EnsureDirectoriesExist()
+    {
+        string configDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config");
+        string sessionsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions");
+
+        if (!Directory.Exists(configDir)) Directory.CreateDirectory(configDir);
+        if (!Directory.Exists(sessionsDir)) Directory.CreateDirectory(sessionsDir);
     }
 }

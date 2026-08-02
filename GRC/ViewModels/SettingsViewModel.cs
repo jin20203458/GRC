@@ -41,6 +41,9 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _isTtsEnabled;
     [ObservableProperty] private TtsLanguage _selectedTtsLanguage;
 
+    [ObservableProperty] private bool _isCredentialRegistered;
+    [ObservableProperty] private string _credentialStatusMessage = string.Empty;
+
 
     // 타이머 취소를 관리할 토큰
     private CancellationTokenSource? _previewCts;
@@ -103,6 +106,59 @@ public partial class SettingsViewModel : ObservableObject
         TypingSoundVolume = settings.TypingSoundVolume;
         IsTtsEnabled = settings.IsTtsEnabled;
         SelectedTtsLanguage = settings.SelectedTtsLanguage;
+
+        UpdateCredentialStatus();
+    }
+
+    private void UpdateCredentialStatus()
+    {
+        IsCredentialRegistered = _settingsService.IsCredentialFileExists();
+        CredentialStatusMessage = IsCredentialRegistered
+            ? "✅ Vertex AI 인증 파일(google-credentials.json)이 등록되어 있습니다."
+            : "⚠️ Vertex AI 인증 파일이 등록되지 않았습니다. (TTS/Vertex AI 사용 시 필요)";
+    }
+
+    [RelayCommand]
+    private void OpenApiKeyGuide()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "https://aistudio.google.com/apikey",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Open URL Error]: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private async Task BrowseCredentialFileAsync()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "JSON 서비스 계정 키 파일 (*.json)|*.json|모든 파일 (*.*)|*.*",
+            Title = "Vertex AI 서비스 계정 키 파일(google-credentials.json) 선택"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            bool success = await _settingsService.CopyCredentialFileAsync(dialog.FileName);
+            if (success)
+            {
+                UpdateCredentialStatus();
+                StatusMessage = "인증 파일이 성공적으로 등록되었습니다!";
+                await Task.Delay(2000);
+                StatusMessage = string.Empty;
+            }
+            else
+            {
+                StatusMessage = "인증 파일 등록 실패. 올바른 JSON 파일인지 확인하세요.";
+            }
+        }
     }
 
     // 설정 저장
