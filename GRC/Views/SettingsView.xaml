@@ -70,7 +70,7 @@
                     Margin="0,0,0,8"
                     FontWeight="SemiBold"
                     Foreground="#D1D1D1"
-                    Text="구글 클라우드 Location (예: asia-northeast3)" />
+                    Text="구글 클라우드 Location (Gemini 3.6 모델 작동을 위해 비워두세요)" />
                 <TextBox
                     Margin="0,0,0,20"
                     Padding="10"
