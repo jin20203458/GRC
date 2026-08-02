@@ -38,6 +38,9 @@ public partial class SessionListViewModel : ObservableObject
     [ObservableProperty]
     private bool _isLoading;
 
+    [ObservableProperty]
+    private bool _hasNoSessions = true;
+
     // MainViewModel에게 "이 세션 열어줘!" 라고 알리는 이벤트 델리게이트
     public event Action<string?, string?, string?, string?, string?, string?>? SessionSelected;
     // SettingsViewModel으로 "설정 화면 보여줘!" 라고 알리는 이벤트 델리게이트
@@ -45,6 +48,7 @@ public partial class SessionListViewModel : ObservableObject
     public SessionListViewModel(ISessionService sessionService)
     {
         _sessionService = sessionService;
+        Sessions.CollectionChanged += (s, e) => HasNoSessions = Sessions.Count == 0;
     }
 
     /// <summary>
@@ -95,10 +99,12 @@ public partial class SessionListViewModel : ObservableObject
             {
                 Sessions.Add(item);
             }
+            HasNoSessions = Sessions.Count == 0;
         }
         finally
         {
             IsLoading = false;
+            HasNoSessions = Sessions.Count == 0;
         }
     }
 

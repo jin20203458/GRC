@@ -1,4 +1,4 @@
-﻿<UserControl
+<UserControl
     x:Class="GRC.Views.SettingsView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -80,18 +80,55 @@
                     Text="{Binding Location, UpdateSourceTrigger=PropertyChanged}" />
 
                 <!--  기존 API Key 항목  -->
-                <TextBlock
-                    Margin="0,0,0,8"
-                    FontWeight="SemiBold"
-                    Foreground="#D1D1D1"
-                    Text="Gemini API Key (AI Studio 전용)" />
+                <DockPanel Margin="0,0,0,8">
+                    <TextBlock
+                        FontWeight="SemiBold"
+                        Foreground="#D1D1D1"
+                        Text="Gemini API Key (AI Studio 전용)" />
+                    <Button
+                        HorizontalAlignment="Right"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Command="{Binding OpenApiKeyGuideCommand}"
+                        Cursor="Hand"
+                        Foreground="#4A90E2">
+                        <TextBlock Text="🔑 API 키 발급받기" TextDecorations="Underline" />
+                    </Button>
+                </DockPanel>
                 <TextBox
-                    Margin="0,0,0,20"
+                    Margin="0,0,0,10"
                     Padding="10"
                     Background="#1E1E20"
                     BorderBrush="#2A2A2A"
                     Foreground="White"
                     Text="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged}" />
+
+                <!--  Vertex AI 인증 파일 관리 UI  -->
+                <Border
+                    Margin="0,0,0,20"
+                    Padding="12"
+                    Background="#18181A"
+                    BorderBrush="#2A2A2D"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                    <StackPanel>
+                        <TextBlock
+                            Margin="0,0,0,8"
+                            FontSize="12"
+                            Foreground="#A0A0A0"
+                            Text="{Binding CredentialStatusMessage}"
+                            TextWrapping="Wrap" />
+                        <Button
+                            Padding="10,6"
+                            HorizontalAlignment="Left"
+                            Background="#2D2D30"
+                            BorderBrush="#3E3E42"
+                            Command="{Binding BrowseCredentialFileCommand}"
+                            Content="📁 서비스 계정 키 파일 (google-credentials.json) 선택..."
+                            Cursor="Hand"
+                            Foreground="White" />
+                    </StackPanel>
+                </Border>
 
                 <TextBlock
                     Margin="0,0,0,8"

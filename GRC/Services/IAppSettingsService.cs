@@ -1,4 +1,4 @@
-﻿using GRC.Models;
+using GRC.Models;
 using System.Threading.Tasks;
 
 namespace GRC.Services;
@@ -21,4 +21,14 @@ public interface IAppSettingsService
     /// <param name="settings">저장할 설정 객체</param>
     /// <returns>작업 완료를 나타내는 Task</returns>
     Task SaveSettingsAsync(AppSettings settings);
+
+    /// <summary>
+    /// Vertex AI 서비스 계정 인증 파일(google-credentials.json) 존재 여부를 확인합니다.
+    /// </summary>
+    bool IsCredentialFileExists();
+
+    /// <summary>
+    /// 외부 json 경로의 파일을 Config/google-credentials.json 위치로 복사합니다.
+    /// </summary>
+    Task<bool> CopyCredentialFileAsync(string sourceFilePath);
 }
