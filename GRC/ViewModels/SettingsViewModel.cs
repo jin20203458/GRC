@@ -19,7 +19,7 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _apiKey = string.Empty;
 
     [ObservableProperty] private string _projectId = string.Empty;
-    [ObservableProperty] private string _location = "asia-northeast3";
+    [ObservableProperty] private string _location = "";
     [ObservableProperty] private bool _useVertexAI = true;
 
     [ObservableProperty] private ModelTier _selectedModel;

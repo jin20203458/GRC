@@ -78,7 +78,7 @@ $quickStartContent = @"
   - 앱 실행 후 오른쪽 상단의 ⚙ (설정) 버튼을 누릅니다.
   - Google AI Studio (https://aistudio.google.com/apikey)에서 무료 API Key를 발급받습니다.
   - 발급받은 API 키를 입력창에 붙여넣고 [저장]을 클릭합니다.
-  - (Vertex AI 사용자의 경우) 설정 창의 [인증 파일 선택] 버튼으로 google-credentials.json을 등록할 수 있습니다.
+  - (Vertex AI 사용자의 경우) 설정 창의 [인증 파일 선택] 버튼으로 google-credentials.json을 등록하며, Location(리전) 필드는 비워두셔야 합니다 (Gemini 3.6 global 지원).
 
 ■ 4단계: 세션 생성 및 대화
   - 메인 화면의 ➕ 버튼을 클릭합니다.
