@@ -26,19 +26,19 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
     private string GetModelName(ModelTier tier) => tier switch
     {
         ModelTier.Pro => "models/gemini-3.1-pro-preview",
-        ModelTier.Flash35 => "models/gemini-3.5-flash", 
-        ModelTier.FlashLite => "models/gemini-3.1-flash-lite-preview",
+        ModelTier.Flash36 => "models/gemini-3.6-flash", 
+        ModelTier.FlashLite => "models/gemini-3.5-flash-lite",
         ModelTier.Flash3 => "models/gemini-3-flash-preview",
-        _ => "models/gemini-3.5-flash" 
+        _ => "models/gemini-3.6-flash" 
     };
 
     private string GetVertexModelName(ModelTier tier) => tier switch
     {
         ModelTier.Pro => "gemini-3.1-pro-preview",
-        ModelTier.Flash35 => "gemini-3.5-flash", 
-        ModelTier.FlashLite => "gemini-3.1-flash-lite-preview",
+        ModelTier.Flash36 => "gemini-3.6-flash", 
+        ModelTier.FlashLite => "gemini-3.5-flash-lite",
         ModelTier.Flash3 => "gemini-3-flash-preview",
-        _ => "gemini-3.5-flash"
+        _ => "gemini-3.6-flash"
     };
 
     public async Task<string> SendMessageAsync(GeminiRequest request, ModelTier? overrideTier = null, CancellationToken cancellationToken = default)
