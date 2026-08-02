@@ -21,11 +21,16 @@ Write-Host "==========================================" -ForegroundColor Cyan
 # 1. 기존 빌드 결과물 정리
 if (Test-Path $targetDir) {
     Write-Host "[1/5] Removing existing build folder: $targetDir" -ForegroundColor Yellow
-    Remove-Item -Path $targetDir -Recurse -Force
+    Remove-Item -Path $targetDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 if (Test-Path $zipFile) {
     Write-Host "[1/5] Removing existing zip file: $zipFile" -ForegroundColor Yellow
-    Remove-Item -Path $zipFile -Force
+    try {
+        Remove-Item -Path $zipFile -Force -ErrorAction Stop
+    } catch {
+        Start-Sleep -Milliseconds 500
+        Remove-Item -Path $zipFile -Force -ErrorAction SilentlyContinue
+    }
 }
 
 # 2. dotnet publish (Self-Contained Release win-x64)
@@ -37,13 +42,18 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# 3. 기본 디렉터리 구조 생성 (Sessions, Config)
-Write-Host "[3/5] Creating default directory structure (Sessions, Config)..." -ForegroundColor Green
+# 3. 기본 디렉터리 구조 생성 (Sessions, Config) 및 보안 클리닝
+Write-Host "[3/5] Creating clean directory structure & security sanitization..." -ForegroundColor Green
 $configDir = Join-Path $targetDir "Config"
 $sessionsDir = Join-Path $targetDir "Sessions"
 
 if (-not (Test-Path $configDir)) { New-Item -ItemType Directory -Path $configDir | Out-Null }
 if (-not (Test-Path $sessionsDir)) { New-Item -ItemType Directory -Path $sessionsDir | Out-Null }
+
+# 🔒 개인 인증키(google-credentials.json), API Key가 포함될 수 있는 AppSettings.json 및 개인 세션 파일 완전 삭제
+Remove-Item -Path "$configDir\google-credentials.json" -Force -ErrorAction SilentlyContinue
+Remove-Item -Path "$targetDir\AppSettings.json" -Force -ErrorAction SilentlyContinue
+Get-ChildItem -Path $sessionsDir -Recurse | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
 # 4. QUICK_START.txt 비개발자용 시작 가이드 생성 및 동봉
 Write-Host "[4/5] Creating QUICK_START.txt user guide..." -ForegroundColor Green
@@ -85,6 +95,9 @@ $quickStartPath = Join-Path $targetDir "QUICK_START.txt"
 
 # 5. ZIP 압축 파일 생성
 Write-Host "[5/5] Compressing portable distribution package into ZIP..." -ForegroundColor Green
+if (Test-Path $zipFile) {
+    try { Remove-Item -Path $zipFile -Force -ErrorAction SilentlyContinue } catch {}
+}
 Compress-Archive -Path "$targetDir\*" -DestinationPath $zipFile -Force
 
 Write-Host "==========================================" -ForegroundColor Cyan

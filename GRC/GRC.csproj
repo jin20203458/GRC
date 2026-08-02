@@ -53,6 +53,7 @@
   <ItemGroup>
     <Content Include="Config\google-credentials.json" Condition="Exists('Config\google-credentials.json')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
 
