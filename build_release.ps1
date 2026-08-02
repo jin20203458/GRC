@@ -91,7 +91,8 @@ $quickStartContent = @"
 "@
 
 $quickStartPath = Join-Path $targetDir "QUICK_START.txt"
-[System.IO.File]::WriteAllText($quickStartPath, $quickStartContent, [System.Text.Encoding]::UTF8)
+$utf8WithBom = New-Object System.Text.UTF8Encoding $true
+[System.IO.File]::WriteAllText($quickStartPath, $quickStartContent, $utf8WithBom)
 
 # 5. ZIP 압축 파일 생성
 Write-Host "[5/5] Compressing portable distribution package into ZIP..." -ForegroundColor Green
