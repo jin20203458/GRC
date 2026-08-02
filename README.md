@@ -35,7 +35,7 @@ GRC는 Google Gemini API를 활용하여 캐릭터 롤플레잉 및 소설 창�
 - [00_project_overview.md](https://github.com/jin20203458/Obsidian.Agent/blob/main/GRC/docs/00_project_overview.md): GRC 프로젝트 정체성, 비전 및 계층 구조 개요
 - [01_grc_architecture.md](https://github.com/jin20203458/Obsidian.Agent/blob/main/GRC/docs/01_grc_architecture.md): 3단계 메모리 파이프라인, O(1) 파일 로거, 비차단 스트리밍 및 동기화 구현 명세
 - [02_user_quickstart_guide.md](https://github.com/jin20203458/Obsidian.Agent/blob/main/GRC/docs/02_user_quickstart_guide.md): 초보자/비개발자 포터블 실행, SmartScreen 우회 및 API 키 가이드
-- [03_grc_feature_spec.md](https://github.com/jin20203458/Obsidian.Agent/blob/main/GRC/docs/03_grc_feature_spec.md): GRC 7대 핵심 기능 엔지니어링 딥다이브 및 데이터 흐름 명세
+- [03_grc_user_guide.md](https://github.com/jin20203458/Obsidian.Agent/blob/main/GRC/docs/03_grc_user_guide.md): GRC 7대 핵심 기능 사용자 사용설명서 및 활용 가이드
 
 ---
 
