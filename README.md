@@ -12,19 +12,18 @@ GRC는 Google Gemini API를 활용하여 캐릭터 롤플레잉 및 소설 창�
 
 ---
 
-## 🚀 일반 사용자 무설치 다운로드 (Download)
+## 일반 사용자 무설치 다운로드 (Download)
 
-> **개발 환경(.NET SDK) 설치 없이 바로 실행하고 싶으신가요?**
+> 개발 환경(.NET SDK) 설치 없이 실행하려면 포터블 패키지를 이용할 수 있습니다.
 
 [![Download Latest Portable Release](https://img.shields.io/badge/Download-Latest_Portable_Release-brightgreen?style=for-the-badge&logo=github)](https://github.com/jin20203458/GRC/releases/latest)
 
 1. 위 다운로드 버튼을 클릭하여 `GRC_v1.0.0_Portable.zip` 파일을 다운로드합니다.
-2. 다운로드한 ZIP 파일의 압축을 원하시는 폴더에 풀어줍니다.
-3. 압축이 해제된 폴더에서 **`GRC.exe`**를 더블 클릭하여 실행합니다.
-4. 초동 실행 안내 및 상세 사용 방법은 압축 파일 내 동봉된 `QUICK_START.txt`를 참조하세요.
+2. 다운로드한 ZIP 파일의 압축을 대상 폴더에 완전히 해제합니다.
+3. 압축이 해제된 폴더에서 `GRC.exe`를 더블 클릭하여 실행합니다.
+4. 초동 실행 안내 및 상세 사용 방법은 압축 파일 내 동봉된 `QUICK_START.txt` 또는 [02_user_quickstart_guide.md](https://github.com/jin20203458/Obsidian.Agent/blob/main/GRC/docs/02_user_quickstart_guide.md)를 참조하세요.
 
-> ⚠️ **Windows SmartScreen 경고 안내**
-> 개인 오픈소스 소프트웨어 특성상 첫 실행 시 *"Windows가 PC를 보호했습니다"* 경고창이 나타날 수 있습니다. **'추가 정보'** ➔ **'실행'** 버튼을 클릭하시면 정상 실행됩니다. (GRC는 안전한 오픈소스 프로젝트입니다.)
+> **Windows SmartScreen 경고 안내**: 개인 오픈소스 특성상 첫 실행 시 "Windows가 PC를 보호했습니다" 경고창이 나타날 수 있습니다. '추가 정보' -> '실행' 버튼을 클릭하면 정상 실행됩니다.
 
 ---
 
