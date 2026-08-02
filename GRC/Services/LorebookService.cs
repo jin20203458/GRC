@@ -193,7 +193,7 @@ model: 검을 쥐는 순간, 머릿속에 낯선 기억의 파편들이 쏟아�
         try
         {
             // 1. API 통신 시도 (현재 프로젝트 설정에 맞게 FlashLite 또는 Flash 사용)
-            string jsonResponse = await apiService.SendMessageAsync(req, ModelTier.Flash35);
+            string jsonResponse = await apiService.SendMessageAsync(req, ModelTier.Flash36);
 
             // 2. API 또는 시스템 에러 감지 (GeminiApiService의 에러 반환 규격 확인)
             if (jsonResponse.StartsWith("[System", StringComparison.OrdinalIgnoreCase))

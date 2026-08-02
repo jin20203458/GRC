@@ -21,7 +21,7 @@ public class AppSettingsService : IAppSettingsService
       ProjectId: "",
       Location: "asia-northeast3",
       UseVertexAI: true,
-      SelectedModel: ModelTier.Flash35,
+      SelectedModel: ModelTier.Flash36,
       SafetyThreshold: BlockThreshold.BLOCK_NONE
   );
 

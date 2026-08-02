@@ -273,7 +273,7 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
             var summaryReq = CreateInternalRequest(prompt, summarySystemPrompt, "text/plain", null, ThinkingLevel.high);
 
             //LogRequestJson("중기 기억 모델 (Medium)", summaryReq);
-            string response = await apiService.SendMessageAsync(summaryReq, ModelTier.Flash35);
+            string response = await apiService.SendMessageAsync(summaryReq, ModelTier.Flash36);
 
             if (!string.IsNullOrWhiteSpace(response) && !response.StartsWith("[System"))
             {
@@ -701,7 +701,7 @@ interface StatusWindow {
                 MaxOutputTokens: 8192,
                 ResponseMimeType: "application/json",
                 ResponseSchema: null,
-                ThinkingConfig: new ThinkingConfig(ThinkingLevel.minimal)
+                ThinkingConfig: new ThinkingConfig(ThinkingLevel.medium)
             )
         );
     }

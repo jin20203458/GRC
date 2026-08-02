@@ -78,11 +78,11 @@ public class SessionArchitectService : ISessionArchitectService
         }
 
         var contents = new List<Content> { new Content("user", [new Part(userPrompt)]) };
-        var generationConfig = new GenerationConfig(null, 4096, "application/json");
+        var generationConfig = new GenerationConfig(null, 4096, "application/json", null, new ThinkingConfig(ThinkingLevel.high));
 
         var request = new GeminiRequest(systemInstruction, contents, null, generationConfig);
 
-        await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash35, ct))
+        await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash36, ct))
         {
             yield return chunk;
         }
@@ -305,11 +305,11 @@ public class SessionArchitectService : ISessionArchitectService
 
         var systemInstruction = new Content("system", [new Part(systemInstructionText)]);
         var contents = new List<Content> { new Content("user", [new Part(userPrompt)]) };
-        var generationConfig = new GenerationConfig(null, 8192, responseMimeType);
+        var generationConfig = new GenerationConfig(null, 8192, responseMimeType, null, new ThinkingConfig(ThinkingLevel.high));
 
         var request = new GeminiRequest(systemInstruction, contents, null, generationConfig);
 
-        await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash35, ct))
+        await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash36, ct))
         {
             yield return chunk;
         }
@@ -423,11 +423,11 @@ public class SessionArchitectService : ISessionArchitectService
 """;
 
         var contents = new List<Content> { new Content("user", [new Part(userPrompt)]) };
-        var generationConfig = new GenerationConfig(null, 8192, responseMimeType);
+        var generationConfig = new GenerationConfig(null, 8192, responseMimeType, null, new ThinkingConfig(ThinkingLevel.high));
 
         var request = new GeminiRequest(systemInstruction, contents, null, generationConfig);
 
-        await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash35, ct))
+        await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash36, ct))
         {
             yield return chunk;
         }
@@ -550,14 +550,14 @@ public class SessionArchitectService : ISessionArchitectService
 
         var si = new Content("system", [new Part(systemInstruction)]);
         var contents = new List<Content> { new Content("user", [new Part(prompt)]) };
-        var config = new GenerationConfig(null, 4096, "application/json");
+        var config = new GenerationConfig(null, 4096, "application/json", null, new ThinkingConfig(ThinkingLevel.high));
 
         var request = new GeminiRequest(si, contents, null, config);
 
         try
         {
             string fullResponse = "";
-            await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash35, ct))
+            await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash36, ct))
             {
                 fullResponse += chunk;
             }
