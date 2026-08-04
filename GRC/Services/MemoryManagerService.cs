@@ -669,7 +669,7 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
 3. 아이템: 명시적인 획득/소비 묘사가 <latest_turn>에 존재할 때만 증감.
 4. NPC 상태(characterConditionDesc): 부상, 감정 변화 등이 묘사된 경우에만 갱신.
 5. 변화가 없는 항목은 이전 값을 그대로 유지.
-6. uiBadges의 기존 Key 명칭(예: 호감도, HP 등)을 절대 변형(예: "호감도" -> "호감도(아리아)" 또는 "아리아_호감도")하지 말고, 반드시 <previous_state>에 존재하는 exact Key 명칭을 그대로 사용하여 갱신하십시오. 새로운 인물이나 완전히 다른 스탯을 추적할 때만 새 Key 추가를 허용합니다.[CUSTOM_RULES]
+6. uiBadges의 기존 Key는 <previous_state>의 명칭을 Exact Match로 재사용하되, 새 동료나 스탯 추적 시에만 새 Key 추가를 허용합니다.[CUSTOM_RULES]
 </rules>
 
 <output_format>
