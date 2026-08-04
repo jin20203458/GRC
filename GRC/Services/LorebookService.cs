@@ -28,14 +28,9 @@ public class LorebookService(IGeminiApiService apiService) : ILorebookService
 
         bool isNewLorebookTriggered;
 
-        int cascadeDepth = 0;
-        const int maxCascadeDepth = 2; // 스노우볼링 방지: 최대 2단계 연쇄 스캔까지만 허용
-
         do
         {
             isNewLorebookTriggered = false; // 이번 루프에서 새 로어북이 켜졌는지 확인하는 플래그
-            cascadeDepth++;
-            if (cascadeDepth > maxCascadeDepth) break;
 
             foreach (var lore in lorebooks)
             {
@@ -57,9 +52,7 @@ public class LorebookService(IGeminiApiService apiService) : ILorebookService
                 Regex targetRegex = _compiledRegexCache.GetOrAdd(cacheKey, key =>
                 {
                     string keywordsPattern = string.Join("|", validKeywords.Select(Regex.Escape));
-                    // 💡 한국어 정밀 조사 바운더리 패턴 (사과나무 등 복합 명사 오매칭 차단)
-                    string particlePattern = @"(?:은|는|이|가|을|를|과|와|의|에|에서|으로|로|에게|한테|도|만|까지|부터|나|이나|며|이며|하고)?";
-                    string pattern = $@"(?<![가-힣a-zA-Z0-9])({keywordsPattern}){particlePattern}(?![가-힣a-zA-Z0-9])";
+                    string pattern = $@"(?<![가-힣a-zA-Z0-9])({keywordsPattern})[가-힣]{{0,3}}(?![가-힣a-zA-Z0-9])";
                     return new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
                 });
 
