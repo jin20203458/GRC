@@ -60,10 +60,31 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
     {
         lock (_shortTermMemory)
         {
-            if (payload.CustomStats != null) _currentContext.CustomStats = payload.CustomStats;
-            if (payload.Chars != null) _currentContext.Chars = payload.Chars;
-            if (payload.Items != null) _currentContext.Items = payload.Items;
-            if (payload.Places != null) _currentContext.Places = payload.Places;
+            if (payload.CustomStats != null && payload.CustomStats.Count > 0)
+            {
+                foreach (var kvp in payload.CustomStats)
+                {
+                    _currentContext.CustomStats[kvp.Key] = kvp.Value;
+                }
+            }
+
+            if (payload.Chars != null && payload.Chars.Count > 0)
+            {
+                foreach (var kvp in payload.Chars)
+                {
+                    _currentContext.Chars[kvp.Key] = kvp.Value;
+                }
+            }
+
+            if (payload.Items != null && payload.Items.Count > 0)
+            {
+                _currentContext.Items = new List<string>(payload.Items);
+            }
+
+            if (payload.Places != null && payload.Places.Count > 0)
+            {
+                _currentContext.Places = new List<string>(payload.Places);
+            }
         }
     }
 
@@ -322,6 +343,7 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
                         _currentContext = new ChapterContext
                         {
                             Plot = $"[제 {_chapterCount}장] 이전 사건이 일단락되고 새로운 국면에 접어들었습니다.",
+                            CustomStats = new Dictionary<string, string>(previousContext.CustomStats),
                             Items = new List<string>(previousContext.Items),
                             Chars = new Dictionary<string, string>(previousContext.Chars),
                             Places = new List<string>(previousContext.Places),
