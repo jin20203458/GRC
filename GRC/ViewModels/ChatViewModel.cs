@@ -165,7 +165,7 @@ public partial class ChatViewModel : ObservableObject
                 var customStatsDict = GRC.Helpers.ChatDataHelper.ParseCustomStats(initialCustomStats);
 
                 CurrentPreset = basePreset with { Name = finalName, Worldview = finalWorldview, StatusUpdateGuide = initialStatusUpdateGuide ?? "" };
-                _memoryService.UpdateContextStatus(new StatusPayload { CustomStats = customStatsDict });
+                _memoryService.UpdateContextStatus(new StatusPayload { CustomStats = customStatsDict }, replaceCustomStats: true);
 
                 _currentFileName = GRC.Helpers.ChatDataHelper.GenerateSessionFileName(finalName);
                 GRC.Helpers.TokenLogger.CurrentSessionFileName = _currentFileName;
@@ -268,7 +268,7 @@ public partial class ChatViewModel : ObservableObject
             CurrentPreset = CurrentPreset with { Worldview = result.Value.Worldview, CustomStats = customStatsDict, StatusUpdateGuide = result.Value.StatusUpdateGuide };
 
             await _presetService.SavePresetAsync(_currentFileName, CurrentPreset);
-            _memoryService.UpdateContextStatus(new StatusPayload { CustomStats = customStatsDict });
+            _memoryService.UpdateContextStatus(new StatusPayload { CustomStats = customStatsDict }, replaceCustomStats: true);
 
             if (!string.IsNullOrWhiteSpace(result.Value.InitialScenario) && result.Value.InitialScenario != currentScenario)
             {
@@ -297,7 +297,7 @@ public partial class ChatViewModel : ObservableObject
             var updatedSession = _memoryService.ExportSession(CurrentPreset);
             await _sessionService.SaveSessionAsync(_currentFileName, updatedSession);
 
-            UpdateStatusUI(currentSession.CurrentContext?.CustomStats, currentSession.CurrentContext?.Chars, currentSession.CurrentContext?.Items, currentSession.CurrentContext?.Places);
+            UpdateStatusUI(updatedSession.CurrentContext?.CustomStats, updatedSession.CurrentContext?.Chars, updatedSession.CurrentContext?.Items, updatedSession.CurrentContext?.Places);
             ChatHistory.Add(new ChatMessage("system", "세계관, 스탯, 초기 시나리오가 성공적으로 업데이트되었습니다. 다음 턴부터 반영됩니다.", DateTime.Now));
         }
     }
@@ -494,8 +494,8 @@ public partial class ChatViewModel : ObservableObject
                 // UI 스레드 안전성 보장 및 갱신 Task 보관
                 _statusUpdateTask = Application.Current.Dispatcher.InvokeAsync(async () =>
                 {
-                    UpdateStatusUI(statusPayload.CustomStats, statusPayload.Chars, statusPayload.Items, statusPayload.Places);
                     _memoryService.UpdateContextStatus(statusPayload);
+                    UpdateStatusUI(_memoryService.CurrentContext?.CustomStats, _memoryService.CurrentContext?.Chars, _memoryService.CurrentContext?.Items, _memoryService.CurrentContext?.Places);
                     System.Diagnostics.Debug.WriteLine("[ChatViewModel] 백그라운드 상태창 갱신 UI 및 데이터 반영 완료");
 
                     //  상태창이 갱신된 최종 메모리 세션을 파일에 즉시 영구 세이브!
@@ -774,7 +774,7 @@ public partial class ChatViewModel : ObservableObject
 
         if (CurrentPreset.CustomStats != null)
         {
-            _memoryService.UpdateContextStatus(new StatusPayload { CustomStats = new Dictionary<string, string>(CurrentPreset.CustomStats) });
+            _memoryService.UpdateContextStatus(new StatusPayload { CustomStats = new Dictionary<string, string>(CurrentPreset.CustomStats) }, replaceCustomStats: true);
         }
 
         var emptySession = _memoryService.ExportSession(CurrentPreset);

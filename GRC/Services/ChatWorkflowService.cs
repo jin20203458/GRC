@@ -36,14 +36,15 @@ public class ChatWorkflowService(
         // 1. 동적 상태창 이벤트 검사
         if (currentStats != null && currentStats.Count > 0)
         {
-            string[] triggerKeywords = { "호감", "애정", "집착", "관계", "순종", "굴복", "타락", "혐오", "증오", "죄책감", "수치심", "이성", "침식", "성욕", "붕괴" };
-            var targetKey = currentStats.Keys.FirstOrDefault(k =>
-            triggerKeywords.Any(keyword => k.Contains(keyword)) &&
-            (triggeredEvents == null || !triggeredEvents.Contains(k)));
+            string[] triggerKeywords = { "호감", "애정", "집착", "관계", "순종", "굴복", "타락", "혐오", "증오", "죄책감", "수치심", "이성", "침식", "흥분", "성욕", "붕괴" };
 
-            if (targetKey != null)
+            foreach (var kvp in currentStats)
             {
-                var (statValue, maxValue) = ParseStatValue(currentStats[targetKey]);
+                string targetKey = kvp.Key;
+                if (!triggerKeywords.Any(keyword => targetKey.Contains(keyword))) continue;
+                if (triggeredEvents != null && triggeredEvents.Contains(targetKey)) continue;
+
+                var (statValue, maxValue) = ParseStatValue(kvp.Value);
                 if (statValue >= maxValue && maxValue > 0)
                 {
                     triggeredEvents?.Add(targetKey);
@@ -58,8 +59,8 @@ public class ChatWorkflowService(
                 }
                 else if (statValue <= 0)
                 {
-                    Debug.WriteLine($"[MetaDirective Triggered MIN] {targetKey} reached {statValue}");
                     triggeredEvents?.Add(targetKey);
+                    Debug.WriteLine($"[MetaDirective Triggered MIN] {targetKey} reached {statValue}");
                     return $"""
                     <meta_directive>
                     [시스템 개입: 극적 상황 발생 (수치 상실 및 소멸)]
@@ -117,6 +118,11 @@ public class ChatWorkflowService(
 
         try
         {
+            if (!string.IsNullOrWhiteSpace(metaDirective))
+            {
+                Debug.WriteLine($"[ChatWorkflowService] MetaDirective 적용됨: {metaDirective}");
+            }
+
             // [호출 1] 서사 전용 API 요청 빌드 (Temperature=preset.Temperature, 서사만 출력)
             var requestPayload = await memoryService.BuildNarrativeRequestAsync(userMessage, preset, metaDirective);
 

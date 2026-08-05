@@ -9,7 +9,7 @@ public class ChapterContext
 
     public string ToPromptString()
     {
-        string customStatsStr = CustomStats.Count > 0 ? string.Join(", ", CustomStats.Select(x => $"[{x.Key}]: {x.Value}")) : "특이사항 없음";
+        string customStatsStr = CustomStats.Count > 0 ? string.Join(", ", CustomStats.Select(x => $"{x.Key}: {x.Value}")) : "특이사항 없음";
         string charsStr = Chars.Count > 0 ? string.Join("\n  * ", Chars.Select(x => $"{x.Key}: {x.Value}")) : "특이사항 없음";
         string itemsStr = Items.Count > 0 ? string.Join(", ", Items.Select(i => $"[{i}]")) : "없음";
         string placesStr = Places.Count > 0 ? string.Join(", ", Places.Select(p => $"[{p}]")) : "특이사항 없음";
@@ -41,7 +41,7 @@ public class ChapterContext
     /// </summary>
     public string ToStatusSnapshotString()
     {
-        string customStatsStr = CustomStats.Count > 0 ? string.Join(", ", CustomStats.Select(x => $"[{x.Key}]: {x.Value}")) : "없음";
+        string customStatsStr = CustomStats.Count > 0 ? string.Join(", ", CustomStats.Select(x => $"{x.Key}: {x.Value}")) : "없음";
         string charsStr = Chars.Count > 0 ? string.Join("\n  * ", Chars.Select(x => $"{x.Key}: {x.Value}")) : "없음";
         string itemsStr = Items.Count > 0 ? string.Join(", ", Items.Select(i => $"[{i}]")) : "없음";
         string placesStr = Places.Count > 0 ? string.Join(", ", Places.Select(p => $"[{p}]")) : "없음";
