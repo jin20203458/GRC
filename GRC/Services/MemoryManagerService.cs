@@ -56,15 +56,22 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
 
     // 현재 롤북 텍스트 
     public string CurrentLorebookText { get; private set; } = string.Empty;
-    public void UpdateContextStatus(StatusPayload payload)
+    public void UpdateContextStatus(StatusPayload payload, bool replaceCustomStats = false)
     {
         lock (_shortTermMemory)
         {
-            if (payload.CustomStats != null && payload.CustomStats.Count > 0)
+            if (payload.CustomStats != null)
             {
-                foreach (var kvp in payload.CustomStats)
+                if (replaceCustomStats)
                 {
-                    _currentContext.CustomStats[kvp.Key] = kvp.Value;
+                    _currentContext.CustomStats = new Dictionary<string, string>(payload.CustomStats);
+                }
+                else if (payload.CustomStats.Count > 0)
+                {
+                    foreach (var kvp in payload.CustomStats)
+                    {
+                        _currentContext.CustomStats[kvp.Key] = kvp.Value;
+                    }
                 }
             }
 

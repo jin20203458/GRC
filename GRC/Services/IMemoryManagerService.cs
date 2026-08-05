@@ -38,7 +38,7 @@ public interface IMemoryManagerService
 
     ChatSession ExportSession(CharacterPreset currentPreset);
 
-    void UpdateContextStatus(StatusPayload payload);
+    void UpdateContextStatus(StatusPayload payload, bool replaceCustomStats = false);
     ChapterContext CurrentContext { get; }
     string CurrentLorebookText { get; }
 
