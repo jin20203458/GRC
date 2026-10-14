@@ -1,3 +1,5 @@
+namespace GRC.Models;
+
 public class ChapterContext
 {
     public string Plot { get; set; } = "새로운 챕터가 시작되었습니다.";

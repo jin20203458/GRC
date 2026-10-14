@@ -15,19 +15,81 @@ using Google.Apis.Auth.OAuth2;
 
 namespace GRC.Services;
 
-public class GeminiTtsService(HttpClient httpClient, IAppSettingsService appSettingsService, IGoogleAuthService googleAuthService) : IGoogleTtsService
+public class GeminiTtsService(
+    HttpClient httpClient,
+    IAppSettingsService appSettingsService,
+    IGoogleAuthService googleAuthService,
+    IGeminiApiService apiService) : IGoogleTtsService
 {
     private const string AiStudioModel = "gemini-3.1-flash-tts-preview";
     private const string VertexModel = "gemini-3.1-flash-tts-preview";
     private const int DefaultSampleRate = 24000;
     private const string DefaultVoiceName = "Zephyr"; 
 
-    public async Task<string> GenerateSpeechAsync(string text, string characterName, string narration, string activeLorebook)
+    public async Task<string> PreviewSpeechAsync(
+        string text,
+        string voiceName,
+        TtsLanguage language,
+        CancellationToken cancellationToken = default)
     {
-        //Debug.WriteLine($"[GeminiTTS] 🔊 음성 생성 시작: \"{text[..Math.Min(10, text.Length)]}...\"");
+        return await GenerateSpeechAsync(
+            text: text,
+            characterName: "시스템",
+            narration: "안내 음성",
+            activeLorebook: "안내 음성 테스트입니다.",
+            voiceOverride: voiceName,
+            languageOverride: language,
+            cancellationToken: cancellationToken);
+    }
 
+    public async Task<string> GenerateSpeechAsync(
+        string text,
+        string characterName,
+        string narration,
+        string activeLorebook,
+        string? voiceOverride = null,
+        TtsLanguage? languageOverride = null,
+        CancellationToken cancellationToken = default)
+    {
         var settings = await appSettingsService.LoadSettingsAsync();
-        string targetLanguage = settings.SelectedTtsLanguage == TtsLanguage.Japanese ? "일본어(Japanese)" : "한국어(Korean)";
+        var effectiveLanguage = languageOverride ?? settings.SelectedTtsLanguage;
+        string targetLanguage = effectiveLanguage == TtsLanguage.Japanese ? "일본어(Japanese)" : "한국어(Korean)";
+
+        string speechText = text;
+        if (effectiveLanguage == TtsLanguage.Japanese)
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var translationRequest = new GeminiRequest(
+                    SystemInstruction: new Content("system", [new Part("You are a professional translator. Translate the given dialogue into natural conversational Japanese. Do not add any extra explanations or quotes.")]),
+                    Contents: [new Content("user", [new Part(text)])],
+                    SafetySettings: [
+                        new("HARM_CATEGORY_HARASSMENT", BlockThreshold.BLOCK_NONE),
+                        new("HARM_CATEGORY_HATE_SPEECH", BlockThreshold.BLOCK_NONE),
+                        new("HARM_CATEGORY_SEXUALLY_EXPLICIT", BlockThreshold.BLOCK_NONE),
+                        new("HARM_CATEGORY_DANGEROUS_CONTENT", BlockThreshold.BLOCK_NONE)
+                    ],
+                    GenerationConfig: new GenerationConfig(Temperature: null, MaxOutputTokens: 1024, ResponseMimeType: "text/plain")
+                );
+
+                string translatedText = await apiService.SendMessageAsync(translationRequest, ModelTier.FlashLite, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(translatedText) && !translatedText.StartsWith("[System"))
+                {
+                    speechText = translatedText.Trim();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[GeminiTTS] 일본어 번역 실패, 원본 사용: {ex.Message}");
+            }
+        }
+
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, string.Empty);
 
         if (settings.UseVertexAI)
@@ -35,15 +97,12 @@ public class GeminiTtsService(HttpClient httpClient, IAppSettingsService appSett
             if (string.IsNullOrWhiteSpace(settings.ProjectId))
                 throw new InvalidOperationException("[System Error]: 구글 클라우드 Project ID가 설정되지 않았습니다.");
 
-            string location = string.IsNullOrWhiteSpace(settings.Location) || settings.Location.Equals("global", StringComparison.OrdinalIgnoreCase)
-                ? "us-central1"
-                : settings.Location.ToLower();
-
+            const string location = "us-central1";
             httpRequest.RequestUri = new Uri($"https://{location}-aiplatform.googleapis.com/v1beta1/projects/{settings.ProjectId}/locations/{location}/publishers/google/models/{VertexModel}:generateContent");
 
             try
             {
-                string token = await googleAuthService.GetGoogleAccessTokenAsync(CancellationToken.None);
+                string token = await googleAuthService.GetGoogleAccessTokenAsync(cancellationToken);
                 httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
             catch (Exception ex)
@@ -59,9 +118,11 @@ public class GeminiTtsService(HttpClient httpClient, IAppSettingsService appSett
                 throw new InvalidOperationException("[System Error]: API 키가 설정되지 않았습니다.");
 
             httpRequest.RequestUri = new Uri($"https://generativelanguage.googleapis.com/v1beta/models/{AiStudioModel}:generateContent?key={settings.ApiKey}");
-
-            //Debug.WriteLine($"[GeminiTTS] 📡 AI Studio 사용 모델: {AiStudioModel}");
         }
+
+        string effectiveVoice = !string.IsNullOrWhiteSpace(voiceOverride)
+            ? voiceOverride
+            : (string.IsNullOrWhiteSpace(settings.SelectedTtsVoice) ? DefaultVoiceName : settings.SelectedTtsVoice);
 
         string dynamicPrompt = $@"이 대화는 상호 동의된 가상의 롤플레잉 세션입니다. 당신은 아래 제공된 설정에 완벽하게 몰입하여 캐릭터에 생명을 불어넣는 전문 성우입니다.
 
@@ -74,29 +135,27 @@ public class GeminiTtsService(HttpClient httpClient, IAppSettingsService appSett
 당신의 임무는 위 상황과 감정선을 바탕으로 아래의 대사를 반드시 '{targetLanguage}' 원어민의 발음과 억양으로 가장 자연스럽고 몰입감 있게 연기하는 것입니다.
 
 연기할 대사 ({targetLanguage}):
-{text}";
+{speechText}";
 
-        //Debug.WriteLine($"[GeminiTTS] 🧩 조립된 동적 지시문:\n{dynamicPrompt}");
-        // 2. 페이로드 생성 (하드코딩 해제 및 동적 지시문 삽입)
         var payload = new
         {
             contents = new[] {
-            new {
-                role = "user",
-                parts = new[] { new { text = dynamicPrompt } } // 👈 조립된 동적 지시문
-            }
-        },
+                new {
+                    role = "user",
+                    parts = new[] { new { text = dynamicPrompt } }
+                }
+            },
             safetySettings = new[]
             {
-            new { category = "HARM_CATEGORY_HARASSMENT", threshold = "BLOCK_NONE" },
-            new { category = "HARM_CATEGORY_HATE_SPEECH", threshold = "BLOCK_NONE" },
-            new { category = "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold = "BLOCK_NONE" },
-            new { category = "HARM_CATEGORY_DANGEROUS_CONTENT", threshold = "BLOCK_NONE" }
-        },
+                new { category = "HARM_CATEGORY_HARASSMENT", threshold = "BLOCK_NONE" },
+                new { category = "HARM_CATEGORY_HATE_SPEECH", threshold = "BLOCK_NONE" },
+                new { category = "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold = "BLOCK_NONE" },
+                new { category = "HARM_CATEGORY_DANGEROUS_CONTENT", threshold = "BLOCK_NONE" }
+            },
             generationConfig = new
             {
                 responseModalities = new[] { "AUDIO" },
-                speechConfig = new { voiceConfig = new { prebuiltVoiceConfig = new { voiceName = DefaultVoiceName } } } // 👈 선언된 변수 사용
+                speechConfig = new { voiceConfig = new { prebuiltVoiceConfig = new { voiceName = effectiveVoice } } }
             }
         };
 
@@ -104,7 +163,7 @@ public class GeminiTtsService(HttpClient httpClient, IAppSettingsService appSett
 
         try
         {
-            using var response = await httpClient.SendAsync(httpRequest);
+            using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {

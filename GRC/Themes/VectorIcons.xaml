@@ -1,0 +1,49 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================================= -->
+    <!-- Modern AI Desktop Pure XAML Vector Geometries                -->
+    <!-- Reference: Modern_AI_Desktop_UI_Guidelines §4                 -->
+    <!-- Zero image files, zero font dependencies, zero emojis         -->
+    <!-- ============================================================= -->
+
+    <!-- 1. Universal Enterprise Standard Geometries -->
+    <Geometry x:Key="IconPlay">M8 5v14l11-7z</Geometry>
+    <Geometry x:Key="IconStop">M6 6h12v12H6z</Geometry>
+    <Geometry x:Key="IconStopSquare">M16 8v8H8V8h8m0-2H8c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z</Geometry>
+    <Geometry x:Key="IconTerminal">M4 17l6-6-6-6m8 14h8</Geometry>
+    <Geometry x:Key="IconCheck">M20 6L9 17l-5-5</Geometry>
+    <Geometry x:Key="IconClose">M18 6L6 18M6 6l12 12</Geometry>
+    <Geometry x:Key="IconPlus">M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z</Geometry>
+    <Geometry x:Key="IconAlertTriangle">M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4m0 4h.01</Geometry>
+    <Geometry x:Key="IconCopy">M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z</Geometry>
+    <Geometry x:Key="IconRefresh">M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15</Geometry>
+    <Geometry x:Key="IconSearch">M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z</Geometry>
+    <Geometry x:Key="IconChevronDown">M6 9l6 6 6-6</Geometry>
+    <Geometry x:Key="IconChevronRight">M9 18l6-6-6-6</Geometry>
+    <Geometry x:Key="IconChevronLeft">M15 18l-6-6 6-6</Geometry>
+    <Geometry x:Key="IconTool">M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z</Geometry>
+    <Geometry x:Key="IconSparkles">M12,2L14.6,8.6L21,11L14.6,13.4L12,20L9.4,13.4L3,11L9.4,8.6L12,2M20.5,17L21.4,19.3L24,20L21.4,20.7L20.5,23L19.6,20.7L17,20L19.6,19.3L20.5,17</Geometry>
+
+    <!-- 2. GRC Specialized Action & Navigation Geometries -->
+    <Geometry x:Key="IconSend">M2.01 21L23 12 2.01 3 2 10l15 2-15 2z</Geometry>
+    <Geometry x:Key="IconEdit">M12 20h9 M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z</Geometry>
+    <Geometry x:Key="IconBook">M12 2L2 7l10 5 10-5-10-5z M2 17l10 5 10-5 M2 12l10 5 10-5</Geometry>
+    <Geometry x:Key="IconHistory">M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z</Geometry>
+    <Geometry x:Key="IconSettings">M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z</Geometry>
+    <Geometry x:Key="IconKey">M12.65 10A5.99 5.99 0 0 0 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6a5.99 5.99 0 0 0 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z</Geometry>
+    <Geometry x:Key="IconFolder">M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z</Geometry>
+    <Geometry x:Key="IconTrash">M9 3v1H4v2h1v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6h1V4h-5V3H9zm2 2h2v1h-2V5zm-3 3h2v11H8V8zm4 0h2v11h-2V8zm4 0h2v11h-2V8z</Geometry>
+    <Geometry x:Key="IconBranch">M7 5a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm10 4a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm1-11.82V13.8a3.99 3.99 0 0 1 2 3.47v.73h2v-.73a6 6 0 0 0-4-5.65V7.18a3.97 3.97 0 0 1-2 0zM17 11a4 4 0 0 1-4 4h-1v2h1a6 6 0 0 0 6-6V9h-2v2z</Geometry>
+    <Geometry x:Key="IconSave">M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z</Geometry>
+    <Geometry x:Key="IconMessageSquare">M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z</Geometry>
+    <Geometry x:Key="IconBrain">M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 21l3.53-.94A8.95 8.95 0 0 0 12 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 16c-1.39 0-2.69-.37-3.82-1.02l-.27-.16-2.09.55.56-2.05-.17-.28A6.97 6.97 0 0 1 5 12c0-3.86 3.14-7 7-7s7 3.14 7 7-3.14 7-7 7z</Geometry>
+    <Geometry x:Key="IconHourglass">M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6z</Geometry>
+    <Geometry x:Key="IconMapPin">M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z</Geometry>
+    <Geometry x:Key="IconDiamond">M12 2L2 12l10 10 10-10L12 2z</Geometry>
+    <Geometry x:Key="IconSquare">M3 3h18v18H3z M5 5v14h14V5H5z</Geometry>
+    <Geometry x:Key="IconUser">M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z</Geometry>
+    <Geometry x:Key="IconShield">M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z</Geometry>
+
+</ResourceDictionary>

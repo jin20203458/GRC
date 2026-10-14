@@ -17,7 +17,6 @@ public partial class ChatViewModel : ObservableObject
     // ==========================================
     // [1. 의존성 주입 및 내부 상태 변수]
     // ==========================================
-    private readonly IGeminiApiService _apiService;
     private readonly IMemoryManagerService _memoryService;
     private readonly ISessionService _sessionService;
     private readonly IPresetStorageService _presetService;
@@ -59,7 +58,7 @@ public partial class ChatViewModel : ObservableObject
     private int _currentChapter = 1;
     partial void OnCurrentChapterChanged(int value)
     {
-        UpdateRandomBackground();
+        _ = UpdateRandomBackgroundAsync();
     }
 
     [ObservableProperty]
@@ -117,7 +116,6 @@ public partial class ChatViewModel : ObservableObject
     // [3. 생성자]
     // ==========================================
     public ChatViewModel(
-        IGeminiApiService apiService,
         IMemoryManagerService memoryService,
         ISessionService sessionService,
         IPresetStorageService presetService,
@@ -128,7 +126,6 @@ public partial class ChatViewModel : ObservableObject
         IThemeService themeService, IDialogService dialogService,
         IGoogleTtsService ttsService, ILorebookService lorebookService)
     {
-        _apiService = apiService;
         _memoryService = memoryService;
         _sessionService = sessionService;
         _presetService = presetService;
@@ -169,6 +166,7 @@ public partial class ChatViewModel : ObservableObject
 
                 _currentFileName = GRC.Helpers.ChatDataHelper.GenerateSessionFileName(finalName);
                 GRC.Helpers.TokenLogger.CurrentSessionFileName = _currentFileName;
+                _memoryService.CurrentSessionFileName = _currentFileName;
 
 
                 await _presetService.SavePresetAsync(_currentFileName, CurrentPreset);
@@ -191,6 +189,7 @@ public partial class ChatViewModel : ObservableObject
             {
                 _currentFileName = fileName;
                 GRC.Helpers.TokenLogger.CurrentSessionFileName = _currentFileName;
+                _memoryService.CurrentSessionFileName = _currentFileName;
                 var savedSession = await _sessionService.LoadSessionAsync(fileName);
                 if (savedSession != null)
                 {
@@ -239,7 +238,7 @@ public partial class ChatViewModel : ObservableObject
             }
             IsBusy = false;
             //  초기 화면부터 랜덤 배경을 적용
-            UpdateRandomBackground();
+            await UpdateRandomBackgroundAsync();
         }
     }
 
@@ -366,8 +365,6 @@ public partial class ChatViewModel : ObservableObject
         int aiMessageIndex = ChatHistory.Count - 1;
 
         CurrentStreamingText = string.Empty;
-        bool isTypingSoundStarted = false;
-        bool isDialogue = false;
 
         var appSettings = await _appSettingsService.LoadSettingsAsync();
         bool isTtsEnabled = appSettings.IsTtsEnabled;
@@ -379,95 +376,30 @@ public partial class ChatViewModel : ObservableObject
             {
                 Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    if (c == '"' || c == '“' || c == '”')
-                    {
-                        isDialogue = !isDialogue;
-                    }
-
-                    bool shouldMuteTyping = isDialogue || (c == '"' || c == '“' || c == '”');
-                    if (shouldMuteTyping)
-                    {
-                        if (isTypingSoundStarted)
-                        {
-                            _audioService.StopTypingSound();
-                            isTypingSoundStarted = false;
-                        }
-                    }
-                    else
-                    {
-                        if (!isTypingSoundStarted)
-                        {
-                            _audioService.StartTypingSound();
-                            isTypingSoundStarted = true;
-                        }
-                    }
-
                     CurrentStreamingText += c;
                     OnCharReceived?.Invoke(c);
                 });
             },
-     onDialoguePrefetch: async (narration, dialogue) =>
-     {
-         if (isTtsEnabled && CurrentPreset != null)
-         {
-             //  현재 메모리에 활성화된 로어북 텍스트 중에서 '인물' 카테고리만 필터링하여 재조립
-             var activeCharacterLorebooks = CurrentPreset.Lorebooks?
-                 .Where(l => l.Category == "인물" && _memoryService.CurrentLorebookText.Contains($"[{l.Name}]"))
-                 .Select(l => $"[{l.Name}]\n{l.Content}");
+            onDialoguePrefetch: async (narration, dialogue) =>
+            {
+                if (isTtsEnabled && CurrentPreset != null)
+                {
+                    // 현재 메모리에 활성화된 로어북 텍스트 중에서 '인물' 카테고리만 필터링하여 재조립
+                    var activeCharacterLorebooks = CurrentPreset.Lorebooks?
+                        .Where(l => l.Category == "인물" && _memoryService.CurrentLorebookText.Contains($"[{l.Name}]"))
+                        .Select(l => $"[{l.Name}]\n{l.Content}");
 
-             string activeLorebook = activeCharacterLorebooks != null && activeCharacterLorebooks.Any()
-                 ? string.Join("\n\n", activeCharacterLorebooks)
-                 : "인물 정보 없음";
+                    string activeLorebook = activeCharacterLorebooks != null && activeCharacterLorebooks.Any()
+                        ? string.Join("\n\n", activeCharacterLorebooks)
+                        : "인물 정보 없음";
 
-             string targetDialogue = dialogue;
-
-             //  현재 TTS 언어 설정 로드
-             var settings = await _appSettingsService.LoadSettingsAsync();
-
-                 if (settings.SelectedTtsLanguage == TtsLanguage.Japanese)
-                 {
-                     var translationRequest = new GeminiRequest(
-       SystemInstruction: new Content("system", [new Part("You are a professional translator. Translate the given dialogue into natural conversational Japanese. Do not add any extra explanations or quotes.")]),
-       Contents: [new Content("user", [new Part(dialogue)])],
-       SafetySettings: [
-        new("HARM_CATEGORY_HARASSMENT", BlockThreshold.BLOCK_NONE),
-        new("HARM_CATEGORY_HATE_SPEECH", BlockThreshold.BLOCK_NONE),
-        new("HARM_CATEGORY_SEXUALLY_EXPLICIT", BlockThreshold.BLOCK_NONE),
-        new("HARM_CATEGORY_DANGEROUS_CONTENT", BlockThreshold.BLOCK_NONE)
-       ],
-       GenerationConfig: new GenerationConfig(Temperature: null, MaxOutputTokens: 1024, ResponseMimeType: "text/plain")
-   );
-
-                     // FlashLite 모델을 사용해 백그라운드에서 신속하게 번역 (비동기)
-                     string translatedText = await _apiService.SendMessageAsync(translationRequest, ModelTier.FlashLite);
-
-                     // 시스템 오류 메세지가 반환되지 않고 정상 번역되었다면 덮어씌움
-                     if (!string.IsNullOrWhiteSpace(translatedText) && !translatedText.StartsWith("[System"))
-                     {
-                         targetDialogue = translatedText.Trim();
-                     }
-                     //Debug.WriteLine(translatedText);
-                 }
-
-                 //  최종적으로 원본 대사 혹은 일본어로 번역된 대사(targetDialogue)를 TTS 엔진으로 전달
-                 return await _ttsService.GenerateSpeechAsync(targetDialogue, CurrentPreset.Name, narration, activeLorebook);
-             }
-             return string.Empty;
-         },
+                    return await _ttsService.GenerateSpeechAsync(dialogue, CurrentPreset.Name, narration, activeLorebook);
+                }
+                return string.Empty;
+            },
             onAudioReady: async (audioFilePath) =>
             {
-                Task? playTask = null;
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    _audioService.StopTypingSound();
-                    isTypingSoundStarted = false;
-                    playTask = _audioService.PlayVoiceSoundAsync(audioFilePath);
-                });
-
-                if (playTask != null)
-                {
-                    await playTask; // 음성 재생이 끝날 때까지 텍스트 타이핑 멈춤
-                }
+                await _audioService.PlayVoiceSoundAsync(audioFilePath);
             },
             onDownloadComplete: async (streamResult) =>
             {
@@ -498,7 +430,7 @@ public partial class ChatViewModel : ObservableObject
                     UpdateStatusUI(_memoryService.CurrentContext?.CustomStats, _memoryService.CurrentContext?.Chars, _memoryService.CurrentContext?.Items, _memoryService.CurrentContext?.Places);
                     System.Diagnostics.Debug.WriteLine("[ChatViewModel] 백그라운드 상태창 갱신 UI 및 데이터 반영 완료");
 
-                    //  상태창이 갱신된 최종 메모리 세션을 파일에 즉시 영구 세이브!
+                    // 상태창이 갱신된 최종 메모리 세션을 파일에 즉시 영구 세이브!
                     if (CurrentPreset != null)
                     {
                         var currentSession = _memoryService.ExportSession(CurrentPreset);
@@ -509,8 +441,6 @@ public partial class ChatViewModel : ObservableObject
             },
             cancellationToken: _cancellationTokenSource.Token
         );
-
-        _audioService.StopTypingSound();
 
         if (result.IsSuccess)
         {
@@ -571,13 +501,9 @@ public partial class ChatViewModel : ObservableObject
     private void OpenArchitectForEdit()
     {
         if (CurrentPreset == null || string.IsNullOrEmpty(_currentFileName)) return;
-        var vm = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<SessionArchitectViewModel>(App.Current.Services);
-        vm.InitializeForEdit(_currentFileName, CurrentPreset);
-        var window = new Views.SessionArchitectWindow(vm);
-        window.Owner = System.Windows.Application.Current.MainWindow;
-        vm.SessionCreated += async (fileName) =>
+
+        _dialogService.ShowSessionArchitectEditWindow(_currentFileName, CurrentPreset, async (fileName) =>
         {
-            window.Close();
             // 프리셋 재로드 및 UI 반영
             CurrentPreset = await _presetService.LoadPresetAsync(_currentFileName);
             
@@ -592,11 +518,11 @@ public partial class ChatViewModel : ObservableObject
                     ChatHistory.Add(msg);
                 }
                 CurrentTurn = session.TotalTurnCount;
+                UpdateStatusUI(_memoryService.CurrentContext?.CustomStats, _memoryService.CurrentContext?.Chars, _memoryService.CurrentContext?.Items, _memoryService.CurrentContext?.Places);
             }
 
             ChatHistory.Add(new ChatMessage("system", "AI 세션 아키텍트에 의해 세계관/로어북/상태창/시나리오가 업데이트되었습니다.", DateTime.Now));
-        };
-        window.ShowDialog();
+        });
     }
 
 
@@ -856,10 +782,17 @@ public partial class ChatViewModel : ObservableObject
         _ = SendMessageAsync();
     }
 
-    private async void UpdateRandomBackground()
+    private async Task UpdateRandomBackgroundAsync()
     {
-        var settings = await _appSettingsService.LoadSettingsAsync();
-        CurrentBackgroundImage = _themeService.GetRandomBackground(settings.SelectedTheme, ref _unusedBackgrounds, CurrentBackgroundImage);
+        try
+        {
+            var settings = await _appSettingsService.LoadSettingsAsync();
+            CurrentBackgroundImage = _themeService.GetRandomBackground(settings.SelectedTheme, ref _unusedBackgrounds, CurrentBackgroundImage);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"배경 이미지 갱신 실패: {ex.Message}");
+        }
     }
 
     [RelayCommand]
@@ -885,36 +818,15 @@ public partial class ChatViewModel : ObservableObject
     {
         _dialogService.RunOnUIThread(() =>
         {
-            // 1. 커스텀 스탯 (게이지 바 처리 로직 및 정렬 추가됨)
+            // 1. 커스텀 스탯 (도메인 팩토리 메서드 및 정렬 활용)
             CustomStatsUIList.Clear();
             if (customStats != null)
             {
-                // 정렬을 위해 임시 리스트에 먼저 담습니다.
-                var tempStats = new List<CustomStatUI>();
+                var sortedStats = customStats
+                    .Select(kvp => CustomStatUI.Create(kvp.Key, kvp.Value))
+                    .OrderByDescending(s => s.IsGauge);
 
-                foreach (var kvp in customStats)
-                {
-                    var statItem = new CustomStatUI { Name = kvp.Key, Value = kvp.Value };
-
-                    // "100/100"과 같이 슬래시(/)가 포함된 형태인지 확인하여 분리
-                    if (!string.IsNullOrWhiteSpace(kvp.Value) && kvp.Value.Contains("/"))
-                    {
-                        var parts = kvp.Value.Split('/');
-                        if (parts.Length == 2 &&
-                            double.TryParse(parts[0].Trim(), out double current) &&
-                            double.TryParse(parts[1].Trim(), out double max))
-                        {
-                            statItem.IsGauge = true;
-                            statItem.CurrentValue = current;
-                            statItem.MaxValue = max;
-                        }
-                    }
-
-                    tempStats.Add(statItem);
-                }
-
-                // IsGauge가 true인 항목이 리스트의 앞쪽에 오도록 내림차순 정렬 후 실제 UI 리스트에 추가합니다.
-                foreach (var statItem in tempStats.OrderByDescending(s => s.IsGauge))
+                foreach (var statItem in sortedStats)
                 {
                     CustomStatsUIList.Add(statItem);
                 }

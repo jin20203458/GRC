@@ -1,4 +1,5 @@
-﻿using System.Windows;
+using System.Windows;
+using System.Windows.Input;
 
 namespace GRC.Views
 {
@@ -14,13 +15,11 @@ namespace GRC.Views
             DialogTitle = title;
             DataContext = this;
 
-            // 소유자 창을 설정하여 중앙에 뜨도록 함
-            if (Application.Current.MainWindow != this)
-                this.Owner = Application.Current.MainWindow;
-
             // 경고(Alert) 모드라면 취소 버튼 숨기기
             if (!isConfirmMode)
+            {
                 BtnCancel.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void BtnOk_Click(object sender, RoutedEventArgs e)
@@ -33,6 +32,24 @@ namespace GRC.Views
         {
             this.DialogResult = false;
             this.Close();
+        }
+
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape)
+            {
+                this.DialogResult = false;
+                this.Close();
+                e.Handled = true;
+            }
+        }
+
+        private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                this.DragMove();
+            }
         }
     }
 }

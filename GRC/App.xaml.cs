@@ -1,6 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 using GRC.Services;
 using GRC.ViewModels;
 
@@ -20,6 +23,10 @@ public partial class App : Application
 
     public App()
     {
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
         // 앱이 생성될 때 서비스들을 등록하고 빌드함
         Services = ConfigureServices();
     }
@@ -27,9 +34,42 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        // C# 코드로 직접 MainWindow 객체를 생성해서 화면에 띄웁니다.
-        var mainWindow = new GRC.Views.MainWindow();
+        var mainWindow = Services.GetRequiredService<GRC.Views.MainWindow>();
         mainWindow.Show();
+    }
+
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        LogFatalException("Dispatcher", e.Exception);
+        MessageBox.Show($"예기치 않은 UI 오류가 발생했습니다:\n{e.Exception.Message}", "시스템 오류", MessageBoxButton.OK, MessageBoxImage.Error);
+        e.Handled = true; // 프로세스 강제 크래시 방지
+    }
+
+    private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        if (e.ExceptionObject is Exception ex)
+        {
+            LogFatalException("AppDomain", ex);
+        }
+    }
+
+    private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        LogFatalException("TaskScheduler", e.Exception);
+        e.SetObserved(); // 백그라운드 태스크 예외로 인한 프로세스 다운 방지
+    }
+
+    private static void LogFatalException(string source, Exception ex)
+    {
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var logDir = Path.Combine(appData, "GRC", "Logs");
+            Directory.CreateDirectory(logDir);
+            var logPath = Path.Combine(logDir, "crash.log");
+            File.AppendAllText(logPath, $"[{DateTime.Now:O}] [{source}] {ex}\n\n");
+        }
+        catch { }
     }
     /// <summary>
     /// 애플리케이션에서 사용할 모든 서비스와 뷰모델을 등록하는 메서드
@@ -86,6 +126,9 @@ public partial class App : Application
         services.AddTransient<ChatViewModel>();
         services.AddTransient<SessionArchitectViewModel>();
         services.AddTransient<SettingsViewModel>();
+
+        // 뷰 계층 등록
+        services.AddSingleton<GRC.Views.MainWindow>();
         // 뷰모델과 서비스 조립 완료 후 반환
         return services.BuildServiceProvider();
     }

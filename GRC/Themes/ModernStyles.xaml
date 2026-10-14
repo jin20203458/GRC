@@ -168,13 +168,22 @@
         </Setter>
     </Style>
 
-    <Style x:Key="HeaderActionButton" TargetType="Button">
-        <Setter Property="Background" Value="#252525" />
-        <Setter Property="Padding" Value="8,4" />
-        <Setter Property="FontSize" Value="11" />
+    <!-- ============================================================= -->
+    <!-- Modern Button Design System (Implicit Base + Semantic Styles) -->
+    <!-- ============================================================= -->
 
-        <Setter Property="Foreground" Value="White" />
-
+    <!-- Base Button Style: Provides unified ControlTemplate, Hand cursor, Pressed/Disabled states -->
+    <Style x:Key="BaseButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="#252528" />
+        <Setter Property="BorderBrush" Value="#3E3E42" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="#F2F2F2" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -182,26 +191,122 @@
                         x:Name="border"
                         Padding="{TemplateBinding Padding}"
                         Background="{TemplateBinding Background}"
-                        BorderBrush="#333333"
-                        BorderThickness="1"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
                         CornerRadius="4">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <ContentPresenter
+                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                            SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="#353535" />
-                            <Setter TargetName="border" Property="BorderBrush" Value="#444444" />
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Opacity" Value="0.75" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="border" Property="Opacity" Value="0.4" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#35353A" />
+                <Setter Property="BorderBrush" Value="#525258" />
+                <Setter Property="Foreground" Value="White" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
+    <!-- Global Implicit Button Style: Prevents any unstyled Button from reverting to Windows Aero theme -->
+    <Style TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}" />
+
+    <!-- Secondary Action Button: Neutral dark gray (Cancel, General actions, Dialog secondary) -->
+    <Style x:Key="SecondaryActionButton" BasedOn="{StaticResource BaseButtonStyle}" TargetType="Button">
+        <Setter Property="Background" Value="#252528" />
+        <Setter Property="BorderBrush" Value="#3E3E42" />
+        <Setter Property="Foreground" Value="#D1D1D1" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#35353A" />
+                <Setter Property="BorderBrush" Value="#525258" />
+                <Setter Property="Foreground" Value="White" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Primary Action Button: Teal brand accent (Confirm, Save, Primary Dialog Action) -->
+    <Style x:Key="PrimaryActionButton" BasedOn="{StaticResource BaseButtonStyle}" TargetType="Button">
+        <Setter Property="Background" Value="#008B99" />
+        <Setter Property="BorderBrush" Value="#00A5B5" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#00A5B5" />
+                <Setter Property="BorderBrush" Value="#33E1F5" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Success Action Button: Emerald green accent (Approve, Next Stage, Create Session) -->
+    <Style x:Key="SuccessActionButton" BasedOn="{StaticResource BaseButtonStyle}" TargetType="Button">
+        <Setter Property="Background" Value="#142F24" />
+        <Setter Property="BorderBrush" Value="#2C8D6C" />
+        <Setter Property="Foreground" Value="#A2E2C8" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#1D4333" />
+                <Setter Property="BorderBrush" Value="#3EBA8F" />
+                <Setter Property="Foreground" Value="White" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Danger Action Button: Crimson red accent (Cancel generation, Stop, Delete) -->
+    <Style x:Key="DangerActionButton" BasedOn="{StaticResource BaseButtonStyle}" TargetType="Button">
+        <Setter Property="Background" Value="#421A1A" />
+        <Setter Property="BorderBrush" Value="#9E3A3A" />
+        <Setter Property="Foreground" Value="#E29494" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#5A2323" />
+                <Setter Property="BorderBrush" Value="#C24848" />
+                <Setter Property="Foreground" Value="White" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Accent Blue Action Button: Blue accent (API key setup onboarding) -->
+    <Style x:Key="AccentBlueActionButton" BasedOn="{StaticResource BaseButtonStyle}" TargetType="Button">
+        <Setter Property="Background" Value="#2563EB" />
+        <Setter Property="BorderBrush" Value="#3B82F6" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#3B82F6" />
+                <Setter Property="BorderBrush" Value="#60A5FA" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Compact Header Action Button (Backward compatible with existing HeaderActionButton) -->
+    <Style x:Key="HeaderActionButton" BasedOn="{StaticResource SecondaryActionButton}" TargetType="Button">
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <!-- Ghost Button: Transparent background for borderless icons and text-only buttons -->
     <Style x:Key="GhostButton" TargetType="Button">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -218,6 +323,9 @@
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="content" Property="Opacity" Value="0.4" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="content" Property="Opacity" Value="0.25" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -269,11 +377,16 @@
                         CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                         Header="이 메시지 재전송">
                         <MenuItem.Icon>
-                            <TextBlock
+                            <Path
+                                Width="14"
+                                Height="14"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                Foreground="#00E676"
-                                Text="🔄" />
+                                Data="{StaticResource IconRefresh}"
+                                Fill="Transparent"
+                                Stretch="Uniform"
+                                Stroke="#00E676"
+                                StrokeThickness="1.5" />
                         </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem
@@ -281,11 +394,14 @@
                         CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                         Header="이 메시지 복사">
                         <MenuItem.Icon>
-                            <TextBlock
+                            <Path
+                                Width="14"
+                                Height="14"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                Foreground="#4DA6FF"
-                                Text="📋" />
+                                Data="{StaticResource IconCopy}"
+                                Fill="#4DA6FF"
+                                Stretch="Uniform" />
                         </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem
@@ -293,11 +409,14 @@
                         CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                         Header="이 메시지 삭제">
                         <MenuItem.Icon>
-                            <TextBlock
+                            <Path
+                                Width="14"
+                                Height="14"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                Foreground="#FF5555"
-                                Text="🗑" />
+                                Data="{StaticResource IconTrash}"
+                                Fill="#FF5555"
+                                Stretch="Uniform" />
                         </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem
@@ -305,11 +424,14 @@
                         CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                         Header="이 시점부터 새 세션으로 분기">
                         <MenuItem.Icon>
-                            <TextBlock
+                            <Path
+                                Width="14"
+                                Height="14"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                Foreground="#B088FF"
-                                Text="🌱" />
+                                Data="{StaticResource IconBranch}"
+                                Fill="#B088FF"
+                                Stretch="Uniform" />
                         </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem
@@ -317,11 +439,14 @@
                         CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                         Header="이 대화를 기억으로 저장">
                         <MenuItem.Icon>
-                            <TextBlock
+                            <Path
+                                Width="14"
+                                Height="14"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                Foreground="#FFD700"
-                                Text="💾" />
+                                Data="{StaticResource IconSave}"
+                                Fill="#FFD700"
+                                Stretch="Uniform" />
                         </MenuItem.Icon>
                     </MenuItem>
                 </ContextMenu>

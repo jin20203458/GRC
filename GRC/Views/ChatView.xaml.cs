@@ -1,7 +1,8 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
+using GRC.Helpers;
+
 namespace GRC.Views
 {
     public partial class ChatView : UserControl
@@ -56,7 +57,7 @@ namespace GRC.Views
         {
             if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
             {
-                ResetAutoScroll();
+                ScrollChatToEnd();
             }
             // F1 키를 눌렀을 때 (대사)
             if (e.Key == Key.F1)
@@ -72,28 +73,20 @@ namespace GRC.Views
             }
         }
 
-        // 💡 [새로 추가] 전송(종이비행기) 버튼을 클릭했을 때 오토스크롤 강제 복구
+        // 전송(종이비행기) 버튼을 클릭했을 때 오토스크롤 강제 복구
         private void BtnSend_Click(object sender, RoutedEventArgs e)
         {
-            Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                ResetAutoScroll(); // 2. 레이아웃 바운스가 끝난 직후에 스크롤을 다시 맨 아래로 꽂고 ON 상태로 만듦
-            }, System.Windows.Threading.DispatcherPriority.Loaded);
+            ScrollChatToEnd();
         }
 
-        // 💡 [새로 추가] 스크롤을 맨 아래로 강제 이동하고 오토스크롤 잠금을 해제하는 핵심 메서드
-        private void ResetAutoScroll()
+        // 스크롤을 맨 아래로 이동시키는 템플릿 탐색 헬퍼 메서드
+        private void ScrollChatToEnd()
         {
-            if (VisualTreeHelper.GetChildrenCount(ChatHistoryItemsControl) > 0)
+            ChatHistoryItemsControl.ApplyTemplate();
+            if (ChatHistoryItemsControl.Template?.FindName("ChatScrollViewer", ChatHistoryItemsControl) is ScrollViewer sv)
             {
-                // ItemsControl 내부에 있는 ScrollViewer를 찾아서 강제 제어합니다.
-                if (VisualTreeHelper.GetChild(ChatHistoryItemsControl, 0) is ScrollViewer sv)
-                {
-                    sv.Tag = true;        // 1. 오토스크롤 스위치를 강제로 On
-                    sv.ScrollToEnd();     // 2. 즉시 화면을 맨 밑으로 꽂아버림
-                }
+                AutoScrollHelper.ScrollToEnd(sv);
             }
         }
-
     }
 }

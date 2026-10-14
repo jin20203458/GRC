@@ -114,7 +114,19 @@
         <!-- 6: 커스텀 스탯 라벨 및 추가 버튼 -->
         <Grid Grid.Row="8" Margin="0,20,0,8">
             <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="#D1D1D1" Text="추적할 커스텀 스탯 (선택 사항)" VerticalAlignment="Center" />
-            <Button Click="AddStatButton_Click" Content="+ 스탯 추가" HorizontalAlignment="Right" Padding="10,4" Background="#2A2A2A" Foreground="White" BorderThickness="0" Cursor="Hand" />
+            <Button Click="AddStatButton_Click" HorizontalAlignment="Right" Padding="10,4" Style="{StaticResource SecondaryActionButton}">
+                <StackPanel Orientation="Horizontal">
+                    <Path
+                        Width="10"
+                        Height="10"
+                        Margin="0,0,5,0"
+                        VerticalAlignment="Center"
+                        Data="{StaticResource IconPlus}"
+                        Fill="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                        Stretch="Uniform" />
+                    <TextBlock VerticalAlignment="Center" Text="스탯 추가" />
+                </StackPanel>
+            </Button>
         </Grid>
 
         <!-- 7: 동적 스탯 입력 리스트 -->
@@ -140,7 +152,15 @@
                             <TextBox Grid.Column="1" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Background="#121212" Foreground="White" BorderBrush="#2A2A2A" Padding="8" Margin="0,0,8,0" />
 
                             <!-- 해당 스탯 삭제 버튼 -->
-                            <Button Grid.Column="2" Click="RemoveStatButton_Click" Tag="{Binding}" Content="✕" Width="30" Background="Transparent" Foreground="#FF5555" BorderThickness="0" Cursor="Hand" />
+                            <Button Grid.Column="2" Click="RemoveStatButton_Click" Tag="{Binding}" Width="30" Foreground="#FF5555" Style="{StaticResource GhostButton}" ToolTip="삭제">
+                                <Path
+                                    Width="10"
+                                    Height="10"
+                                    Data="{StaticResource IconClose}"
+                                    Stretch="Uniform"
+                                    Stroke="#FF5555"
+                                    StrokeThickness="2" />
+                            </Button>
                         </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
@@ -157,15 +177,13 @@
                 Width="80"
                 Margin="0,0,10,0"
                 Click="CancelButton_Click"
-                Style="{StaticResource HeaderActionButton}">
-                <TextBlock Foreground="#AAAAAA" Text="취소" />
-            </Button>
+                Content="취소"
+                Style="{StaticResource SecondaryActionButton}" />
             <Button
                 Width="100"
                 Click="StartButton_Click"
-                Style="{StaticResource HeaderActionButton}">
-                <TextBlock FontWeight="Bold" Foreground="White" Text="대화 시작" />
-            </Button>
+                Content="대화 시작"
+                Style="{StaticResource PrimaryActionButton}" />
         </StackPanel>
     </Grid>
 </Window>

@@ -1,31 +1,185 @@
-﻿<Window
+<Window
     x:Class="GRC.Views.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:helpers="clr-namespace:GRC.Helpers"
+    xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
     xmlns:views="clr-namespace:GRC.Views"
     xmlns:vm="clr-namespace:GRC.ViewModels"
     Title="GenAI Roleplay Chat"
     Width="600"
     Height="850"
-    helpers:WindowTitleBarBehavior.EnableDarkTitleBar="True"
-    Background="#343541"
-    Icon="/Resources/GRC.ico"
+    MinWidth="480"
+    MinHeight="600"
+    Background="#121214"
+    Icon="pack://application:,,,/GRC;component/Resources/GRC.ico"
     WindowStartupLocation="CenterScreen">
 
+    <!--  WindowChrome 기반 일체형 셸 (WPF_Architecture_Guidelines §10)  -->
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome
+            CaptionHeight="36"
+            CornerRadius="0"
+            GlassFrameThickness="-1"
+            NonClientFrameEdges="None"
+            ResizeBorderThickness="6"
+            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
     <Window.Resources>
-        <DataTemplate DataType="{x:Type vm:SessionListViewModel}">
-            <views:SessionListView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:ChatViewModel}">
-            <views:ChatView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
-            <views:SettingsView />
-        </DataTemplate>
+        <ResourceDictionary>
+            <DataTemplate DataType="{x:Type vm:SessionListViewModel}">
+                <views:SessionListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:ChatViewModel}">
+                <views:ChatView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+                <views:SettingsView />
+            </DataTemplate>
+
+            <!--  캡션 버튼 공용 스타일  -->
+            <Style x:Key="CaptionButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Width" Value="46" />
+                <Setter Property="Height" Value="36" />
+                <Setter Property="Foreground" Value="#AAAAAA" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#252528" />
+                                    <Setter Property="Foreground" Value="White" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#1E1E22" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!--  닫기 캡션 버튼 전용 스타일 (Windows 레드 액센트)  -->
+            <Style x:Key="CloseCaptionButtonStyle" BasedOn="{StaticResource CaptionButtonStyle}" TargetType="Button">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#E81123" />
+                                    <Setter Property="Foreground" Value="White" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#C4101E" />
+                                    <Setter Property="Foreground" Value="White" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
     </Window.Resources>
 
-    <Grid>
-        <ContentControl Content="{Binding CurrentPage}" />
+    <!--  최상위 루트 컨테이너  -->
+    <Grid Background="#121214">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--  1. 일체형 커스텀 타이틀바  -->
+        <Border
+            Grid.Row="0"
+            Background="#18181C"
+            BorderBrush="#25252A"
+            BorderThickness="0,0,0,1"
+            MouseRightButtonUp="TitleBar_MouseRightButtonUp">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!--  좌측 공식 앱 타이틀 브랜딩  -->
+                <StackPanel
+                    Grid.Column="0"
+                    Margin="16,0,0,0"
+                    VerticalAlignment="Center"
+                    IsHitTestVisible="False"
+                    Orientation="Horizontal">
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        FontSize="12"
+                        FontWeight="Bold"
+                        Foreground="#E0E0E0"
+                        Text="GRC" />
+                    <TextBlock
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        FontSize="11"
+                        Foreground="#6C7280"
+                        Text="GenAI Roleplay Chat" />
+                </StackPanel>
+
+                <!--  중앙 빈 공간: WindowChrome Caption 드래그 영역  -->
+
+                <!--  우측 창 제어 버튼군  -->
+                <StackPanel
+                    Grid.Column="2"
+                    Orientation="Horizontal"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button
+                        Click="MinimizeButton_Click"
+                        Style="{StaticResource CaptionButtonStyle}"
+                        ToolTip="최소화">
+                        <Path
+                            Width="10"
+                            Height="1"
+                            Data="M0 0h10v1H0z"
+                            Fill="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" />
+                    </Button>
+                    <Button
+                        x:Name="MaximizeButton"
+                        Click="MaximizeButton_Click"
+                        Style="{StaticResource CaptionButtonStyle}"
+                        ToolTip="최대화">
+                        <Path
+                            x:Name="MaximizeIcon"
+                            Width="10"
+                            Height="10"
+                            Data="M1 1h8v8H1V1z"
+                            Fill="Transparent"
+                            Stroke="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                            StrokeThickness="1" />
+                    </Button>
+                    <Button
+                        Click="CloseButton_Click"
+                        Style="{StaticResource CloseCaptionButtonStyle}"
+                        ToolTip="닫기">
+                        <Path
+                            Width="10"
+                            Height="10"
+                            Data="{StaticResource IconClose}"
+                            Stretch="Uniform"
+                            Stroke="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                            StrokeThickness="1.2" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!--  2. 메인 페이지 콘텐츠  -->
+        <ContentControl Grid.Row="1" Content="{Binding CurrentPage}" />
     </Grid>
 </Window>

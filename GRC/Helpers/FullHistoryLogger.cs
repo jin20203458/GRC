@@ -1,4 +1,4 @@
-﻿using GRC.Models;
+using GRC.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -188,6 +188,28 @@ public static class FullHistoryLogger
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[FullHistoryLogger Clear Error]: {ex.Message}");
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
+    }
+
+    // 분기 세션 저장 또는 전체 재직렬화 저장을 위한 스레드 안전 메서드
+    public static async Task SaveFullHistoryAsync(string sessionFileName, List<ChatMessage> history)
+    {
+        if (string.IsNullOrEmpty(sessionFileName)) return;
+        string logPath = GetLogPath(sessionFileName);
+        await _fileLock.WaitAsync();
+        try
+        {
+            string dir = Path.GetDirectoryName(logPath)!;
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            await File.WriteAllTextAsync(logPath, JsonSerializer.Serialize(history, _options));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[FullHistoryLogger Save Error]: {ex.Message}");
         }
         finally
         {

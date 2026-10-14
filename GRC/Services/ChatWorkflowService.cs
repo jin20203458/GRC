@@ -15,7 +15,8 @@ namespace GRC.Services;
 public class ChatWorkflowService(
     IGeminiApiService apiService,
     IMemoryManagerService memoryService,
-    IAppSettingsService appSettingsService) : IChatWorkflowService
+    IAppSettingsService appSettingsService,
+    IAudioService audioService) : IChatWorkflowService
 {
     public string? GetMetaDirective(string inputText, bool isFastForwardEnabled, 
         Dictionary<string, string>? currentStats, List<string>? triggeredEvents, 
@@ -138,14 +139,38 @@ public class ChatWorkflowService(
             var typingTask = Task.Run(async () =>
             {
                 bool uiIsDialogue = false;
-                await foreach (var c in channel.Reader.ReadAllAsync(cancellationToken))
+                bool isTypingSoundStarted = false;
+                try
                 {
-                    onCharReceived?.Invoke(c);
-
-                    if (c == '"' || c == '\u201c' || c == '\u201d')
+                    await foreach (var c in channel.Reader.ReadAllAsync(cancellationToken))
                     {
-                        uiIsDialogue = !uiIsDialogue;
-                        if (!uiIsDialogue) // 대사가 끝나는 시점
+                        bool isQuote = (c == '"' || c == '\u201c' || c == '\u201d');
+                        if (isQuote)
+                        {
+                            uiIsDialogue = !uiIsDialogue;
+                        }
+
+                        bool shouldMuteTyping = uiIsDialogue || isQuote;
+                        if (shouldMuteTyping)
+                        {
+                            if (isTypingSoundStarted)
+                            {
+                                audioService.StopTypingSound();
+                                isTypingSoundStarted = false;
+                            }
+                        }
+                        else
+                        {
+                            if (!isTypingSoundStarted)
+                            {
+                                audioService.StartTypingSound();
+                                isTypingSoundStarted = true;
+                            }
+                        }
+
+                        onCharReceived?.Invoke(c);
+
+                        if (isQuote && !uiIsDialogue) // 대사가 끝나는 시점
                         {
                             if (prefetchTasks.TryDequeue(out var ttsTask))
                             {
@@ -158,22 +183,28 @@ public class ChatWorkflowService(
 
                                     if (!string.IsNullOrEmpty(audioPath) && onAudioReady != null)
                                     {
+                                        audioService.StopTypingSound();
+                                        isTypingSoundStarted = false;
                                         await onAudioReady(audioPath);
                                     }
                                 }
                                 catch (Exception ex) { Debug.WriteLine($"[TTS Error]: {ex.Message}"); }
                             }
                         }
-                    }
 
-                    if (currentChatDelay > 0)
-                    {
-                        await Task.Delay(currentChatDelay, cancellationToken);
+                        if (currentChatDelay > 0)
+                        {
+                            await Task.Delay(currentChatDelay, cancellationToken);
+                        }
+                        else
+                        {
+                            await Task.Yield();
+                        }
                     }
-                    else
-                    {
-                        await Task.Yield();
-                    }
+                }
+                finally
+                {
+                    audioService.StopTypingSound();
                 }
             }, cancellationToken);
 

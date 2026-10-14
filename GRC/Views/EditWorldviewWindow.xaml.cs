@@ -44,9 +44,6 @@ public partial class EditWorldviewWindow : Window
             foreach (var kvp in currentStats)
                 StatItems.Add(new StatInputItem { Name = kvp.Key, Value = kvp.Value });
         }
-
-        if (Application.Current.MainWindow != this)
-            this.Owner = Application.Current.MainWindow;
     }
 
     private void AddStatButton_Click(object sender, RoutedEventArgs e)

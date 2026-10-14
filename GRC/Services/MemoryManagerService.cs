@@ -56,6 +56,7 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
 
     // 현재 롤북 텍스트 
     public string CurrentLorebookText { get; private set; } = string.Empty;
+    public string CurrentSessionFileName { get; set; } = string.Empty;
     public void UpdateContextStatus(StatusPayload payload, bool replaceCustomStats = false)
     {
         lock (_shortTermMemory)
@@ -107,7 +108,7 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
                 _shortTermMemory.RemoveRange(0, MemoryCompressionChunkSize);
                 _shortTermVersion++;
                 System.Diagnostics.Debug.WriteLine("[MemoryManager] 안전 밸브 작동: 요약 장기 실패로 인해 오래된 단기 기억을 강제로 밀어냅니다.");
-                _ = Task.Run(() => MemoryEventLogger.LogMemoryEventAsync("[단기 기억] 안전 밸브 작동: 요약 장기 실패로 인해 오래된 단기 기억을 강제로 밀어냅니다."));
+                LogMemoryEvent("[단기 기억] 안전 밸브 작동: 요약 장기 실패로 인해 오래된 단기 기억을 강제로 밀어냅니다.");
             }
         }
 
@@ -227,6 +228,11 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
         return request;
     }
 
+    /// <summary>
+    /// 18턴 도달 후 중기 기억 압축 전 대화 안정화 대기 시간 (ms, 기본값: 3000ms, 단위 테스트 시 단축 가능)
+    /// </summary>
+    public int CompressionDelayMs { get; set; } = 3000;
+
     public void AddModelResponse(ChatMessage message)
     {
         lock (_shortTermMemory)
@@ -237,7 +243,10 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
 
     private async Task CompressToMediumTermAsync()
     {
-        await Task.Delay(3000);
+        if (CompressionDelayMs > 0)
+        {
+            await Task.Delay(CompressionDelayMs);
+        }
         if (!_summarizeLock.Wait(0)) return;
         System.Diagnostics.Debug.WriteLine("[MemoryManager] 중기 서사 요약 로직 시작");
         try
@@ -301,7 +310,7 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
             var summaryReq = CreateInternalRequest(prompt, summarySystemPrompt, "text/plain", null, ThinkingLevel.high);
 
             //LogRequestJson("중기 기억 모델 (Medium)", summaryReq);
-            string response = await apiService.SendMessageAsync(summaryReq, ModelTier.Flash36);
+            string response = await apiService.SendMessageAsync(summaryReq, ModelTier.Flash);
 
             if (!string.IsNullOrWhiteSpace(response) && !response.StartsWith("[System"))
             {
@@ -330,14 +339,14 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
                     _mediumTermUpdateCount++;
 
                     System.Diagnostics.Debug.WriteLine($"[MemoryManager] 중기 병합 성공 (역사 100자): {_currentContext.Plot.Substring(0, Math.Min(100, _currentContext.Plot.Length))}...");
-                    _ = Task.Run(() => MemoryEventLogger.LogMemoryEventAsync($"[중기 기억] 병합 성공 (요약 100자): {_currentContext.Plot.Substring(0, Math.Min(100, _currentContext.Plot.Length))}..."));
+                    LogMemoryEvent($"[중기 기억] 병합 성공 (요약 100자): {_currentContext.Plot.Substring(0, Math.Min(100, _currentContext.Plot.Length))}...");
 
                     // 메모리 큐 정리 및 앵커 활성화
                     // 중기 챕터가 임계치에 도달하면 즉시 챕터 전환 (폭포수 큐 밀어넣기)
                     if (_mediumTermUpdateCount >= MediumTermThreshold)
                     {
                         System.Diagnostics.Debug.WriteLine("[MemoryManager] 중기 임계치 도달: 현재 챕터를 다중 버퍼로 밀어내고 챕터를 전환합니다.");
-                        _ = Task.Run(() => MemoryEventLogger.LogMemoryEventAsync("[중기 기억] 임계치 도달: 챕터 전환 및 큐 버퍼 이동"));
+                        LogMemoryEvent("[중기 기억] 임계치 도달: 챕터 전환 및 큐 버퍼 이동");
 
                         // 1. 현재 챕터를 큐에 보관
                         _mediumBuffers.Enqueue(_currentContext);
@@ -368,7 +377,7 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
                             {
                                 _mediumBuffers.Dequeue();
                                 System.Diagnostics.Debug.WriteLine("[MemoryManager] 큐 적체 감지: MaxMediumBufferCount+2 초과로 가장 오래된 버퍼 강제 삭제.");
-                                _ = Task.Run(() => MemoryEventLogger.LogMemoryEventAsync("[중기 기억] 버퍼 적체로 인한 강제 Dequeue 작동"));
+                                LogMemoryEvent("[중기 기억] 버퍼 적체로 인한 강제 Dequeue 작동");
                             }
 
                             var oldestBuffer = _mediumBuffers.Peek();
@@ -388,13 +397,13 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
             {
                 // 예외가 문자열로 변환되어 조용히 지나갔을 때의 실패 사유 기록
                 System.Diagnostics.Debug.WriteLine($"[MemoryManager] 중기 서사 압축 API 오류: {response}");
-                _ = Task.Run(() => MemoryEventLogger.LogMemoryEventAsync($"[중기 기억] 압축 실패 (API 통신 오류): {response}"));
+                LogMemoryEvent($"[중기 기억] 압축 실패 (API 통신 오류): {response}");
             }
         } // try 구문 끝
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[MemoryManager] 중기 서사 압축 실패: {ex.Message}");
-            _ = Task.Run(() => MemoryEventLogger.LogMemoryEventAsync($"[중기 기억] 압축 실패 오류: {ex.Message}"));
+            LogMemoryEvent($"[중기 기억] 압축 실패 오류: {ex.Message}");
         }
         finally
         {
@@ -496,12 +505,12 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
                     retryCount++;
                     // 503(과부하)이나 429(속도제한) 에러일 때 특히 유효합니다.
                     System.Diagnostics.Debug.WriteLine($"[MemoryManager] 장기 요약 시도 중({retryCount}/{maxRetries}) 에러: {ex.Message}");
-                    _ = Task.Run(() => MemoryEventLogger.LogMemoryEventAsync($"[장기 기억] API 통신 오류 (시도 {retryCount}/{maxRetries}): {ex.Message}"));
+                    LogMemoryEvent($"[장기 기억] API 통신 오류 (시도 {retryCount}/{maxRetries}): {ex.Message}");
 
                     if (retryCount >= maxRetries)
                     {
                         System.Diagnostics.Debug.WriteLine("[MemoryManager] 장기 기억 서사 병합 최종 실패. 챕터 전환을 중단합니다.");
-                        _ = Task.Run(() => MemoryEventLogger.LogMemoryEventAsync($"[장기 기억] 서사 병합 3회 시도 최종 실패. 에러: {ex.Message}"));
+                        LogMemoryEvent($"[장기 기억] 서사 병합 3회 시도 최종 실패. 에러: {ex.Message}");
                         return; // 시도 모두 실패 시 안전하게 종료
                     }
 
@@ -528,7 +537,7 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
                 }
 
                 System.Diagnostics.Debug.WriteLine($"[MemoryManager] 장기 병합 성공 (역사 100자): {_longTermSummary.Substring(0, Math.Min(100, _longTermSummary.Length))}...");
-                _ = Task.Run(() => MemoryEventLogger.LogMemoryEventAsync($"[장기 기억] 서사 병합 성공 (역사 100자): {_longTermSummary.Substring(0, Math.Min(100, _longTermSummary.Length))}..."));
+                LogMemoryEvent($"[장기 기억] 서사 병합 성공 (역사 100자): {_longTermSummary.Substring(0, Math.Min(100, _longTermSummary.Length))}...");
             }
 
             System.Diagnostics.Debug.WriteLine("[MemoryManager] 장기 기억 로직 종료.");
@@ -741,5 +750,8 @@ interface StatusWindow {
         new("HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold),
         new("HARM_CATEGORY_DANGEROUS_CONTENT", threshold)
     ];
+
+    private void LogMemoryEvent(string message) =>
+        _ = Task.Run(() => MemoryEventLogger.LogMemoryEventAsync(message, CurrentSessionFileName));
 }
 

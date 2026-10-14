@@ -36,10 +36,10 @@ public enum BlockThreshold
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum ModelTier
 {
-    Pro,        // 최고 성능 (복잡한 추론)
-    Flash36,    // 가성비 메인 (일반 대화 - gemini-3.6-flash)
-    FlashLite,  // 초가성비 (백그라운드 요약 - gemini-3.5-flash-lite)
-    Flash3      // gemini-3-flash-preview
+    Pro,        // 최고 성능 (복잡한 추론 - gemini-4-argon)
+    Flash,      // 메인 고성능 플래시 (일반 대화 - gemini-3.8-flash)
+    Flash35,    // 표준 가성비 플래시 (gemini-3.5-flash)
+    FlashLite   // 초가성비 (백그라운드 요약 - gemini-3.5-flash-lite)
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

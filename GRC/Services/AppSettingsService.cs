@@ -21,9 +21,8 @@ public class AppSettingsService : IAppSettingsService
         var defaultSettings = new AppSettings(
       ApiKey: "",
       ProjectId: "",
-      Location: "",
       UseVertexAI: true,
-      SelectedModel: ModelTier.Flash36,
+      SelectedModel: ModelTier.Flash,
       SafetyThreshold: BlockThreshold.BLOCK_NONE
   );
 

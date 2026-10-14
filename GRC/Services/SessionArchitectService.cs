@@ -82,7 +82,7 @@ public class SessionArchitectService : ISessionArchitectService
 
         var request = new GeminiRequest(systemInstruction, contents, null, generationConfig);
 
-        await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash36, ct))
+        await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash, ct))
         {
             yield return chunk;
         }
@@ -309,7 +309,7 @@ public class SessionArchitectService : ISessionArchitectService
 
         var request = new GeminiRequest(systemInstruction, contents, null, generationConfig);
 
-        await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash36, ct))
+        await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash, ct))
         {
             yield return chunk;
         }
@@ -427,7 +427,7 @@ public class SessionArchitectService : ISessionArchitectService
 
         var request = new GeminiRequest(systemInstruction, contents, null, generationConfig);
 
-        await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash36, ct))
+        await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash, ct))
         {
             yield return chunk;
         }
@@ -557,7 +557,7 @@ public class SessionArchitectService : ISessionArchitectService
         try
         {
             string fullResponse = "";
-            await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash36, ct))
+            await foreach (var chunk in _apiService.SendMessageStreamAsync(request, ModelTier.Flash, ct))
             {
                 fullResponse += chunk;
             }

@@ -39,11 +39,6 @@ public partial class NewSessionSetupWindow : Window
 
         // ItemsControl에 컬렉션 바인딩
         CustomStatsItemsControl.ItemsSource = StatItems;
-
-        if (Application.Current.MainWindow != this)
-        {
-            this.Owner = Application.Current.MainWindow;
-        }
     }
 
     // [+ 스탯 추가] 버튼 클릭 시

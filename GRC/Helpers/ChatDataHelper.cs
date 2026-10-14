@@ -1,4 +1,4 @@
-﻿using GRC.Models;
+using GRC.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -39,18 +39,9 @@ public static class ChatDataHelper
         return $"{safeFolderName}_{DateTime.Now:yyyyMMdd}_{uniqueCode}";
     }
 
-    // 3. 분기된 세션의 FullHistory 파일 저장 로직
+    // 3. 분기된 세션의 FullHistory 파일 저장 로직 (FullHistoryLogger 세마포어 락 위임)
     public static async Task SaveBranchedHistoryAsync(string sessionFileName, List<ChatMessage> history)
     {
-        string logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", sessionFileName);
-        if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
-
-        string logPath = Path.Combine(logDir, "FullHistory.json");
-        var options = new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-        };
-        await File.WriteAllTextAsync(logPath, JsonSerializer.Serialize(history, options));
+        await FullHistoryLogger.SaveFullHistoryAsync(sessionFileName, history);
     }
 }

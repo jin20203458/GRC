@@ -25,20 +25,20 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
 
     private string GetModelName(ModelTier tier) => tier switch
     {
-        ModelTier.Pro => "models/gemini-3.1-pro-preview",
-        ModelTier.Flash36 => "models/gemini-3.6-flash", 
+        ModelTier.Pro => "models/gemini-4-argon",
+        ModelTier.Flash => "models/gemini-3.8-flash", 
+        ModelTier.Flash35 => "models/gemini-3.5-flash",
         ModelTier.FlashLite => "models/gemini-3.5-flash-lite",
-        ModelTier.Flash3 => "models/gemini-3-flash-preview",
-        _ => "models/gemini-3.6-flash" 
+        _ => "models/gemini-3.8-flash" 
     };
 
     private string GetVertexModelName(ModelTier tier) => tier switch
     {
-        ModelTier.Pro => "gemini-3.1-pro-preview",
-        ModelTier.Flash36 => "gemini-3.6-flash", 
+        ModelTier.Pro => "gemini-4-argon",
+        ModelTier.Flash => "gemini-3.8-flash", 
+        ModelTier.Flash35 => "gemini-3.5-flash",
         ModelTier.FlashLite => "gemini-3.5-flash-lite",
-        ModelTier.Flash3 => "gemini-3-flash-preview",
-        _ => "gemini-3.6-flash"
+        _ => "gemini-3.8-flash"
     };
 
     public async Task<string> SendMessageAsync(GeminiRequest request, ModelTier? overrideTier = null, CancellationToken cancellationToken = default)
@@ -55,15 +55,8 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
             if (string.IsNullOrWhiteSpace(settings.ProjectId))
                 return "[System Error]: 구글 클라우드 Project ID가 설정되지 않았습니다.";
 
-            string location = string.IsNullOrWhiteSpace(settings.Location) ? "global" : settings.Location.ToLower();
-
-            // global 리전일 경우 호스트명 앞에 지역을 붙이지 않습니다.
-            string hostName = location == "global"
-                ? "aiplatform.googleapis.com"
-                : $"{location}-aiplatform.googleapis.com";
-
             string modelName = GetVertexModelName(overrideTier ?? settings.SelectedModel);
-            requestUri = $"https://{hostName}/v1beta1/projects/{settings.ProjectId}/locations/{location}/publishers/google/models/{modelName}:generateContent";
+            requestUri = $"https://aiplatform.googleapis.com/v1beta1/projects/{settings.ProjectId}/locations/global/publishers/google/models/{modelName}:generateContent";
 
             try
             {
@@ -75,7 +68,7 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
                 return $"[System Error]: 인증 토큰 획득 실패. 인증 파일을 확인하세요. {ex.Message}";
             }
 
-            System.Diagnostics.Debug.WriteLine($"[Vertex AI 단발성 호출]: {modelName}, 리전: {location}");
+            System.Diagnostics.Debug.WriteLine($"[Vertex AI 단발성 호출]: {modelName}, 리전: global");
         }
         else
         {
@@ -198,17 +191,10 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
                 yield break;
             }
 
-            string location = string.IsNullOrWhiteSpace(settings.Location) ? "global" : settings.Location.ToLower();
-
-            // global 리전일 경우 호스트명 앞에 지역을 붙이지 않습니다.
-            string hostName = location == "global"
-                ? "aiplatform.googleapis.com"
-                : $"{location}-aiplatform.googleapis.com";
-
             string modelName = GetVertexModelName(overrideTier ?? settings.SelectedModel);
-            System.Diagnostics.Debug.WriteLine($"[Vertex AI 스트리밍 사용 모델]: {modelName}, 리전: {location}");
+            System.Diagnostics.Debug.WriteLine($"[Vertex AI 스트리밍 사용 모델]: {modelName}, 리전: global");
 
-            requestUri = $"https://{hostName}/v1beta1/projects/{settings.ProjectId}/locations/{location}/publishers/google/models/{modelName}:streamGenerateContent?alt=sse";
+            requestUri = $"https://aiplatform.googleapis.com/v1beta1/projects/{settings.ProjectId}/locations/global/publishers/google/models/{modelName}:streamGenerateContent?alt=sse";
 
             // 💡 C# 문법 제한 해결: catch 문 밖에서 yield를 반환하기 위해 변수 사용
             string? authErrorMessage = null;

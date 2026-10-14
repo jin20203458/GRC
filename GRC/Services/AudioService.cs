@@ -31,8 +31,13 @@ public class AudioService : IAudioService
     private bool _isVoicePlaying = false;
     private string? _lastPlayedFilePath;
 
+    private readonly System.Windows.Threading.Dispatcher _dispatcher;
+
     public AudioService()
     {
+        _dispatcher = System.Windows.Application.Current?.Dispatcher 
+            ?? System.Windows.Threading.Dispatcher.CurrentDispatcher;
+
         // 1. BGM 플레이어 설정
         _bgmPlayer.Open(new Uri("pack://siteoforigin:,,,/Resources/bgm.m4a"));
         _bgmPlayer.MediaEnded += (s, e) =>
@@ -67,46 +72,72 @@ public class AudioService : IAudioService
         };
     }
 
-    public void SetBgmState(bool isEnabled)
+    private void RunOnUIThread(Action action)
     {
-        if (isEnabled && !_isBgmPlaying)
+        if (_dispatcher.CheckAccess())
         {
-            _bgmPlayer.Play();
-            _isBgmPlaying = true;
+            action();
         }
-        else if (!isEnabled && _isBgmPlaying)
+        else
         {
-            _bgmPlayer.Pause();
-            _isBgmPlaying = false;
+            _dispatcher.InvokeAsync(action);
         }
     }
 
-    public void SetBgmVolume(double volume) => _bgmPlayer.Volume = volume;
+    public void SetBgmState(bool isEnabled)
+    {
+        RunOnUIThread(() =>
+        {
+            if (isEnabled && !_isBgmPlaying)
+            {
+                _bgmPlayer.Play();
+                _isBgmPlaying = true;
+            }
+            else if (!isEnabled && _isBgmPlaying)
+            {
+                _bgmPlayer.Pause();
+                _isBgmPlaying = false;
+            }
+        });
+    }
+
+    public void SetBgmVolume(double volume) => RunOnUIThread(() => _bgmPlayer.Volume = volume);
 
     public void SetTypingSoundState(bool isEnabled) => _isTypingSoundEnabled = isEnabled;
-    public void SetTypingSoundVolume(double volume) => _typingPlayer.Volume = volume;
+    public void SetTypingSoundVolume(double volume) => RunOnUIThread(() => _typingPlayer.Volume = volume);
 
     public void StartTypingSound()
     {
-        if (_isTypingSoundEnabled)
+        RunOnUIThread(() =>
         {
-            _typingPlayer.Position = TimeSpan.Zero;
-            _typingPlayer.Play();
-        }
+            if (_isTypingSoundEnabled)
+            {
+                _typingPlayer.Position = TimeSpan.Zero;
+                _typingPlayer.Play();
+            }
+        });
     }
+
     public void StopTypingSound()
     {
-        _typingPlayer.Pause();
+        RunOnUIThread(() =>
+        {
+            _typingPlayer.Pause();
+        });
     }
+
     public Task PlayVoiceSoundAsync(string filePath)
     {
         var tcs = new TaskCompletionSource<bool>();
-        _voiceQueue.Enqueue((filePath, tcs));
-
-        if (!_isVoicePlaying)
+        RunOnUIThread(() =>
         {
-            PlayNextVoice();
-        }
+            _voiceQueue.Enqueue((filePath, tcs));
+
+            if (!_isVoicePlaying)
+            {
+                PlayNextVoice();
+            }
+        });
         return tcs.Task; // 음성 재생이 끝날 때까지 완료되지 않음
     }
     public void PlayVoiceSound(string filePath) => _ = PlayVoiceSoundAsync(filePath);
@@ -147,44 +178,48 @@ public class AudioService : IAudioService
             _currentVoiceTcs = null;
         }
     }
+
     public void StopVoiceSound()
     {
-        _voicePlayer.Stop();
-        _voicePlayer.Close(); // 파일 잠금 해제
-
-        // 2. 최근에 연주 중이던 파일 즉시 삭제
-        if (_lastPlayedFilePath != null)
+        RunOnUIThread(() =>
         {
-            try
-            {
-                if (System.IO.File.Exists(_lastPlayedFilePath))
-                {
-                    System.IO.File.Delete(_lastPlayedFilePath);
-                }
-            }
-            catch {}
-            _lastPlayedFilePath = null;
-        }
+            _voicePlayer.Stop();
+            _voicePlayer.Close(); // 파일 잠금 해제
 
-        // 3. 대기 큐에 쌓여 아직 재생되지 못한 파일들도 전부 삭제 처리
-        while (_voiceQueue.Count > 0)
-        {
-            var next = _voiceQueue.Dequeue();
-            try
+            // 2. 최근에 연주 중이던 파일 즉시 삭제
+            if (_lastPlayedFilePath != null)
             {
-                if (System.IO.File.Exists(next.FilePath))
+                try
                 {
-                    System.IO.File.Delete(next.FilePath);
+                    if (System.IO.File.Exists(_lastPlayedFilePath))
+                    {
+                        System.IO.File.Delete(_lastPlayedFilePath);
+                    }
                 }
+                catch {}
+                _lastPlayedFilePath = null;
             }
-            catch {}
-            next.Tcs.TrySetResult(false);
-        }
 
-        _isVoicePlaying = false;
-        // 스킵(정지) 시 무한 대기에 빠지지 않도록 취소 신호를 보냄
-        _currentVoiceTcs?.TrySetResult(false);
-        _currentVoiceTcs = null;
+            // 3. 대기 큐에 쌓여 아직 재생되지 못한 파일들도 전부 삭제 처리
+            while (_voiceQueue.Count > 0)
+            {
+                var next = _voiceQueue.Dequeue();
+                try
+                {
+                    if (System.IO.File.Exists(next.FilePath))
+                    {
+                        System.IO.File.Delete(next.FilePath);
+                    }
+                }
+                catch {}
+                next.Tcs.TrySetResult(false);
+            }
+
+            _isVoicePlaying = false;
+            // 스킵(정지) 시 무한 대기에 빠지지 않도록 취소 신호를 보냄
+            _currentVoiceTcs?.TrySetResult(false);
+            _currentVoiceTcs = null;
+        });
     }
 
 }

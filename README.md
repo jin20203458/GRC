@@ -41,7 +41,7 @@ GRC는 Google Gemini API를 활용하여 캐릭터 롤플레잉 및 소설 창�
 ## 핵심 기능 (Key Features)
 
 - **3단계 메모리 파이프라인**: 단기(최근 18턴) ➔ 중기(10턴 단위 챕터 요약) ➔ 장기(1,500자 단위 연대기 압축)로 구성된 계층적 캐시로 토큰 사용량을 최적화합니다.
-- **최신 Gemini 모델 & 추론 레벨 최적화**: 메인 서사와 세션 아키텍트에 `Gemini 3.6 Flash`(High Thinking), 백그라운드 스탯/추천 답글에 `Gemini 3.5 Flash Lite`(Medium Thinking)를 배치하여 반응 속도와 몰입감을 동시에 확보합니다.
+- **최신 Gemini 모델 & 추론 레벨 최적화**: 메인 서사와 세션 아키텍트에 `Gemini 3.8 Flash`(High Thinking), 백그라운드 스탯/추천 답글에 `Gemini 3.5 Flash Lite`(Medium Thinking), 장기 연대기 요약에 `Gemini 4.0 Pro`(`gemini-4-argon`)를 배치하여 반응 속도와 몰입감을 동시에 확보합니다.
 - **비차단(Non-blocking) 렌더링**: `System.Threading.Channels` 비동기 스트리밍 및 60FPS 배치 렌더링으로 타자 출력 시 UI 지연을 방지합니다.
 - **O(1) 파일 쓰기 최적화**: 전체 JSON 역직렬화 오버헤드 없이 바이너리 탐색(Seek)을 통해 배열 끝부분에 새 로그를 추가하는 고성능 로거를 구현했습니다.
 - **AI 세션 아키텍트**: 한 줄의 키워드로 세계관 설정, 인물 사전(로어북), 스탯창 및 프롬프트를 자율 기획하고 감사관 모델을 통해 자가 검수(Self-Review)합니다.
@@ -94,13 +94,11 @@ GRC는 Google AI Studio와 Google Cloud Vertex AI 연동을 지원합니다.
 1. Google Cloud 콘솔 IAM 및 행정 메뉴에서 서비스 계정을 생성하고 키 파일(`.json`)을 다운로드합니다.
    * **권장 역할(Role)**: `Vertex AI 사용자` (Vertex AI User) 및 `Cloud Text-to-Speech API 사용자` (또는 `편집자`)
 2. 앱 실행 후 설정 메뉴에서 **[서비스 계정 키 파일 선택]** 버튼을 통해 다운로드한 키 파일을 선택하여 등록합니다. (또는 `Config/google-credentials.json`에 직접 배치)
-3. 구글 클라우드 **Project ID**를 입력합니다.
-4. **주의**: **Location(리전) 필드는 반드시 비워두셔야(Empty/Global) 합니다.** Gemini 3.6 Flash 모델은 글로벌 전용 엔드포인트에서 작동합니다.
-5. `AppSettings.json` 직접 편집 시 예시:
+3. 구글 클라우드 **Project ID**를 입력합니다. (엔드포인트는 Google Cloud Global로 자동 고정되어 동작합니다)
+4. `AppSettings.json` 직접 편집 시 예시:
    ```json
    {
      "ProjectId": "YOUR_PROJECT_ID",
-     "Location": "",
      "UseVertexAI": true
    }
    ```

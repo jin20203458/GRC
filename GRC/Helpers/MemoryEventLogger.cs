@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -6,23 +6,23 @@ namespace GRC.Helpers;
 
 public static class MemoryEventLogger
 {
-    public static async Task LogMemoryEventAsync(string logMessage)
+    public static async Task LogMemoryEventAsync(string logMessage, string? sessionId = null)
     {
         try
         {
-            // TokenLogger에서 관리 중인 현재 세션 파일명 활용
-            string sessionId = TokenLogger.CurrentSessionFileName;
-            if (string.IsNullOrEmpty(sessionId)) return;
+            // 명시적으로 세션 ID가 제공되면 우선 사용, 없으면 TokenLogger 전역 값으로 Fallback
+            string targetSessionId = !string.IsNullOrEmpty(sessionId) ? sessionId : TokenLogger.CurrentSessionFileName;
+            if (string.IsNullOrEmpty(targetSessionId)) return;
 
             string logPath;
             // TokenLogger의 GetLogPath 로직 참고 (하위 호환성 및 새 폴더 분기 대응)
-            if (sessionId.EndsWith(".json"))
+            if (targetSessionId.EndsWith(".json"))
             {
-                logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", sessionId.Replace(".json", "_MemoryLog.txt"));
+                logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", targetSessionId.Replace(".json", "_MemoryLog.txt"));
             }
             else
             {
-                string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", sessionId);
+                string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", targetSessionId);
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
                 logPath = Path.Combine(dir, "MemoryLog.txt");
             }

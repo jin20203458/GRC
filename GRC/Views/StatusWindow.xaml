@@ -1,4 +1,4 @@
-﻿<Window
+<Window
     x:Class="GRC.Views.StatusWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -43,12 +43,14 @@
                                     BorderThickness="1"
                                     CornerRadius="10">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock
+                                        <Path
+                                            Width="11"
+                                            Height="11"
                                             Margin="0,0,6,0"
                                             VerticalAlignment="Center"
-                                            FontSize="12"
-                                            Foreground="#F4A261"
-                                            Text="📍" />
+                                            Data="{StaticResource IconMapPin}"
+                                            Fill="#F4A261"
+                                            Stretch="Uniform" />
                                         <TextBlock
                                             VerticalAlignment="Center"
                                             FontSize="12.5"
@@ -79,12 +81,14 @@
                                     CornerRadius="10">
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock
+                                            <Path
+                                                Width="10"
+                                                Height="10"
                                                 Margin="0,0,6,0"
                                                 VerticalAlignment="Center"
-                                                FontSize="13"
-                                                Foreground="#88E0EF"
-                                                Text="❖" />
+                                                Data="{StaticResource IconDiamond}"
+                                                Fill="#88E0EF"
+                                                Stretch="Uniform" />
                                             <TextBlock
                                                 Margin="0,0,8,0"
                                                 VerticalAlignment="Center"
@@ -157,12 +161,14 @@
                                     CornerRadius="10">
                                     <StackPanel>
                                         <StackPanel Margin="0,0,0,6" Orientation="Horizontal">
-                                            <TextBlock
+                                            <Path
+                                                Width="11"
+                                                Height="11"
                                                 Margin="0,0,6,0"
                                                 VerticalAlignment="Center"
-                                                FontSize="15"
-                                                Foreground="#00A5B5"
-                                                Text="▣" />
+                                                Data="{StaticResource IconSquare}"
+                                                Fill="#00A5B5"
+                                                Stretch="Uniform" />
                                             <TextBlock
                                                 VerticalAlignment="Center"
                                                 FontSize="15"
@@ -199,12 +205,16 @@
                                     BorderThickness="1"
                                     CornerRadius="8">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock
+                                        <Path
+                                            Width="9"
+                                            Height="9"
                                             Margin="0,0,6,0"
                                             VerticalAlignment="Center"
-                                            FontSize="11"
-                                            Foreground="#008B99"
-                                            Text="🔹" />
+                                            Data="{StaticResource IconChevronRight}"
+                                            Fill="Transparent"
+                                            Stretch="Uniform"
+                                            Stroke="#008B99"
+                                            StrokeThickness="2" />
                                         <TextBlock
                                             Margin="0,0,8,0"
                                             VerticalAlignment="Center"

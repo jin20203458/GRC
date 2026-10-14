@@ -30,13 +30,10 @@
                 Foreground="#D1D1D1"
                 Text="세계관 및 캐릭터 설정 (불변 법칙)" />
             <Button
-                Padding="8,4"
                 HorizontalAlignment="Right"
-                Background="#2A2A2A"
-                BorderThickness="0"
+                Padding="8,4"
                 Click="EditScenarioButton_Click"
-                Cursor="Hand"
-                Foreground="White">
+                Style="{StaticResource SecondaryActionButton}">
                 <TextBlock FontSize="12" Text="초기 시나리오 수정" />
             </Button>
         </Grid>
@@ -79,14 +76,22 @@
                 Foreground="#D1D1D1"
                 Text="추적할 커스텀 스탯" />
             <Button
-                Padding="10,4"
                 HorizontalAlignment="Right"
-                Background="#2A2A2A"
-                BorderThickness="0"
+                Padding="10,4"
                 Click="AddStatButton_Click"
-                Content="+ 스탯 추가"
-                Cursor="Hand"
-                Foreground="White" />
+                Style="{StaticResource SecondaryActionButton}">
+                <StackPanel Orientation="Horizontal">
+                    <Path
+                        Width="10"
+                        Height="10"
+                        Margin="0,0,5,0"
+                        VerticalAlignment="Center"
+                        Data="{StaticResource IconPlus}"
+                        Fill="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                        Stretch="Uniform" />
+                    <TextBlock VerticalAlignment="Center" Text="스탯 추가" />
+                </StackPanel>
+            </Button>
         </Grid>
 
         <Border
@@ -125,14 +130,18 @@
                                 <Button
                                     Grid.Column="2"
                                     Width="36"
-                                    Background="#2A1414"
-                                    BorderThickness="0"
                                     Click="RemoveStatButton_Click"
-                                    Content="✕"
-                                    Cursor="Hand"
-                                    Foreground="#FF5555"
+                                    Style="{StaticResource DangerActionButton}"
                                     Tag="{Binding}"
-                                    ToolTip="삭제" />
+                                    ToolTip="삭제">
+                                    <Path
+                                        Width="10"
+                                        Height="10"
+                                        Data="{StaticResource IconClose}"
+                                        Stretch="Uniform"
+                                        Stroke="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                                        StrokeThickness="2" />
+                                </Button>
                             </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -149,18 +158,13 @@
                 Width="80"
                 Margin="0,0,10,0"
                 Click="CancelButton_Click"
-                Style="{StaticResource HeaderActionButton}">
-                <TextBlock Foreground="#AAAAAA" Text="취소" />
-            </Button>
+                Content="취소"
+                Style="{StaticResource SecondaryActionButton}" />
             <Button
                 Width="100"
                 Click="SaveButton_Click"
-                Style="{StaticResource HeaderActionButton}">
-                <TextBlock
-                    FontWeight="Bold"
-                    Foreground="White"
-                    Text="저장" />
-            </Button>
+                Content="저장"
+                Style="{StaticResource PrimaryActionButton}" />
         </StackPanel>
     </Grid>
 </Window>

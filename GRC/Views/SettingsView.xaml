@@ -18,11 +18,23 @@
                 HorizontalAlignment="Left"
                 Command="{Binding GoBackCommand}"
                 Style="{StaticResource GhostButton}">
-                <TextBlock
-                    FontSize="15"
-                    FontWeight="SemiBold"
-                    Foreground="#A0A0B0"
-                    Text="← 뒤로" />
+                <StackPanel Orientation="Horizontal">
+                    <Path
+                        Width="12"
+                        Height="12"
+                        Margin="0,0,6,0"
+                        VerticalAlignment="Center"
+                        Data="{StaticResource IconChevronLeft}"
+                        Fill="Transparent"
+                        Stretch="Uniform"
+                        Stroke="#A0A0B0"
+                        StrokeThickness="2" />
+                    <TextBlock
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        Foreground="#A0A0B0"
+                        Text="뒤로" />
+                </StackPanel>
             </Button>
             <TextBlock
                 HorizontalAlignment="Center"
@@ -65,20 +77,6 @@
                     Foreground="White"
                     Text="{Binding ProjectId, UpdateSourceTrigger=PropertyChanged}" />
 
-                <!--  💡 추가된 구글 클라우드 Region  -->
-                <TextBlock
-                    Margin="0,0,0,8"
-                    FontWeight="SemiBold"
-                    Foreground="#D1D1D1"
-                    Text="구글 클라우드 Location (Gemini 3.6 모델 작동을 위해 비워두세요)" />
-                <TextBox
-                    Margin="0,0,0,20"
-                    Padding="10"
-                    Background="#1E1E20"
-                    BorderBrush="#2A2A2A"
-                    Foreground="White"
-                    Text="{Binding Location, UpdateSourceTrigger=PropertyChanged}" />
-
                 <!--  기존 API Key 항목  -->
                 <DockPanel Margin="0,0,0,8">
                     <TextBlock
@@ -87,12 +85,20 @@
                         Text="Gemini API Key (AI Studio 전용)" />
                     <Button
                         HorizontalAlignment="Right"
-                        Background="Transparent"
-                        BorderThickness="0"
                         Command="{Binding OpenApiKeyGuideCommand}"
-                        Cursor="Hand"
-                        Foreground="#4A90E2">
-                        <TextBlock Text="🔑 API 키 발급받기" TextDecorations="Underline" />
+                        Foreground="#4A90E2"
+                        Style="{StaticResource GhostButton}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path
+                                Width="12"
+                                Height="12"
+                                Margin="0,0,6,0"
+                                VerticalAlignment="Center"
+                                Data="{StaticResource IconKey}"
+                                Fill="#4A90E2"
+                                Stretch="Uniform" />
+                            <TextBlock Text="API 키 발급받기" TextDecorations="Underline" />
+                        </StackPanel>
                     </Button>
                 </DockPanel>
                 <TextBox
@@ -119,14 +125,22 @@
                             Text="{Binding CredentialStatusMessage}"
                             TextWrapping="Wrap" />
                         <Button
-                            Padding="10,6"
                             HorizontalAlignment="Left"
-                            Background="#2D2D30"
-                            BorderBrush="#3E3E42"
+                            Padding="10,6"
                             Command="{Binding BrowseCredentialFileCommand}"
-                            Content="📁 서비스 계정 키 파일 (google-credentials.json) 선택..."
-                            Cursor="Hand"
-                            Foreground="White" />
+                            Style="{StaticResource SecondaryActionButton}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path
+                                    Width="13"
+                                    Height="13"
+                                    Margin="0,0,6,0"
+                                    VerticalAlignment="Center"
+                                    Data="{StaticResource IconFolder}"
+                                    Fill="#D1D1D1"
+                                    Stretch="Uniform" />
+                                <TextBlock Text="서비스 계정 키 파일 (google-credentials.json) 선택..." />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Border>
 
@@ -136,12 +150,45 @@
                     Foreground="#D1D1D1"
                     Text="사용할 모델 (Model Tier)" />
                 <ComboBox
-                    Margin="0,0,0,20"
+                    Margin="0,0,0,15"
                     Padding="5"
                     Background="#1E1E20"
                     Foreground="Black"
                     ItemsSource="{Binding AvailableModelTiers}"
                     SelectedItem="{Binding SelectedModel}" />
+
+                <!--  LLM 엔드포인트 연결 시험 UI  -->
+                <Border
+                    Margin="0,0,0,25"
+                    Padding="12,10"
+                    Background="#18181A"
+                    BorderBrush="#2A2A2D"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,8">
+                            <Button
+                                HorizontalAlignment="Left"
+                                Padding="12,6"
+                                Command="{Binding TestConnectionCommand}"
+                                Content="연결 시험"
+                                FontWeight="SemiBold"
+                                Style="{StaticResource SecondaryActionButton}" />
+                            <TextBlock
+                                Margin="10,0,0,0"
+                                VerticalAlignment="Center"
+                                FontSize="11"
+                                Foreground="#888899"
+                                Text="선택된 모델과 인증 정보로 실제 통신을 점검합니다." />
+                        </DockPanel>
+                        <TextBlock
+                            FontSize="11.5"
+                            FontWeight="SemiBold"
+                            Foreground="{Binding TestStatusColor}"
+                            Text="{Binding TestStatusMessage}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
 
                 <TextBlock
                     Margin="0,0,0,8"
@@ -241,17 +288,75 @@
                     Foreground="#D1D1D1"
                     Text="TTS 읽어주기 언어" />
                 <ComboBox
-                    Margin="0,0,0,20"
+                    Margin="0,0,0,15"
                     Padding="5"
                     Background="#1E1E20"
                     Foreground="Black"
                     ItemsSource="{Binding AvailableTtsLanguages}"
                     SelectedItem="{Binding SelectedTtsLanguage}" />
+
+                <TextBlock
+                    Margin="0,0,0,8"
+                    FontWeight="SemiBold"
+                    Foreground="#D1D1D1"
+                    Text="TTS 음성 캐릭터 (Voice)" />
+                <ComboBox
+                    Margin="0,0,0,15"
+                    Padding="5"
+                    Background="#1E1E20"
+                    Foreground="Black"
+                    ItemsSource="{Binding AvailableTtsVoices}"
+                    SelectedItem="{Binding SelectedTtsVoiceOption}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,2" Orientation="Vertical">
+                                <TextBlock FontWeight="SemiBold" Text="{Binding DisplayName}" />
+                                <TextBlock
+                                    FontSize="10.5"
+                                    Foreground="#666666"
+                                    Text="{Binding Description}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <!--  TTS 음성 미리듣기 패널  -->
+                <Border
+                    Margin="0,0,0,25"
+                    Padding="12,10"
+                    Background="#18181A"
+                    BorderBrush="#2A2A2D"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,8">
+                            <Button
+                                HorizontalAlignment="Left"
+                                Padding="12,6"
+                                Command="{Binding TestTtsCommand}"
+                                Content="음성 미리듣기"
+                                FontWeight="SemiBold"
+                                Style="{StaticResource SecondaryActionButton}" />
+                            <TextBlock
+                                Margin="10,0,0,0"
+                                VerticalAlignment="Center"
+                                FontSize="11"
+                                Foreground="#888899"
+                                Text="선택된 언어와 음성으로 샘플 오디오를 생성하여 재생합니다." />
+                        </DockPanel>
+                        <TextBlock
+                            FontSize="11.5"
+                            FontWeight="SemiBold"
+                            Foreground="{Binding TtsTestStatusColor}"
+                            Text="{Binding TtsTestStatusMessage}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
                 <Button
                     Margin="0,20,0,15"
                     Padding="0,12"
                     Command="{Binding SaveSettingsCommand}"
-                    Style="{StaticResource HeaderActionButton}">
+                    Style="{StaticResource PrimaryActionButton}">
                     <TextBlock
                         FontWeight="Bold"
                         Foreground="White"

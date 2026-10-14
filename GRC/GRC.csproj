@@ -40,8 +40,6 @@
     <None Remove="Resources\Fantasy\bg8.png" />
     <None Remove="Resources\Fantasy\bg9.PNG" />
     <None Remove="Resources\GRC.ico" />
-    <None Remove="Resources\GRC.png" />
-    <None Remove="Resources\Image_fx.png" />
     <None Remove="Resources\Modern\bg1.jpg" />
     <None Remove="Resources\Modern\bg2.jpg" />
     <None Remove="Resources\Modern\bg3.jpg" />

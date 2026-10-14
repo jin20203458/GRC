@@ -19,7 +19,7 @@ public partial class MainViewModel : ObservableObject
         _serviceProvider = serviceProvider;
 
         // 앱 시작 시 세션 리스트 화면으로 초기 네비게이션
-        ApplyInitialBgmState();
+        _ = ApplyInitialBgmStateAsync();
         NavigateToSessionList();
     }
 
@@ -33,24 +33,33 @@ public partial class MainViewModel : ObservableObject
         var sessionListVm = _serviceProvider.GetRequiredService<SessionListViewModel>();
 
         // 3. 이벤트 구독(+=) 연결
-        sessionListVm.SessionSelected += OnSessionSelected;
+        sessionListVm.SessionSelected += (f, p, w, s, c, u) => _ = OnSessionSelectedAsync(f, p, w, s, c, u);
         sessionListVm.SettingsRequested += NavigateToSettings;
 
         CurrentPage = sessionListVm;
     }
-    private async void ApplyInitialBgmState()
+
+    private async Task ApplyInitialBgmStateAsync()
     {
-        var appSettingsService = _serviceProvider.GetRequiredService<IAppSettingsService>();
-        var audioService = _serviceProvider.GetRequiredService<IAudioService>();
-        var settings = await appSettingsService.LoadSettingsAsync();
+        try
+        {
+            var appSettingsService = _serviceProvider.GetRequiredService<IAppSettingsService>();
+            var audioService = _serviceProvider.GetRequiredService<IAudioService>();
+            var settings = await appSettingsService.LoadSettingsAsync();
 
-        audioService.SetBgmVolume(settings.BgmVolume);
-        audioService.SetBgmState(settings.IsBgmEnabled);
+            audioService.SetBgmVolume(settings.BgmVolume);
+            audioService.SetBgmState(settings.IsBgmEnabled);
 
-        audioService.SetTypingSoundVolume(settings.TypingSoundVolume);
-        audioService.SetTypingSoundState(settings.IsTypingSoundEnabled);
+            audioService.SetTypingSoundVolume(settings.TypingSoundVolume);
+            audioService.SetTypingSoundState(settings.IsTypingSoundEnabled);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"초기 BGM 상태 설정 실패: {ex.Message}");
+        }
     }
-    private async void OnSessionSelected(string? fileName, string? presetName, string? worldview, string? scenario, string? customStats, string? statusUpdateGuide)
+
+    private async Task OnSessionSelectedAsync(string? fileName, string? presetName, string? worldview, string? scenario, string? customStats, string? statusUpdateGuide)
     {
         try
         {
@@ -67,6 +76,8 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"세션 로드 실패: {ex.Message}");
+            _currentChatVm?.Cleanup();
+            _currentChatVm = null;
         }
     }
 

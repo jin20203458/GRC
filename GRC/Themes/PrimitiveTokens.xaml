@@ -1,0 +1,59 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================================= -->
+    <!-- Tier 1: Invariant Primitive Tokens                            -->
+    <!-- Reference: Modern_AI_Desktop_UI_Guidelines §2.A               -->
+    <!-- ============================================================= -->
+
+    <!-- 1. Invariant Canvas & Surface Colors (Zinc Scale) -->
+    <Color x:Key="ColorZinc950">#0B0C10</Color>
+    <Color x:Key="ColorZinc900">#13141C</Color>
+    <Color x:Key="ColorZinc800">#1A1D27</Color>
+    <Color x:Key="ColorZinc750">#232736</Color>
+    <Color x:Key="ColorZinc700">#2E3446</Color>
+    <Color x:Key="ColorBorderSubtle">#22FFFFFF</Color>
+    <Color x:Key="ColorBorderStrong">#33FFFFFF</Color>
+
+    <!-- 2. Typography Colors -->
+    <Color x:Key="ColorTextPrimary">#F2F4F8</Color>
+    <Color x:Key="ColorTextSecondary">#AAB2C0</Color>
+    <Color x:Key="ColorTextMuted">#6B7280</Color>
+    <Color x:Key="ColorTextThought">#A2B9D8</Color>
+    <Color x:Key="ColorTextOnAccent">#FFFFFF</Color>
+
+    <!-- 3. Enterprise Status Palette (Bg-Border-Text 3-Tier Pairing) -->
+    <!-- Normal / Success -->
+    <Color x:Key="ColorStatusSuccessBg">#112017</Color>
+    <Color x:Key="ColorStatusSuccessBorder">#166534</Color>
+    <Color x:Key="ColorStatusSuccessText">#4ADE80</Color>
+    <Color x:Key="ColorDotLive">#10B981</Color>
+
+    <!-- Error / Danger -->
+    <Color x:Key="ColorStatusErrorBg">#261315</Color>
+    <Color x:Key="ColorStatusErrorBorder">#7F1D1D</Color>
+    <Color x:Key="ColorStatusErrorText">#F87171</Color>
+    <Color x:Key="ColorDotCritical">#E11D48</Color>
+
+    <!-- Warning / Wait -->
+    <Color x:Key="ColorStatusWarningBg">#241C10</Color>
+    <Color x:Key="ColorStatusWarningBorder">#92400E</Color>
+    <Color x:Key="ColorStatusWarningText">#FBBF24</Color>
+    <Color x:Key="ColorDotWarning">#D97706</Color>
+
+    <!-- Brand Accent Colors (GRC Teal Accent) -->
+    <Color x:Key="ColorAccentPrimary">#008B99</Color>
+    <Color x:Key="ColorAccentPrimaryHover">#00A5B5</Color>
+
+    <!-- Translucent Overlay -->
+    <Color x:Key="ColorOverlayDim">#80000000</Color>
+
+    <!-- 4. Dimensions & Metric Rules -->
+    <CornerRadius x:Key="CornerRadiusCard">8</CornerRadius>
+    <CornerRadius x:Key="CornerRadiusBubble">4,16,16,16</CornerRadius>
+    <CornerRadius x:Key="CornerRadiusBadge">10</CornerRadius>
+    <FontFamily x:Key="SansFontFamily">Segoe UI Variable Text, Segoe UI, -apple-system, sans-serif</FontFamily>
+    <FontFamily x:Key="CodeFontFamily">Cascadia Code, Consolas, Courier New, monospace</FontFamily>
+
+</ResourceDictionary>

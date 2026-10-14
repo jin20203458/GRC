@@ -98,10 +98,10 @@
                         Width="16"
                         Height="16"
                         Margin="0,0,6,0"
-                        Data="M12,2L14.6,8.6L21,11L14.6,13.4L12,20L9.4,13.4L3,11L9.4,8.6L12,2M20.5,17L21.4,19.3L24,20L21.4,20.7L20.5,23L19.6,20.7L17,20L19.6,19.3L20.5,17"
+                        VerticalAlignment="Center"
+                        Data="{StaticResource IconSparkles}"
                         Fill="#008B99"
-                        Stretch="Uniform"
-                        VerticalAlignment="Center" />
+                        Stretch="Uniform" />
                     <TextBlock
                         FontSize="16"
                         FontWeight="Bold"
@@ -229,17 +229,20 @@
 
                                             <Button
                                                 Padding="14,6"
-                                                Background="#142F24"
-                                                BorderBrush="#2C8D6C"
-                                                BorderThickness="1"
                                                 Command="{Binding DataContext.ApproveAndProceedCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                Cursor="Hand"
-                                                Style="{StaticResource HeaderActionButton}">
-                                                <TextBlock
-                                                    FontSize="12"
-                                                    FontWeight="SemiBold"
-                                                    Foreground="#A2E2C8"
-                                                    Text="▶ 승인, 다음 단계" />
+                                                FontSize="12"
+                                                Style="{StaticResource SuccessActionButton}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Path
+                                                        Width="10"
+                                                        Height="10"
+                                                        Margin="0,0,6,0"
+                                                        VerticalAlignment="Center"
+                                                        Data="{StaticResource IconPlay}"
+                                                        Fill="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                                                        Stretch="Uniform" />
+                                                    <TextBlock VerticalAlignment="Center" Text="승인, 다음 단계" />
+                                                </StackPanel>
                                             </Button>
                                         </StackPanel>
                                     </StackPanel>
@@ -444,36 +447,23 @@
                                     Margin="10,0,0,0"
                                     Width="60"
                                     Height="36"
-                                    Background="#421A1A"
-                                    BorderBrush="#9E3A3A"
-                                    BorderThickness="1"
                                     Command="{Binding CancelCommand}"
-                                    Style="{StaticResource HeaderActionButton}"
-                                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
-                                    <TextBlock
-                                        FontSize="13"
-                                        FontWeight="Bold"
-                                        Foreground="#E29494"
-                                        Text="중단" />
-                                </Button>
+                                    Content="중단"
+                                    FontSize="13"
+                                    Style="{StaticResource DangerActionButton}"
+                                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
 
-                                <!-- 전송 버튼 (남색 배제 및 무채색/어두운 회색 톤 조정) -->
+                                <!-- 전송 버튼 (무채색/어두운 회색 톤) -->
                                 <Button
                                     Grid.Column="2"
                                     Margin="10,0,0,0"
                                     Width="80"
                                     Height="36"
-                                    Background="#1E2024"
-                                    BorderBrush="#2D3139"
-                                    BorderThickness="1"
                                     Command="{Binding SendCommand}"
-                                    Style="{StaticResource HeaderActionButton}">
-                                    <TextBlock
-                                        FontSize="13"
-                                        FontWeight="Bold"
-                                        Foreground="#FFFFFF"
-                                        Text="전송" />
-                                </Button>
+                                    Content="전송"
+                                    FontSize="13"
+                                    FontWeight="Bold"
+                                    Style="{StaticResource SecondaryActionButton}" />
 
                                 <!-- ↻ 자동/수동 모드 토글 버튼 -->
                                 <Button
@@ -495,8 +485,17 @@
                                                 Background="#0AFFFFFF"
                                                 BorderBrush="#2D3139">
                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <TextBlock x:Name="ToggleIcon" Text="↻" FontSize="13" VerticalAlignment="Center" Foreground="#66FFFFFF" />
-                                                    <TextBlock x:Name="ToggleText" Text="자동" FontSize="12" FontWeight="SemiBold" Margin="4,0,0,0" VerticalAlignment="Center" Foreground="#66FFFFFF" />
+                                                    <Path
+                                                        x:Name="ToggleIcon"
+                                                        Width="12"
+                                                        Height="12"
+                                                        VerticalAlignment="Center"
+                                                        Data="{StaticResource IconRefresh}"
+                                                        Fill="Transparent"
+                                                        Stretch="Uniform"
+                                                        Stroke="#66FFFFFF"
+                                                        StrokeThickness="1.5" />
+                                                    <TextBlock x:Name="ToggleText" Text="자동" FontSize="12" FontWeight="SemiBold" Margin="5,0,0,0" VerticalAlignment="Center" Foreground="#66FFFFFF" />
                                                 </StackPanel>
                                             </Border>
                                             <ControlTemplate.Triggers>
@@ -504,7 +503,7 @@
                                                 <DataTrigger Binding="{Binding IsAutoMode}" Value="True">
                                                     <Setter TargetName="ToggleBorder" Property="Background" Value="#1A008B99" />
                                                     <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="#008B99" />
-                                                    <Setter TargetName="ToggleIcon" Property="Foreground" Value="#008B99" />
+                                                    <Setter TargetName="ToggleIcon" Property="Stroke" Value="#008B99" />
                                                     <Setter TargetName="ToggleText" Property="Foreground" Value="#008B99" />
                                                 </DataTrigger>
                                                 <!-- 호버 시 은은하게 밝아지는 효과 -->

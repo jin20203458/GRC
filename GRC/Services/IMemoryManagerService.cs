@@ -41,5 +41,6 @@ public interface IMemoryManagerService
     void UpdateContextStatus(StatusPayload payload, bool replaceCustomStats = false);
     ChapterContext CurrentContext { get; }
     string CurrentLorebookText { get; }
+    string CurrentSessionFileName { get; set; }
 
 }

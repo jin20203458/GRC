@@ -1,16 +1,31 @@
 using GRC.Models;
+using GRC.ViewModels;
 using GRC.Views;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 
 namespace GRC.Services;
 
+public record NewSessionSetupResult(
+    string Name,
+    string Worldview,
+    string Scenario,
+    string CustomStats,
+    string StatusUpdateGuide
+);
+
 public interface IDialogService
 {
-    (bool IsSaved, string Worldview, string CustomStats, string? InitialScenario, string StatusUpdateGuide)? ShowEditWorldviewDialog(string currentWorldview, Dictionary<string, string>? currentStats, string currentScenario, string currentStatusUpdateGuide);
+    NewSessionSetupResult? ShowNewSessionSetupDialog();
+    (bool IsSaved, string Worldview, string CustomStats, string? InitialScenario, string StatusUpdateGuide)? ShowEditWorldviewDialog(
+        string currentWorldview, Dictionary<string, string>? currentStats, string currentScenario, string currentStatusUpdateGuide);
     List<LorebookEntry>? ShowEditLorebookDialog(List<LorebookEntry>? currentLorebooks);
+    void ShowSessionArchitectWindow(Action<string>? onSessionCreated = null);
+    void ShowSessionArchitectEditWindow(string fileName, CharacterPreset preset, Func<string, Task>? onSessionUpdated = null);
     void ShowStatusWindow(object viewModel);
     void ShowStoryHistoryWindow(object viewModel);
     bool ShowConfirm(string message, string title);
@@ -19,31 +34,138 @@ public interface IDialogService
     void CloseAuxiliaryWindows();
 }
 
-public class DialogService : IDialogService
+public class DialogService(IServiceProvider serviceProvider) : IDialogService
 {
-    public (bool IsSaved, string Worldview, string CustomStats, string? InitialScenario, string StatusUpdateGuide)? ShowEditWorldviewDialog(string currentWorldview, Dictionary<string, string>? currentStats, string currentScenario, string currentStatusUpdateGuide)
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
+
+    private static void SetOwner(Window window)
     {
-        var dialog = new EditWorldviewWindow(currentWorldview, currentStats, currentScenario, currentStatusUpdateGuide);
-        if (dialog.ShowDialog() == true)
-            return (true, dialog.InputWorldview, dialog.InputCustomStats, dialog.ChangedInitialScenario, dialog.InputStatusUpdateGuide);
-        return null;
+        var mainWindow = Application.Current?.MainWindow;
+        if (mainWindow != null && mainWindow != window && mainWindow.IsVisible)
+        {
+            window.Owner = mainWindow;
+        }
+    }
+
+    public void RunOnUIThread(Action action)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
+        {
+            action();
+        }
+        else
+        {
+            dispatcher.Invoke(action);
+        }
+    }
+
+    public NewSessionSetupResult? ShowNewSessionSetupDialog()
+    {
+        NewSessionSetupResult? result = null;
+        RunOnUIThread(() =>
+        {
+            var dialog = new NewSessionSetupWindow();
+            SetOwner(dialog);
+            if (dialog.ShowDialog() == true)
+            {
+                result = new NewSessionSetupResult(
+                    dialog.InputName,
+                    dialog.InputWorldview,
+                    dialog.InputScenario,
+                    dialog.InputCustomStats,
+                    dialog.InputStatusUpdateGuide
+                );
+            }
+        });
+        return result;
+    }
+
+    public (bool IsSaved, string Worldview, string CustomStats, string? InitialScenario, string StatusUpdateGuide)? ShowEditWorldviewDialog(
+        string currentWorldview, Dictionary<string, string>? currentStats, string currentScenario, string currentStatusUpdateGuide)
+    {
+        (bool IsSaved, string Worldview, string CustomStats, string? InitialScenario, string StatusUpdateGuide)? result = null;
+        RunOnUIThread(() =>
+        {
+            var dialog = new EditWorldviewWindow(currentWorldview, currentStats, currentScenario, currentStatusUpdateGuide);
+            SetOwner(dialog);
+            if (dialog.ShowDialog() == true)
+            {
+                result = (true, dialog.InputWorldview, dialog.InputCustomStats, dialog.ChangedInitialScenario, dialog.InputStatusUpdateGuide);
+            }
+        });
+        return result;
     }
 
     public List<LorebookEntry>? ShowEditLorebookDialog(List<LorebookEntry>? currentLorebooks)
     {
-        var dialog = new EditLorebookWindow(currentLorebooks);
-        if (dialog.ShowDialog() == true) return dialog.FinalLorebooks;
-        return null;
+        List<LorebookEntry>? result = null;
+        RunOnUIThread(() =>
+        {
+            var dialog = new EditLorebookWindow(currentLorebooks);
+            SetOwner(dialog);
+            if (dialog.ShowDialog() == true)
+            {
+                result = dialog.FinalLorebooks;
+            }
+        });
+        return result;
+    }
+
+    public void ShowSessionArchitectWindow(Action<string>? onSessionCreated = null)
+    {
+        RunOnUIThread(() =>
+        {
+            var vm = _serviceProvider.GetRequiredService<SessionArchitectViewModel>();
+            var window = new SessionArchitectWindow(vm);
+            SetOwner(window);
+            vm.SessionCreated += (fileName) =>
+            {
+                window.Close();
+                onSessionCreated?.Invoke(fileName);
+            };
+            window.ShowDialog();
+        });
+    }
+
+    public void ShowSessionArchitectEditWindow(string fileName, CharacterPreset preset, Func<string, Task>? onSessionUpdated = null)
+    {
+        RunOnUIThread(() =>
+        {
+            var vm = _serviceProvider.GetRequiredService<SessionArchitectViewModel>();
+            vm.InitializeForEdit(fileName, preset);
+            var window = new SessionArchitectWindow(vm);
+            SetOwner(window);
+            vm.SessionCreated += async (updatedFileName) =>
+            {
+                window.Close();
+                if (onSessionUpdated != null)
+                {
+                    await onSessionUpdated(updatedFileName);
+                }
+            };
+            window.ShowDialog();
+        });
     }
 
     public void ShowStatusWindow(object viewModel)
     {
-        new StatusWindow((ViewModels.ChatViewModel)viewModel).Show();
+        RunOnUIThread(() =>
+        {
+            var window = new StatusWindow((ChatViewModel)viewModel);
+            SetOwner(window);
+            window.Show();
+        });
     }
 
     public void ShowStoryHistoryWindow(object viewModel)
     {
-        new StoryHistoryWindow((ViewModels.ChatViewModel)viewModel).Show();
+        RunOnUIThread(() =>
+        {
+            var window = new StoryHistoryWindow((ChatViewModel)viewModel);
+            SetOwner(window);
+            window.Show();
+        });
     }
 
     public bool ShowConfirm(string message, string title)
@@ -52,6 +174,7 @@ public class DialogService : IDialogService
         RunOnUIThread(() =>
         {
             var customMsgBox = new CustomMessageBoxWindow(message, title, isConfirmMode: true);
+            SetOwner(customMsgBox);
             result = customMsgBox.ShowDialog() == true;
         });
         return result;
@@ -62,24 +185,23 @@ public class DialogService : IDialogService
         RunOnUIThread(() =>
         {
             var customMsgBox = new CustomMessageBoxWindow(message, title, isConfirmMode: false);
+            SetOwner(customMsgBox);
             customMsgBox.ShowDialog();
         });
-    }
-
-    public void RunOnUIThread(Action action)
-    {
-        Application.Current.Dispatcher.Invoke(action);
     }
 
     public void CloseAuxiliaryWindows()
     {
         RunOnUIThread(() =>
         {
-            var windowsToClose = Application.Current.Windows.OfType<Window>()
+            var windowsToClose = Application.Current?.Windows.OfType<Window>()
                 .Where(w => w is StatusWindow || w is StoryHistoryWindow || w is SessionArchitectWindow)
                 .ToList();
 
-            foreach (var w in windowsToClose) w.Close();
+            if (windowsToClose != null)
+            {
+                foreach (var w in windowsToClose) w.Close();
+            }
         });
     }
 }
