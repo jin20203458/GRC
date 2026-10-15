@@ -19,11 +19,6 @@ public class ClueTracker : IClueTracker
     private readonly List<ClueSlotItem> _activeClues = new(MaxActiveSlots);
     private readonly List<ClueSlotItem> _archivedClues = new();
 
-    private static readonly string[] DefaultGatingKeywords =
-    [
-        "주머니", "쪽지", "편지", "비밀", "숨기", "숨긴", "추궁", "의심",
-        "단서", "의문", "열쇠", "인장", "목걸이", "반지", "털어놓", "진실", "수색", "조사", "캐물", "정체"
-    ];
 
     public IReadOnlyList<ClueSlotItem> ActiveClues
     {
@@ -141,6 +136,11 @@ public class ClueTracker : IClueTracker
         }
     }
 
+    private static readonly HashSet<string> MetaStopWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "단서", "비밀", "정보", "기록", "사건", "상태", "내용", "아이템", "물건", "존재", "의문", "의혹"
+    };
+
     public List<ClueSlotItem> GetGatedClues(string userInput, float[]? userQueryEmbedding = null)
     {
         if (string.IsNullOrWhiteSpace(userInput))
@@ -148,31 +148,27 @@ public class ClueTracker : IClueTracker
 
         lock (_syncRoot)
         {
-            if (_activeClues.Count == 0) return [];
-
-            // 유저 입력에 추궁/수색 키워드가 포함되었는지 1차 검사
-            bool containsGeneralGatingKeyword = DefaultGatingKeywords.Any(k =>
-                userInput.Contains(k, StringComparison.OrdinalIgnoreCase));
+            if (_activeClues.Count == 0 && _archivedClues.Count == 0) return [];
 
             var matched = new List<ClueSlotItem>();
-            foreach (var clue in _activeClues)
+
+            // 활성 단서(Active)를 우선 탐색하고, 필요 시 콜드 아카이브(Archived)까지 전수 핀포인트 탐색
+            var candidatePool = _activeClues.Concat(_archivedClues);
+
+            foreach (var clue in candidatePool)
             {
-                // 1. 포괄 수색/추궁 키워드 일치 시 즉시 인출 (0ms Fast-Path 1)
-                if (containsGeneralGatingKeyword)
+                // 1. 단서 본문에서 2글자 이상 핵심 명사/단어가 유저 입력에 직접 일치하는지 검사 (Fast-Path)
+                // 메타 수식어(단서, 비밀, 정보 등)는 불용어 제외하여 위양성 차단
+                var tokens = clue.Clue.Split([' ', ',', '.', '\'', '\"', ':', ';', '!', '?', '-', '_', '[', ']'], StringSplitOptions.RemoveEmptyEntries);
+                bool tokenMatched = tokens.Any(t => t.Length >= 2 && !MetaStopWords.Contains(t) && userInput.Contains(t, StringComparison.OrdinalIgnoreCase));
+
+                if (tokenMatched)
                 {
                     matched.Add(clue);
                     continue;
                 }
 
-                // 2. 단서 본문에서 2글자 이상 핵심 명사/단어가 유저 입력에 있는지 검사 (Fast-Path 2)
-                var tokens = clue.Clue.Split([' ', ',', '.', '\'', '\"'], StringSplitOptions.RemoveEmptyEntries);
-                if (tokens.Any(t => t.Length >= 2 && userInput.Contains(t, StringComparison.OrdinalIgnoreCase)))
-                {
-                    matched.Add(clue);
-                    continue;
-                }
-
-                // 3. [신규] 시맨틱 임베딩 코사인 유사도 검사 (동의어/이음동의어 Semantic Path)
+                // 2. 시맨틱 임베딩 코사인 유사도 검사 (동의어/이음동의어 Semantic Path, >= 0.80)
                 if (userQueryEmbedding != null && userQueryEmbedding.Length == 768 &&
                     clue.Embedding != null && clue.Embedding.Length == 768)
                 {
@@ -184,7 +180,11 @@ public class ClueTracker : IClueTracker
                 }
             }
 
-            return matched;
+            // 중복 방지 및 최대 MaxActiveSlots(3개)까지만 인출
+            return matched
+                .DistinctBy(c => c.Id)
+                .Take(MaxActiveSlots)
+                .ToList();
         }
     }
 

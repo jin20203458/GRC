@@ -201,4 +201,58 @@ public class ClueTrackerTests
 
         Assert.True(tracker.ActiveClues.Count <= 3);
     }
+
+    [Fact]
+    public void GetGatedClues_WhenGeneralActionKeywordOnly_WithoutTargetMatch_BlocksRetrieval()
+    {
+        // Arrange - "외투 주머니 속 붉은 밀랍 쪽지" 단서가 활성화되어 있음
+        var tracker = new ClueTracker();
+        tracker.AddOrUpdateClue("외투 주머니 속 붉은 밀랍 쪽지", 1, "c1");
+
+        // Act - 과거에는 "수색", "조사" 키워드로 단서가 누출되었으나, 100% 타겟 RAG에서는 대상 일치 없으므로 완전 차단
+        var result1 = tracker.GetGatedClues("방 안을 조심스럽게 수색하고 구석구석 조사한다.");
+        var result2 = tracker.GetGatedClues("주변에 숨겨진 비밀이나 수상한 단서가 있는지 살핀다.");
+
+        // Assert - 스포일러 누출 0건 (빈 리스트 차단 증명)
+        Assert.Empty(result1);
+        Assert.Empty(result2);
+    }
+
+    [Fact]
+    public void GetGatedClues_WhenMultipleCluesExist_OnlyTargetedClueIsRetrieved()
+    {
+        // Arrange - 검은 칼 단서와 붉은 구두 단서가 공존
+        var tracker = new ClueTracker();
+        tracker.AddOrUpdateClue("검은 칼의 자루에 치명적인 독침이 숨겨져 있다.", 1, "c_sword");
+        tracker.AddOrUpdateClue("하녀의 붉은 구두 밑창에 진흙이 묻어있다.", 1, "c_shoes");
+
+        // Act - 유저가 "검은 칼"만 지목하여 조사
+        var result = tracker.GetGatedClues("탁자 위에 놓인 검은 칼을 집어 들고 자세히 살펴본다.");
+
+        // Assert - 검은 칼 단서만 단독 인출되고, 붉은 구두는 절대 인출되지 않음 (어텐션 오염 0% 증명)
+        Assert.Single(result);
+        Assert.Equal("c_sword", result[0].Id);
+    }
+
+    [Fact]
+    public void GetGatedClues_WhenArchivedClueTargeted_RecallsDormantClue()
+    {
+        // Arrange - 단서가 슬롯 상한(Max 3)으로 밀려나 L2 Dormant 아카이브로 이관된 상태
+        var tracker = new ClueTracker();
+        tracker.AddOrUpdateClue("고대 사원의 황금 열쇠", 1, "c_key"); // 1번 단서
+        tracker.AddOrUpdateClue("기사단장의 비밀 서신", 2, "c_letter");
+        tracker.AddOrUpdateClue("마녀의 은색 방울", 3, "c_bell");
+        tracker.AddOrUpdateClue("용병의 부러진 검", 4, "c_sword"); // 4번 단서가 추가되면서 c_key가 Dormant로 이관
+
+        Assert.Equal(3, tracker.ActiveClues.Count);
+        Assert.DoesNotContain(tracker.ActiveClues, c => c.Id == "c_key");
+        Assert.Contains(tracker.ArchivedClues, c => c.Id == "c_key");
+
+        // Act - 유저가 50턴 뒤에 과거 잊힌 "황금 열쇠"를 다시 언급
+        var result = tracker.GetGatedClues("인벤토리에서 먼지 쌓인 황금 열쇠를 꺼내 만져본다.");
+
+        // Assert - L2 아카이브에 잠복 중이던 c_key 단서가 핀포인트로 정상 회수됨
+        Assert.Single(result);
+        Assert.Equal("c_key", result[0].Id);
+    }
 }
