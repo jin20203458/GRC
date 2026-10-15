@@ -132,9 +132,34 @@ public class MemoryManagerService : IMemoryManagerService
             {
                 foreach (var clue in payload.UnresolvedClues)
                 {
-                    if (!string.IsNullOrWhiteSpace(clue))
+                    if (string.IsNullOrWhiteSpace(clue)) continue;
+                    string trimmedClue = clue.Trim();
+
+                    // 이미 활성 단서에 존재하고 768차원 임베딩이 캐시되어 있는지 검사 (중복 API 호출 방지)
+                    bool alreadyHasEmbedding = _clueTracker.ActiveClues.Any(c =>
+                        string.Equals(c.Clue, trimmedClue, StringComparison.OrdinalIgnoreCase) &&
+                        c.Embedding != null && c.Embedding.Length == 768);
+
+                    string clueId = _clueTracker.AddOrUpdateClue(trimmedClue, _totalTurnCount);
+
+                    // 임베딩이 없는 신규 단서일 때만 백그라운드 비동기 생성 (Non-blocking & Exception Isolated)
+                    if (!alreadyHasEmbedding)
                     {
-                        _clueTracker.AddOrUpdateClue(clue.Trim(), _totalTurnCount);
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                var emb = await _apiService.GetEmbeddingAsync(trimmedClue);
+                                if (emb != null && emb.Length == 768)
+                                {
+                                    _clueTracker.UpdateClueEmbedding(clueId, emb);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[ClueTracker] 단서 임베딩 비동기 생성 오류 (무시됨): {ex.Message}");
+                            }
+                        });
                     }
                 }
                 _clueTracker.TickTurn(_totalTurnCount);
@@ -229,8 +254,8 @@ public class MemoryManagerService : IMemoryManagerService
             );
         }
 
-        // (4) 조건부 게이팅 복선/단서 추출
-        var gatedClues = _clueTracker.GetGatedClues(effectiveUserMessage.Text);
+        // (4) 조건부 게이팅 복선/단서 추출 (텍스트 매칭 + 시맨틱 임베딩 하이브리드)
+        var gatedClues = _clueTracker.GetGatedClues(effectiveUserMessage.Text, queryEmbedding);
 
         // (5) 인물 감정 상태 대비 (BiTemporalEntityProjector)
         List<EntitySlotItem> entitySlots = [];

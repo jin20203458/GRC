@@ -97,4 +97,108 @@ public class ClueTrackerTests
         Assert.Single(result2);
         Assert.Equal("c1", result2[0].Id);
     }
+
+    [Fact]
+    public void GetGatedClues_WhenSynonymInputWithHighSemanticSimilarity_ReturnsGatedClues()
+    {
+        // Arrange - '흑철검' 단서와 '검은 쇠검' 유저 입력 (공통 어휘 0건, 코사인 유사도 1.0 모의 벡터)
+        var tracker = new ClueTracker();
+        var clueEmb = new float[768];
+        var queryEmb = new float[768];
+        for (int i = 0; i < 768; i++)
+        {
+            clueEmb[i] = 1.0f / MathF.Sqrt(768);
+            queryEmb[i] = 1.0f / MathF.Sqrt(768); // 동일 방향 (유사도 1.0)
+        }
+
+        tracker.AddOrUpdateClue("루시엘의 품에서 발견된 흑철검", 1, "c1", clueEmb);
+
+        string synonymUserInput = "바닥에 뒹구는 검은 쇠검을 천천히 들어올린다.";
+
+        // Act 1: 임베딩 없이 텍스트만 넣었을 때 - Fast-Path 1, 2 모두 차단되어 빈 리스트 반환 (위양성 방지 검증)
+        var resultWithoutEmbedding = tracker.GetGatedClues(synonymUserInput, null);
+        Assert.Empty(resultWithoutEmbedding);
+
+        // Act 2: 유사도 0.80 이상 시맨틱 임베딩 주입 시 - 3단계 시맨틱 경로로 정상 인출 증명
+        var resultWithEmbedding = tracker.GetGatedClues(synonymUserInput, queryEmb);
+
+        // Assert - 순수 시맨틱 게이팅으로 단서가 정상 인출됨
+        Assert.Single(resultWithEmbedding);
+        Assert.Equal("c1", resultWithEmbedding[0].Id);
+    }
+
+    [Fact]
+    public void GetGatedClues_WhenLowSimilarityEmbedding_BlocksRetrieval()
+    {
+        // Arrange - 무관한 벡터 (직교 벡터, 유사도 0.0)
+        var tracker = new ClueTracker();
+        var clueEmb = new float[768];
+        var queryEmb = new float[768];
+        clueEmb[0] = 1.0f;
+        queryEmb[1] = 1.0f; // 직교 (유사도 0.0)
+
+        tracker.AddOrUpdateClue("루시엘의 품에서 떨어진 흑철검", 1, "c1", clueEmb);
+
+        // Act - 텍스트 매칭(품에서, 떨어진, 흑철검 등)도 없고 임베딩 유사도도 0.0인 무관한 입력
+        var result = tracker.GetGatedClues("숲속 오솔길을 조용히 걸어가며 밤하늘을 올려다본다.", queryEmb);
+
+        // Assert - 텍스트 불일치 및 임계치(0.80) 미달로 차단됨
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void UpdateClueEmbedding_UpdatesEmbeddingSafely()
+    {
+        // Arrange
+        var tracker = new ClueTracker();
+        string clueId = tracker.AddOrUpdateClue("비밀 쪽지", 1);
+        Assert.Null(tracker.ActiveClues[0].Embedding);
+
+        var newEmb = new float[768];
+        newEmb[0] = 1.0f;
+
+        // Act
+        tracker.UpdateClueEmbedding(clueId, newEmb);
+
+        // Assert
+        Assert.NotNull(tracker.ActiveClues[0].Embedding);
+        Assert.Equal(768, tracker.ActiveClues[0].Embedding!.Length);
+        Assert.Equal(1.0f, tracker.ActiveClues[0].Embedding![0]);
+    }
+
+    [Fact]
+    public void ConcurrentAccess_IsThreadSafe()
+    {
+        // Arrange
+        var tracker = new ClueTracker();
+        for (int i = 0; i < 3; i++)
+        {
+            tracker.AddOrUpdateClue($"단서 {i}", i);
+        }
+
+        var dummyEmb = new float[768];
+
+        // Act & Assert - 10개 병렬 태스크에서 동시에 Add, Update, Read 호출 시 InvalidOperationException 미발생
+        System.Threading.Tasks.Parallel.For(0, 100, i =>
+        {
+            if (i % 3 == 0)
+            {
+                tracker.AddOrUpdateClue($"병렬 단서 {i}", i);
+            }
+            else if (i % 3 == 1)
+            {
+                var clues = tracker.ActiveClues;
+                if (clues.Count > 0)
+                {
+                    tracker.UpdateClueEmbedding(clues[0].Id, dummyEmb);
+                }
+            }
+            else
+            {
+                tracker.GetGatedClues("아무 텍스트", dummyEmb);
+            }
+        });
+
+        Assert.True(tracker.ActiveClues.Count <= 3);
+    }
 }
