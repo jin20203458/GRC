@@ -282,4 +282,70 @@ public class MemoryManagerServiceTests
         Assert.Equal("각성 상태", service.CurrentContext.CustomStats["Status"]);
         Assert.False(service.CurrentContext.CustomStats.ContainsKey("HP"));
     }
+
+    [Fact]
+    public async Task BuildNarrativeRequestAsync_ExcludesVisible15LedgersFromRAGPool()
+    {
+        // Arrange
+        var fakeApi = new FakeGeminiApiService();
+        var fakeSettings = new FakeAppSettingsService();
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
+
+        var preset = new CharacterPreset(
+            Name: "테스트",
+            Worldview: "세계관",
+            SystemPrompt: "시스템",
+            Temperature: 0.7f,
+            MaxOutputTokens: 1000
+        );
+
+        // 현재 챕터에 렛저 10개 추가 (상시 노출 15개 이하)
+        for (int i = 1; i <= 10; i++)
+        {
+            service.CurrentContext.EventLedgers.Add(new EventLedgerItem(i, $"현재 사건 {i}"));
+        }
+
+        // Act - 과거 앵커 질문 ("옛날 약속 기억나?")
+        var request = await service.BuildNarrativeRequestAsync(
+            new ChatMessage("user", "옛날 그 약속 기억나?", DateTime.Now), preset);
+
+        // Assert - 10개는 상시 노출 영역(<internal_chronicle_facts>)에 있으므로,
+        // <recalled_history>에 중복 인출되지 않아야 함 (태그 미생성)
+        var userPart = request.Contents[^1].Parts[0].Text!;
+        Assert.Contains("<internal_chronicle_facts>", userPart);
+        Assert.DoesNotContain("<recalled_history>", userPart);
+    }
+
+    [Fact]
+    public async Task BuildNarrativeRequestAsync_WhenLedgersExceed15_IncludesPushedOutLedgersInRAGPool()
+    {
+        // Arrange
+        var fakeApi = new FakeGeminiApiService();
+        var fakeSettings = new FakeAppSettingsService();
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
+
+        var preset = new CharacterPreset(
+            Name: "테스트",
+            Worldview: "세계관",
+            SystemPrompt: "시스템",
+            Temperature: 0.7f,
+            MaxOutputTokens: 1000
+        );
+
+        // 현재 챕터에 렛저 18개 추가 (1~3번은 15개 밖으로 밀려남)
+        for (int i = 1; i <= 18; i++)
+        {
+            service.CurrentContext.EventLedgers.Add(new EventLedgerItem(i, $"사건 기록 {i}"));
+        }
+
+        // Act - 유저 입력
+        var request = await service.BuildNarrativeRequestAsync(
+            new ChatMessage("user", "다음 행동을 진행한다.", DateTime.Now), preset);
+
+        var userPart = request.Contents[^1].Parts[0].Text!;
+        // 상시 노출 영역에는 최근 15개(4~18번)만 노출되어야 함
+        Assert.Contains("[Turn 18]: 사건 기록 18", userPart);
+        Assert.Contains("[Turn 4]: 사건 기록 4", userPart);
+        Assert.DoesNotContain("[Turn 1]: 사건 기록 1", userPart); // 1번은 상시 노출에서 밀려남
+    }
 }

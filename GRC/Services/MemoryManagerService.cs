@@ -227,10 +227,11 @@ public class MemoryManagerService : IMemoryManagerService
         // TTS 호환성을 위해 CurrentLorebookText 갱신
         CurrentLorebookText = string.Join("\n", matchedLorebooks.Select(l => $"[{l.Name}]\n{l.Content}"));
 
-        // (3) RAG 과거 회상 검색 (과거 챕터 및 현재 챕터 렛저)
+        // (3) RAG 과거 회상 검색 (상시 노출 15개 밖으로 밀려난 과거 챕터 및 오래된 렛저)
         List<EventLedgerItem> allHistoricalLedgers = [];
         lock (_shortTermMemory)
         {
+            // 1. 이미 완료되어 밀려난 과거 챕터 버퍼들의 렛저 (전원 RAG 대상)
             foreach (var buf in _mediumBuffers)
             {
                 if (buf.EventLedgers != null && buf.EventLedgers.Count > 0)
@@ -238,9 +239,11 @@ public class MemoryManagerService : IMemoryManagerService
                     allHistoricalLedgers.AddRange(buf.EventLedgers);
                 }
             }
-            if (_currentContext.EventLedgers != null && _currentContext.EventLedgers.Count > 0)
+
+            // 2. 현재 챕터에서 상시 노출 윈도우(최근 15개) 밖으로 밀려난 오래된 렛저만 편입 (중복 인출 0% 원천 차단)
+            if (_currentContext.EventLedgers != null && _currentContext.EventLedgers.Count > 15)
             {
-                allHistoricalLedgers.AddRange(_currentContext.EventLedgers);
+                allHistoricalLedgers.AddRange(_currentContext.EventLedgers.Take(_currentContext.EventLedgers.Count - 15));
             }
         }
 
