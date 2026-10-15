@@ -14,6 +14,7 @@ public class ClueTracker : IClueTracker
     public const int MaxActiveSlots = 3;
     public const int TtlTurns = 20;
     public const float SemanticSimilarityThreshold = 0.80f;
+    public const int DefaultStickyTurns = 2; // 현재 턴 포함 총 3턴 활성 잔존 (트리거 턴 1 + 추가 2턴)
 
     private readonly object _syncRoot = new();
     private readonly List<ClueSlotItem> _activeClues = new(MaxActiveSlots);
@@ -143,40 +144,56 @@ public class ClueTracker : IClueTracker
 
     public List<ClueSlotItem> GetGatedClues(string userInput, float[]? userQueryEmbedding = null)
     {
-        if (string.IsNullOrWhiteSpace(userInput))
-            return [];
-
         lock (_syncRoot)
         {
             if (_activeClues.Count == 0 && _archivedClues.Count == 0) return [];
 
             var matched = new List<ClueSlotItem>();
+            var directMatchedIds = new HashSet<string>();
 
-            // 활성 단서(Active)를 우선 탐색하고, 필요 시 콜드 아카이브(Archived)까지 전수 핀포인트 탐색
-            var candidatePool = _activeClues.Concat(_archivedClues);
+            // 활성 단서(Active) 및 콜드 아카이브(Archived) 대상 전수 핀포인트 검사
+            var allClues = _activeClues.Concat(_archivedClues).DistinctBy(c => c.Id).ToList();
 
-            foreach (var clue in candidatePool)
+            if (!string.IsNullOrWhiteSpace(userInput))
             {
-                // 1. 단서 본문에서 2글자 이상 핵심 명사/단어가 유저 입력에 직접 일치하는지 검사 (Fast-Path)
-                // 메타 수식어(단서, 비밀, 정보 등)는 불용어 제외하여 위양성 차단
-                var tokens = clue.Clue.Split([' ', ',', '.', '\'', '\"', ':', ';', '!', '?', '-', '_', '[', ']'], StringSplitOptions.RemoveEmptyEntries);
-                bool tokenMatched = tokens.Any(t => t.Length >= 2 && !MetaStopWords.Contains(t) && userInput.Contains(t, StringComparison.OrdinalIgnoreCase));
-
-                if (tokenMatched)
+                foreach (var clue in allClues)
                 {
-                    matched.Add(clue);
-                    continue;
-                }
+                    // 1. 단서 본문에서 2글자 이상 핵심 명사/단어가 유저 입력에 직접 일치하는지 검사 (Fast-Path)
+                    var tokens = clue.Clue.Split([' ', ',', '.', '\'', '\"', ':', ';', '!', '?', '-', '_', '[', ']'], StringSplitOptions.RemoveEmptyEntries);
+                    bool tokenMatched = tokens.Any(t => t.Length >= 2 && !MetaStopWords.Contains(t) && userInput.Contains(t, StringComparison.OrdinalIgnoreCase));
 
-                // 2. 시맨틱 임베딩 코사인 유사도 검사 (동의어/이음동의어 Semantic Path, >= 0.80)
-                if (userQueryEmbedding != null && userQueryEmbedding.Length == 768 &&
-                    clue.Embedding != null && clue.Embedding.Length == 768)
-                {
-                    float similarity = VectorMathHelper.CosineSimilarity(userQueryEmbedding, clue.Embedding);
-                    if (similarity >= SemanticSimilarityThreshold)
+                    bool semanticMatched = false;
+                    // 2. 시맨틱 임베딩 코사인 유사도 검사 (Semantic Path, >= 0.80)
+                    if (!tokenMatched && userQueryEmbedding != null && userQueryEmbedding.Length == 768 &&
+                        clue.Embedding != null && clue.Embedding.Length == 768)
                     {
-                        matched.Add(clue);
+                        float similarity = VectorMathHelper.CosineSimilarity(userQueryEmbedding, clue.Embedding);
+                        if (similarity >= SemanticSimilarityThreshold)
+                        {
+                            semanticMatched = true;
+                        }
                     }
+
+                    if (tokenMatched || semanticMatched)
+                    {
+                        directMatchedIds.Add(clue.Id);
+                        // 직접 매칭된 단서는 잔존 턴을 2로 충전 (현재 턴 포함 총 3턴 활성 잔존)
+                        var refreshed = clue with { RemainingStickyTurns = DefaultStickyTurns };
+                        UpdateClueInternal(refreshed);
+                        matched.Add(refreshed);
+                    }
+                }
+            }
+
+            // 3. 이번 턴에 직접 매칭되지 않았지만, 이전 턴에 인출되어 잔존 중(RemainingStickyTurns > 0)인 단서 유지
+            foreach (var clue in allClues)
+            {
+                if (!directMatchedIds.Contains(clue.Id) && clue.RemainingStickyTurns > 0)
+                {
+                    // 1턴 소진 (Sticky 카운트다운)
+                    var decayed = clue with { RemainingStickyTurns = clue.RemainingStickyTurns - 1 };
+                    UpdateClueInternal(decayed);
+                    matched.Add(decayed);
                 }
             }
 
@@ -185,6 +202,22 @@ public class ClueTracker : IClueTracker
                 .DistinctBy(c => c.Id)
                 .Take(MaxActiveSlots)
                 .ToList();
+        }
+    }
+
+    private void UpdateClueInternal(ClueSlotItem item)
+    {
+        int activeIdx = _activeClues.FindIndex(c => c.Id == item.Id);
+        if (activeIdx >= 0)
+        {
+            _activeClues[activeIdx] = item;
+            return;
+        }
+
+        int archivedIdx = _archivedClues.FindIndex(c => c.Id == item.Id);
+        if (archivedIdx >= 0)
+        {
+            _archivedClues[archivedIdx] = item;
         }
     }
 

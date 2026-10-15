@@ -14,75 +14,150 @@ namespace GRC.Services;
 public class HybridLorebookRetriever : IHybridLorebookRetriever
 {
     public const float DenseThreshold = 0.85f;
-    public const int DefaultMaxTokenBudget = 2000;
+    public const int DefaultMaxTokenBudget = 3000;
+    public const int DefaultStickyTurns = 2; // 현재 턴 포함 총 3턴 활성 잔존 (트리거 턴 1 + 추가 2턴)
+
     private static readonly ConcurrentDictionary<string, Regex> RegexCache = new();
+    private readonly object _syncRoot = new();
+    private readonly Dictionary<string, int> _stickyTurns = new(StringComparer.OrdinalIgnoreCase);
 
     public List<LorebookEntry> Retrieve(
         string userQuery,
         float[]? queryEmbedding,
         IEnumerable<LorebookEntry> allLorebooks,
+        IEnumerable<string>? activeCharNames = null,
         int maxTokenBudget = DefaultMaxTokenBudget)
     {
         if (allLorebooks == null) return [];
         var lorebookList = allLorebooks.ToList();
         if (lorebookList.Count == 0) return [];
 
-        var matchedEntries = new List<LorebookEntry>();
-
-        // 1. Sparse 검색: 키워드 정규식 직접 매칭
-        if (!string.IsNullOrWhiteSpace(userQuery))
+        lock (_syncRoot)
         {
-            foreach (var entry in lorebookList)
+            // [1단계] 이번 턴 직접 매칭 (Sparse 정규식 OR Dense 시맨틱 임베딩 >= 0.85)
+            var directMatched = new List<LorebookEntry>();
+            if (!string.IsNullOrWhiteSpace(userQuery))
             {
-                if (IsSparseMatched(userQuery, entry.Keywords))
+                foreach (var entry in lorebookList)
                 {
-                    matchedEntries.Add(entry);
+                    if (IsSparseMatched(userQuery, entry.Keywords))
+                    {
+                        directMatched.Add(entry);
+                        continue;
+                    }
+
+                    if (queryEmbedding != null && queryEmbedding.Length == 768 &&
+                        entry.Embedding != null && entry.Embedding.Length == 768)
+                    {
+                        float similarity = VectorMathHelper.CosineSimilarity(queryEmbedding, entry.Embedding);
+                        if (similarity >= DenseThreshold)
+                        {
+                            directMatched.Add(entry);
+                        }
+                    }
                 }
             }
-        }
 
-        // 2. Dense 검색: 시맨틱 임베딩 코사인 유사도 >= 0.85 (queryEmbedding != null 일 때만)
-        if (queryEmbedding != null && queryEmbedding.Length == 768)
-        {
-            foreach (var entry in lorebookList)
+            var directMatchedNames = new HashSet<string>(directMatched.Select(e => e.Name), StringComparer.OrdinalIgnoreCase);
+
+            // 직접 매칭된 로어북은 잔존 턴을 2로 충전 (현재 턴 포함 총 3턴 활성)
+            foreach (var name in directMatchedNames)
             {
-                if (entry.Embedding == null || entry.Embedding.Length != 768)
-                    continue;
+                _stickyTurns[name] = DefaultStickyTurns;
+            }
 
-                float similarity = VectorMathHelper.CosineSimilarity(queryEmbedding, entry.Embedding);
-                if (similarity >= DenseThreshold)
+            // [2단계] 이전 턴에서 인출되어 잔존 중(Sticky)인 로어북
+            var stickyMatched = new List<LorebookEntry>();
+            var activeStickyNames = _stickyTurns.Keys.ToList();
+            foreach (var name in activeStickyNames)
+            {
+                if (!directMatchedNames.Contains(name))
                 {
-                    matchedEntries.Add(entry);
+                    int remaining = _stickyTurns[name];
+                    if (remaining > 0)
+                    {
+                        var entry = lorebookList.FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
+                        if (entry != null)
+                        {
+                            stickyMatched.Add(entry);
+                        }
+                        // 1턴 소진 (Sticky 카운트다운)
+                        _stickyTurns[name] = remaining - 1;
+                    }
+                    else
+                    {
+                        _stickyTurns.Remove(name);
+                    }
                 }
             }
-        }
 
-        // 3. 병렬 합집합 & Name 기준 중복 제거 & Priority 내림차순 정렬
-        var sortedEntries = matchedEntries
-            .DistinctBy(e => e.Name)
-            .OrderByDescending(e => e.Priority)
-            .ToList();
-
-        // 4. 토큰 예산(기본 2000 토큰) 기반 동적 패킹
-        var selected = new List<LorebookEntry>();
-        int accumulatedTokens = 0;
-
-        foreach (var entry in sortedEntries)
-        {
-            // 항목 이름 + 본문 + 마크다운 태그 오버헤드(약 10토큰)
-            int entryTokens = EstimateTokens(entry.Name) + EstimateTokens(entry.Content) + 10;
-
-            // 첫 번째 항목은 2000토큰을 초과하더라도 최소 1개는 포함 보장 (Zero Starvation)
-            if (selected.Count > 0 && accumulatedTokens + entryTokens > maxTokenBudget)
+            // [3단계] 상태창 등장인물(activeCharNames) 로어북 후보
+            var charMatched = new List<LorebookEntry>();
+            if (activeCharNames != null)
             {
-                break;
+                var charNameSet = new HashSet<string>(activeCharNames.Where(n => !string.IsNullOrWhiteSpace(n)), StringComparer.OrdinalIgnoreCase);
+                if (charNameSet.Count > 0)
+                {
+                    foreach (var entry in lorebookList)
+                    {
+                        // 이미 1단계(직접)나 2단계(잔존)에 포함된 항목은 중복 제외
+                        if (directMatchedNames.Contains(entry.Name) || stickyMatched.Any(s => string.Equals(s.Name, entry.Name, StringComparison.OrdinalIgnoreCase)))
+                            continue;
+
+                        // 카테고리가 "인물"이거나, 이름 또는 키워드가 상태창 인물 이름과 일치하는 경우
+                        bool isCharEntry = string.Equals(entry.Category, "인물", StringComparison.OrdinalIgnoreCase) ||
+                                           charNameSet.Contains(entry.Name) ||
+                                           (entry.Keywords != null && entry.Keywords.Any(k => charNameSet.Contains(k)));
+
+                        if (isCharEntry)
+                        {
+                            charMatched.Add(entry);
+                        }
+                    }
+                }
             }
 
-            selected.Add(entry);
-            accumulatedTokens += entryTokens;
-        }
+            // [4단계] 3단계 우선순위 동적 패킹 (최대 maxTokenBudget)
+            // 1순위: 직접 매칭 (Priority 내림차순)
+            // 2순위: 이전 잔존 (Priority 내림차순)
+            // 3순위: 상태창 인물 (Priority 내림차순)
+            var sortedDirect = directMatched.DistinctBy(e => e.Name).OrderByDescending(e => e.Priority).ToList();
+            var sortedSticky = stickyMatched.DistinctBy(e => e.Name).OrderByDescending(e => e.Priority).ToList();
+            var sortedChar = charMatched.DistinctBy(e => e.Name).OrderByDescending(e => e.Priority).ToList();
 
-        return selected;
+            var candidateOrder = sortedDirect
+                .Concat(sortedSticky)
+                .Concat(sortedChar)
+                .DistinctBy(e => e.Name)
+                .ToList();
+
+            var selected = new List<LorebookEntry>();
+            int accumulatedTokens = 0;
+
+            foreach (var entry in candidateOrder)
+            {
+                int entryTokens = EstimateTokens(entry.Name) + EstimateTokens(entry.Content) + 10;
+
+                // 첫 번째 항목은 예산을 초과하더라도 최소 1개는 포함 보장 (Zero Starvation)
+                if (selected.Count > 0 && accumulatedTokens + entryTokens > maxTokenBudget)
+                {
+                    continue; // 더 작은 다음 항목이 들어갈 수 있는지 탐색
+                }
+
+                selected.Add(entry);
+                accumulatedTokens += entryTokens;
+            }
+
+            return selected;
+        }
+    }
+
+    public void ClearSticky()
+    {
+        lock (_syncRoot)
+        {
+            _stickyTurns.Clear();
+        }
     }
 
     /// <summary>

@@ -212,15 +212,25 @@ public class MemoryManagerService : IMemoryManagerService
             }
         }
 
-        // (2) 하이브리드 로어북 검색 (Sparse 정규식 OR Dense 0.85, 최대 2,000토큰 동적 패킹)
+        // (2) 하이브리드 로어북 검색 (Sparse 정규식 OR Dense 0.85, 최대 3,000토큰 동적 패킹, 3턴 잔존 및 상태창 인물 보충)
         List<LorebookEntry> matchedLorebooks = [];
         if (preset.Lorebooks != null && preset.Lorebooks.Count > 0)
         {
+            IEnumerable<string>? activeChars = null;
+            lock (_shortTermMemory)
+            {
+                if (_currentContext.Chars != null && _currentContext.Chars.Count > 0)
+                {
+                    activeChars = _currentContext.Chars.Keys.ToList();
+                }
+            }
+
             matchedLorebooks = _hybridLorebookRetriever.Retrieve(
                 effectiveUserMessage.Text,
                 queryEmbedding,
                 preset.Lorebooks,
-                maxTokenBudget: 2000
+                activeCharNames: activeChars,
+                maxTokenBudget: 3000
             );
         }
 
@@ -622,6 +632,7 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
                 Plot = $"[제 {_chapterCount}장] 새로운 이야기가 시작되었습니다."
             };
             _clueTracker.Clear();
+            _hybridLorebookRetriever.ClearSticky();
             Volatile.Write(ref _requiresHighQualityAnchor, 1);
         }
     }
@@ -641,6 +652,7 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
             _chapterCount = session.ChapterCount;
             _totalTurnCount = session.TotalTurnCount;
             _clueTracker.RestoreClues(session.ActiveClues, session.ArchivedClues);
+            _hybridLorebookRetriever.ClearSticky();
             // 대화 내역이 없는 신규 세션일 때만 앵커를 활성화하고, 기존 대화가 이어지는 세션 로드 시에는 불필요한 과잉 추론 방지
             int anchorRequired = (session.History == null || session.History.Count == 0) ? 1 : 0;
             Volatile.Write(ref _requiresHighQualityAnchor, anchorRequired);

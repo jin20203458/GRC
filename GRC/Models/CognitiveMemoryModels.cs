@@ -49,13 +49,15 @@ public enum ClueStatus
 /// <param name="LastReferencedTurn">마지막으로 언급/참조된 턴</param>
 /// <param name="Status">현재 라이프사이클 상태</param>
 /// <param name="Embedding">선택적 시맨틱 검색용 벡터</param>
+/// <param name="RemainingStickyTurns">인출 후 추가 잔존 턴 수 (0: 즉시 휘발, 2: 2턴 더 잔존)</param>
 public record ClueSlotItem(
     string Id,
     string Clue,
     int CreatedTurn,
     int LastReferencedTurn,
     ClueStatus Status = ClueStatus.Active,
-    float[]? Embedding = null
+    float[]? Embedding = null,
+    int RemainingStickyTurns = 0
 );
 
 /// <summary>

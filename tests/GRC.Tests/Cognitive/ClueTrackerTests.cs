@@ -255,4 +255,50 @@ public class ClueTrackerTests
         Assert.Single(result);
         Assert.Equal("c_key", result[0].Id);
     }
+
+    [Fact]
+    public void GetGatedClues_StickyRetention_PersistsForThreeTurnsTotal()
+    {
+        // Arrange
+        var tracker = new ClueTracker();
+        tracker.AddOrUpdateClue("검은 칼의 자루에 치명적인 독침이 숨겨져 있다.", 1, "c_sword");
+
+        // Turn 1 (트리거 턴): 유저가 "검은 칼" 직접 지목 -> 1순위 직접 매칭 (RemainingStickyTurns = 2 충전)
+        var turn1 = tracker.GetGatedClues("탁자 위에 놓인 검은 칼을 집어 들고 살펴본다.");
+        Assert.Single(turn1);
+        Assert.Equal("c_sword", turn1[0].Id);
+
+        // Turn 2 (다음 턴): 유저가 대명사("그것")를 써서 키워드 미매칭 -> Sticky 잔존으로 인출됨 (1턴 차감)
+        var turn2 = tracker.GetGatedClues("칼집에서 그것을 뽑아 칼날을 비춰본다.");
+        Assert.Single(turn2);
+        Assert.Equal("c_sword", turn2[0].Id);
+
+        // Turn 3 (다다음 턴): 유저가 키워드 없는 다른 행동 -> Sticky 잔존으로 인출됨 (2턴 차감)
+        var turn3 = tracker.GetGatedClues("손잡이를 단단히 쥐고 자세를 고쳐잡는다.");
+        Assert.Single(turn3);
+        Assert.Equal("c_sword", turn3[0].Id);
+
+        // Turn 4 (4턴째): 추가 언급 없이 3턴 경과 만료 -> 프롬프트에서 자동 제외(소멸)
+        var turn4 = tracker.GetGatedClues("여관 문을 열고 밖으로 나간다.");
+        Assert.Empty(turn4);
+    }
+
+    [Fact]
+    public void ResolveClue_DuringSticky_ImmediatelyRemovesFromRetrieval()
+    {
+        // Arrange
+        var tracker = new ClueTracker();
+        tracker.AddOrUpdateClue("검은 칼의 자루에 치명적인 독침이 숨겨져 있다.", 1, "c_sword");
+
+        // Turn 1: 직접 매칭되어 잔존 턴이 부여됨
+        var turn1 = tracker.GetGatedClues("검은 칼을 살펴본다.");
+        Assert.Single(turn1);
+
+        // Act - 사건 해결(독침 해제 및 진실 규명)로 ResolveClue 호출
+        tracker.ResolveClue("c_sword");
+
+        // Assert - 잔존 턴이 남아있었더라도 해결 즉시 영구 삭제되어 다음 턴에 0건 인출
+        var turn2 = tracker.GetGatedClues("그것을 다시 확인한다.");
+        Assert.Empty(turn2);
+    }
 }
