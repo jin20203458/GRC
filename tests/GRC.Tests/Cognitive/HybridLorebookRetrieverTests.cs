@@ -95,4 +95,59 @@ public class HybridLorebookRetrieverTests
         Assert.Single(result);
         Assert.Equal("흑철검", result[0].Name);
     }
+
+    [Fact]
+    public void Retrieve_WhenMultipleShortEntriesMatch_PacksMoreThanThreeWithinBudget()
+    {
+        // Arrange - 짧은 마이크로 로어북 6개 (키워드 일치, 각 약 30토큰)
+        var retriever = new HybridLorebookRetriever();
+        var lorebooks = new List<LorebookEntry>();
+        for (int i = 1; i <= 6; i++)
+        {
+            lorebooks.Add(new LorebookEntry($"설정{i}", ["공통키워드"], $"짧은 설정 본문 {i}", "일반", Priority: 10 - i));
+        }
+
+        // Act - 유저 입력에 '공통키워드'가 있어 6개 모두 매칭됨 (총 토큰 약 240T <= 2000T)
+        var result = retriever.Retrieve("공통키워드에 대해 이야기한다.", null, lorebooks, maxTokenBudget: 2000);
+
+        // Assert - 기존 3개 고정 상한을 넘어 6개 모두 안전하게 패킹됨
+        Assert.Equal(6, result.Count);
+        Assert.Equal("설정1", result[0].Name);
+        Assert.Equal("설정6", result[5].Name);
+    }
+
+    [Fact]
+    public void Retrieve_WhenEntriesExceedBudget_CapsAtBudgetLimit()
+    {
+        // Arrange - 약 900토큰짜리 긴 로어북 3개 (한글 약 1300자)
+        var retriever = new HybridLorebookRetriever();
+        string longContent = new string('가', 1300); // 약 871 토큰
+
+        var lorebooks = new List<LorebookEntry>
+        {
+            new("긴설정1", ["마법"], longContent, "일반", Priority: 10),
+            new("긴설정2", ["마법"], longContent, "일반", Priority: 9),
+            new("긴설정3", ["마법"], longContent, "일반", Priority: 8)
+        };
+
+        // Act - 1번(약 880T) + 2번(약 880T) = 약 1760T. 3번째가 추가되면 2000T를 초과하므로 2개에서 커트되어야 함
+        var result = retriever.Retrieve("마법에 대해 묻는다.", null, lorebooks, maxTokenBudget: 2000);
+
+        // Assert - 예산(2000T) 한도 내에서 정확히 2개만 인출됨
+        Assert.Equal(2, result.Count);
+        Assert.Equal("긴설정1", result[0].Name);
+        Assert.Equal("긴설정2", result[1].Name);
+    }
+
+    [Fact]
+    public void EstimateTokens_ReturnsReasonableEstimates()
+    {
+        // 한글 10자 -> 약 7토큰
+        int koreanTokens = HybridLorebookRetriever.EstimateTokens("가나다라마바사아자차");
+        Assert.True(koreanTokens >= 6 && koreanTokens <= 10);
+
+        // 영문 20자 -> 약 5토큰
+        int englishTokens = HybridLorebookRetriever.EstimateTokens("abcdefghijklmnopqrst");
+        Assert.True(englishTokens >= 4 && englishTokens <= 8);
+    }
 }

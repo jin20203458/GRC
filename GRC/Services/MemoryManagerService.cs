@@ -212,7 +212,7 @@ public class MemoryManagerService : IMemoryManagerService
             }
         }
 
-        // (2) 하이브리드 로어북 검색 (Sparse 정규식 OR Dense 0.85)
+        // (2) 하이브리드 로어북 검색 (Sparse 정규식 OR Dense 0.85, 최대 2,000토큰 동적 패킹)
         List<LorebookEntry> matchedLorebooks = [];
         if (preset.Lorebooks != null && preset.Lorebooks.Count > 0)
         {
@@ -220,7 +220,7 @@ public class MemoryManagerService : IMemoryManagerService
                 effectiveUserMessage.Text,
                 queryEmbedding,
                 preset.Lorebooks,
-                maxResults: 3
+                maxTokenBudget: 2000
             );
         }
 
