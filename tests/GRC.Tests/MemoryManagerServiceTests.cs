@@ -37,8 +37,10 @@ public class MemoryManagerServiceTests
             yield break;
         }
 
+        public float[]? MockEmbedding { get; set; }
+
         public Task<float[]> GetEmbeddingAsync(string text, CancellationToken cancellationToken = default)
-            => Task.FromResult(Array.Empty<float>());
+            => Task.FromResult(MockEmbedding ?? Array.Empty<float>());
     }
 
     internal class FakeLorebookService : ILorebookService
@@ -347,5 +349,60 @@ public class MemoryManagerServiceTests
         Assert.Contains("[Turn 18]: 사건 기록 18", userPart);
         Assert.Contains("[Turn 4]: 사건 기록 4", userPart);
         Assert.DoesNotContain("[Turn 1]: 사건 기록 1", userPart); // 1번은 상시 노출에서 밀려남
+    }
+
+    [Fact]
+    public async Task BuildNarrativeRequestAsync_WhenUserRecallsPushedOutLedger_RecallsOnlyPushedOutLedgerViaRAG()
+    {
+        // Arrange - 768차원 임베딩을 제공하는 Fake API 설정
+        var targetEmb = new float[768];
+        for (int i = 0; i < 768; i++) targetEmb[i] = 1.0f / MathF.Sqrt(768);
+
+        var otherEmb = new float[768];
+        otherEmb[0] = 1.0f; // targetEmb와 다른 방향
+
+        var fakeApi = new FakeGeminiApiService { MockEmbedding = targetEmb };
+        var fakeSettings = new FakeAppSettingsService();
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
+
+        var preset = new CharacterPreset(
+            Name: "테스트",
+            Worldview: "세계관",
+            SystemPrompt: "시스템",
+            Temperature: 0.7f,
+            MaxOutputTokens: 1000
+        );
+
+        // NPC 등록 (살리언스 게이팅 +2점 유도)
+        service.CurrentContext.Chars["루시엘"] = "동료";
+
+        // 1번 렛저: 밀려날 대상이며 targetEmb를 장착 (과거의 펜던트 약속)
+        service.CurrentContext.EventLedgers.Add(new EventLedgerItem(1, "루시엘과 맹세한 푸른 펜던트의 서약", targetEmb));
+
+        // 2~18번 렛저들: 상시 노출 영역에 들어갈 최근 17개 렛저들 (otherEmb 장착)
+        for (int i = 2; i <= 18; i++)
+        {
+            service.CurrentContext.EventLedgers.Add(new EventLedgerItem(i, $"사건 기록 {i}", otherEmb));
+        }
+
+        // Act - 유저가 과거 질문 ("루시엘, 예전에 맹세했던 푸른 펜던트 약속 기억나?")
+        // "예전"(+3점), "루시엘"(+2점), "?"(+1점) -> 살리언스 6점 (RAG 임계치 3점 돌파)
+        var request = await service.BuildNarrativeRequestAsync(
+            new ChatMessage("user", "루시엘, 예전에 맹세했던 푸른 펜던트 약속 기억나?", DateTime.Now), preset);
+
+        var userPart = request.Contents[^1].Parts[0].Text!;
+
+        // Assert 1: RAG 태그(<recalled_history>)가 프롬프트에 정상 생성되어야 함
+        Assert.Contains("<recalled_history>", userPart);
+
+        // Assert 2: 상시 노출에서 밀려났던 1번 렛저가 RAG를 통해 <recalled_history> 안으로 쏙 소환되어야 함!
+        Assert.Contains("[Turn 1]: 루시엘과 맹세한 푸른 펜던트의 서약", userPart);
+
+        // Assert 3: 상시 노출 영역(<internal_chronicle_facts>)에는 1번 렛저가 없고, 최신 15개(4~18번)만 존재해야 함
+        int internalStartIndex = userPart.IndexOf("<internal_chronicle_facts>");
+        int internalEndIndex = userPart.IndexOf("</internal_chronicle_facts>");
+        string internalSection = userPart.Substring(internalStartIndex, internalEndIndex - internalStartIndex);
+        Assert.DoesNotContain("[Turn 1]:", internalSection);
+        Assert.Contains("[Turn 18]:", internalSection);
     }
 }
