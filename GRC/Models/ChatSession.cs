@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace GRC.Models;
@@ -14,5 +14,7 @@ public record ChatSession(
     string LongTermSummary,                 // 장기 기억 (전체 줄거리)
     int ChapterCount = 1,
     int TotalTurnCount = 0,
-    int MediumTermUpdateCount = 0
+    int MediumTermUpdateCount = 0,
+    List<ClueSlotItem>? ActiveClues = null,
+    List<ClueSlotItem>? ArchivedClues = null
 );

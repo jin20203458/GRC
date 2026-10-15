@@ -23,6 +23,9 @@ public class ChatWorkflowServiceTests
         {
             yield break;
         }
+
+        public Task<float[]> GetEmbeddingAsync(string text, CancellationToken cancellationToken = default)
+            => Task.FromResult(Array.Empty<float>());
     }
 
     private class FakeMemoryManagerService : IMemoryManagerService

@@ -1,4 +1,4 @@
-﻿using GRC.Models;
+using GRC.Models;
 using System.Threading.Tasks;
 
 namespace GRC.Services;
@@ -16,4 +16,9 @@ public interface IGeminiApiService
     /// 스트리밍 방식으로 답변 조각들을 받아옵니다. (실시간 채팅용)
     /// </summary>
     IAsyncEnumerable<string> SendMessageStreamAsync(GeminiRequest request, ModelTier? overrideTier = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 텍스트에 대한 임베딩 벡터(Google text-embedding-004, 768차원)를 비동기로 받아옵니다.
+    /// </summary>
+    Task<float[]> GetEmbeddingAsync(string text, CancellationToken cancellationToken = default);
 }

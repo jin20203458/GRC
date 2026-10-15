@@ -23,13 +23,6 @@ public class PresetStorageService : IPresetStorageService
             return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CharacterPreset.json");
         }
 
-        // 구버전(단일 json 파일 세션) 호환성 처리
-        if (sessionFileName.EndsWith(".json"))
-        {
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", sessionFileName.Replace(".json", "_Preset.json"));
-        }
-
-        // 최신 버전 (세션 전용 폴더 내부의 Preset.json)
         return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", sessionFileName, "Preset.json");
     }
 

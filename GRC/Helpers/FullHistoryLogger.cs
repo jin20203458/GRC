@@ -19,9 +19,6 @@ public static class FullHistoryLogger
     };
     private static string GetLogPath(string sessionId)
     {
-        if (sessionId.EndsWith(".json"))
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", sessionId.Replace(".json", "_FullHistory.json"));
-
         string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", sessionId);
         if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
         return Path.Combine(dir, "FullHistory.json");

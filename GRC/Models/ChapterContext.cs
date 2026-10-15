@@ -8,6 +8,7 @@ public class ChapterContext
     public List<string> Items { get; set; } = new();
     public List<string> Places { get; set; } = new();
     public List<string> TriggeredMetaEvents { get; set; } = new();
+    public List<EventLedgerItem> EventLedgers { get; set; } = new();
 
     public string ToPromptString()
     {

@@ -4,17 +4,51 @@ using System.Text.RegularExpressions;
 
 namespace GRC.Services;
 
-public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsService appSettingsService, ILorebookService lorebookService) : IMemoryManagerService
+public class MemoryManagerService : IMemoryManagerService
 {
-    private static readonly Regex PlotRegex = new Regex(
-        @"<plot\s*>(.*?)</plot\s*>",
-        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.NonBacktracking
-    );
 
     private static readonly Regex ChronicleRegex = new Regex(
         @"<chronicle\s*>(.*?)</chronicle\s*>",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.NonBacktracking
     );
+
+    private readonly IGeminiApiService _apiService;
+    private readonly IAppSettingsService _appSettingsService;
+    private readonly ICognitivePromptAssembler _cognitivePromptAssembler;
+    private readonly IEventLedgerExtractor _eventLedgerExtractor;
+    private readonly IClueTracker _clueTracker;
+    private readonly IHybridLorebookRetriever _hybridLorebookRetriever;
+    private readonly IGatedRAGRetriever _gatedRagRetriever;
+
+    public MemoryManagerService(
+        IGeminiApiService apiService,
+        IAppSettingsService appSettingsService,
+        ICognitivePromptAssembler cognitivePromptAssembler,
+        IEventLedgerExtractor eventLedgerExtractor,
+        IClueTracker clueTracker,
+        IHybridLorebookRetriever hybridLorebookRetriever,
+        IGatedRAGRetriever gatedRagRetriever)
+    {
+        _apiService = apiService;
+        _appSettingsService = appSettingsService;
+        _cognitivePromptAssembler = cognitivePromptAssembler;
+        _eventLedgerExtractor = eventLedgerExtractor;
+        _clueTracker = clueTracker;
+        _hybridLorebookRetriever = hybridLorebookRetriever;
+        _gatedRagRetriever = gatedRagRetriever;
+    }
+
+    public MemoryManagerService(
+        IGeminiApiService apiService,
+        IAppSettingsService appSettingsService)
+        : this(apiService, appSettingsService,
+               new CognitivePromptAssembler(),
+               new EventLedgerExtractor(apiService),
+               new ClueTracker(),
+               new HybridLorebookRetriever(),
+               new GatedRAGRetriever())
+    {
+    }
 
     private readonly SemaphoreSlim _summarizeLock = new(1, 1);
 
@@ -93,6 +127,18 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
             {
                 _currentContext.Places = new List<string>(payload.Places);
             }
+
+            if (payload.UnresolvedClues != null && payload.UnresolvedClues.Count > 0)
+            {
+                foreach (var clue in payload.UnresolvedClues)
+                {
+                    if (!string.IsNullOrWhiteSpace(clue))
+                    {
+                        _clueTracker.AddOrUpdateClue(clue.Trim(), _totalTurnCount);
+                    }
+                }
+                _clueTracker.TickTurn(_totalTurnCount);
+            }
         }
     }
 
@@ -120,107 +166,138 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
             _ = Task.Run(async () => await CompressToMediumTermAsync());
         }
 
-        string formatRule = """
-<syntax_rules>
-- AI 메타발언(인사/요약/설명) 금지. 즉시 서사 시작.
-- 서사: 순수 산문 (※ 마크다운, *별표* 등 기호 절대 금지)
-- 대사: " "
-- 독백: 「 」
-- 상태창 수치(%, HP 분수, 골드 액수 등)나 시스템 용어를 서사에 날것으로 노출하지 말고, 신체 상태나 간접적인 묘사로 승화하십시오.
-</syntax_rules>
+        // 1. 메타 지침 및 빈 입력 합성 (Auto-Play HTTP 400 및 시스템 이벤트 유실 방어)
+        string effectiveText = !string.IsNullOrWhiteSpace(metaDirective)
+            ? (string.IsNullOrWhiteSpace(userMessage.Text) ? metaDirective : $"{userMessage.Text}\n{metaDirective}")
+            : userMessage.Text;
+        var effectiveUserMessage = new ChatMessage(userMessage.Role, effectiveText, userMessage.Timestamp);
 
-<example>
-바람이 스산하게 창문을 두드렸다. 방 안은 기묘하리만치 조용했다.
-"누구 계신가요?"
-목소리가 허공에 흩어지자, 어둠이 더 짙어지는 기분이 들었다.
-「아무도 없는 건가.」
-</example>
-""";
-
-
-        string lorebookInjection = lorebookService.BuildLorebookInjection(preset.Lorebooks, _currentContext, _shortTermMemory);
-        CurrentLorebookText = lorebookInjection;
-
-        // 오직 변하지 않는 페르소나와 규칙만 SystemInstruction으로 고정
-        string finalSystemInstruction = $"""
-{preset.SystemPrompt}
-<master_setting>
-{preset.Worldview}
-</master_setting>
-{lorebookInjection}
-{formatRule}
-""";
-
-        // 2. 변동 컨텍스트 (User Prompt 영역)
-        List<Content> apiContents = new List<Content>();
-        lock (_shortTermMemory)
+        // 2. 인지 컨텍스트(CognitiveContext) 검색 및 조립
+        // (1) 유저 입력 텍스트 기반 임베딩 비동기 생성 시도 (RAG & 로어북용)
+        float[]? queryEmbedding = null;
+        if (!string.IsNullOrWhiteSpace(effectiveUserMessage.Text))
         {
-            for (int i = 0; i < _shortTermMemory.Count; i++)
+            try
             {
-                var m = _shortTermMemory[i];
-                string role = m.Role == "user" ? "user" : "model";
-                string text = m.Text;
-
-                // [핵심] 가장 마지막 메시지(현재 유저의 턴)에만 지시어 부착
-                if (i == _shortTermMemory.Count - 1 && role == "user")
-                {
-                    //  큐에 있는 모든 중기 버퍼의 서사(Plot)를 시간순으로 결합
-                    var mediumPlotsBuilder = new System.Text.StringBuilder();
-                    if (_mediumBuffers.Any())
-                    {
-                        foreach (var buffer in _mediumBuffers)
-                        {
-                            // 상태 데이터(Chars, Items)는 빼고 오직 서사만 이어붙임
-                            mediumPlotsBuilder.AppendLine(buffer.Plot);
-                        }
-                    }
-                    else
-                    {
-                        mediumPlotsBuilder.AppendLine("이전 챕터 기록 없음.");
-                    }
-                    string mediumPlots = mediumPlotsBuilder.ToString().TrimEnd();
-
-                    string actionText = m.Text;
-                    if (!string.IsNullOrWhiteSpace(metaDirective))
-                    {
-                        actionText += $"\n{metaDirective}";
-                    }
-
-
-                    text = $"""
-            <background_context>
-            [지나간 역사]
-            {_longTermSummary}
-            
-            [최근 챕터의 서사 흐름]
-            {mediumPlots}
-            </background_context>
-
-            [현재 챕터 진행 상황]
-            {_currentContext.ToPromptString()}
-            
-            <current_action>
-            {actionText}
-            </current_action>
-            
-            <final_instruction>
-            지시: 위 문맥을 바탕으로 유저의 <current_action>에 대한 서사적 묘사를 즉각 진행하십시오.
-            </final_instruction>
-            """;
-                }
-
-                apiContents.Add(new Content(role, [new Part(text)]));
+                queryEmbedding = await _apiService.GetEmbeddingAsync(effectiveUserMessage.Text);
+            }
+            catch
+            {
+                queryEmbedding = null; // 실패 시 null 유지
             }
         }
 
-        var settings = await appSettingsService.LoadSettingsAsync();
+        // (2) 하이브리드 로어북 검색 (Sparse 정규식 OR Dense 0.85)
+        List<LorebookEntry> matchedLorebooks = [];
+        if (preset.Lorebooks != null && preset.Lorebooks.Count > 0)
+        {
+            matchedLorebooks = _hybridLorebookRetriever.Retrieve(
+                effectiveUserMessage.Text,
+                queryEmbedding,
+                preset.Lorebooks,
+                maxResults: 3
+            );
+        }
 
-        var request = new GeminiRequest(
-            SystemInstruction: new Content("system", [new Part(finalSystemInstruction)]),
-            Contents: apiContents,
-            SafetySettings: GetSafetySettings(settings.SafetyThreshold),
-            GenerationConfig: new GenerationConfig(preset.Temperature, preset.MaxOutputTokens, "text/plain", null, new ThinkingConfig(ThinkingLevel.medium))
+        // TTS 호환성을 위해 CurrentLorebookText 갱신
+        CurrentLorebookText = string.Join("\n", matchedLorebooks.Select(l => $"[{l.Name}]\n{l.Content}"));
+
+        // (3) RAG 과거 회상 검색 (과거 챕터 및 현재 챕터 렛저)
+        List<EventLedgerItem> allHistoricalLedgers = [];
+        lock (_shortTermMemory)
+        {
+            foreach (var buf in _mediumBuffers)
+            {
+                if (buf.EventLedgers != null && buf.EventLedgers.Count > 0)
+                {
+                    allHistoricalLedgers.AddRange(buf.EventLedgers);
+                }
+            }
+            if (_currentContext.EventLedgers != null && _currentContext.EventLedgers.Count > 0)
+            {
+                allHistoricalLedgers.AddRange(_currentContext.EventLedgers);
+            }
+        }
+
+        List<EventLedgerItem> recalledLedgers = [];
+        if (_gatedRagRetriever.ShouldTriggerRAG(effectiveUserMessage.Text, _currentContext.Chars?.Keys))
+        {
+            recalledLedgers = _gatedRagRetriever.RetrieveRecalledHistory(
+                queryEmbedding,
+                allHistoricalLedgers,
+                maxResults: 2
+            );
+        }
+
+        // (4) 조건부 게이팅 복선/단서 추출
+        var gatedClues = _clueTracker.GetGatedClues(effectiveUserMessage.Text);
+
+        // (5) 인물 감정 상태 대비 (BiTemporalEntityProjector)
+        List<EntitySlotItem> entitySlots = [];
+        lock (_shortTermMemory)
+        {
+            if (_currentContext.Chars != null && _currentContext.Chars.Count > 0)
+            {
+                foreach (var kvp in _currentContext.Chars)
+                {
+                    string statValue = _currentContext.CustomStats != null && _currentContext.CustomStats.TryGetValue(kvp.Key, out var sv) ? sv : "";
+                    entitySlots.Add(new EntitySlotItem(
+                        Name: kvp.Key,
+                        StatValue: statValue,
+                        MentalStage: kvp.Value,
+                        ConditionDesc: kvp.Value,
+                        InitialAnchor: ""
+                    ));
+                }
+            }
+        }
+
+        // (6) CognitiveContext 조립
+        List<EventLedgerItem> currentChapterLedgers;
+        lock (_shortTermMemory)
+        {
+            currentChapterLedgers = _currentContext.EventLedgers != null
+                ? _currentContext.EventLedgers.ToList()
+                : [];
+        }
+
+        var cognitiveContext = new CognitiveContext(
+            MacroChronicle: _longTermSummary,
+            LedgerFacts: currentChapterLedgers,
+            Entities: entitySlots,
+            ActiveClues: gatedClues,
+            RetrievedLores: matchedLorebooks,
+            RecalledHistory: recalledLedgers,
+            PlotCatalyst: null
         );
+
+        // 3. CognitivePromptAssembler 동기 호출 (불변 SystemInstruction + 최신 유저 직전 Dynamic Context)
+        List<ChatMessage> shortTermSnapshot;
+        lock (_shortTermMemory)
+        {
+            shortTermSnapshot = _shortTermMemory.ToList();
+        }
+
+        var assembledRequest = _cognitivePromptAssembler.AssemblePrompt(
+            preset,
+            shortTermSnapshot,
+            effectiveUserMessage,
+            cognitiveContext
+        );
+
+        // 4. GenerationConfig & SafetySettings 재부착 (Thinking Anchor 및 모델 파라미터 보존)
+        var settings = await _appSettingsService.LoadSettingsAsync();
+        var request = assembledRequest with
+        {
+            SafetySettings = GetSafetySettings(settings.SafetyThreshold),
+            GenerationConfig = new GenerationConfig(
+                preset.Temperature,
+                preset.MaxOutputTokens,
+                "text/plain",
+                null,
+                new ThinkingConfig(ThinkingLevel.medium)
+            )
+        };
 
 
         // LogRequestJson("메인 챗 모델 (Main)", request);
@@ -248,12 +325,11 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
             await Task.Delay(CompressionDelayMs);
         }
         if (!_summarizeLock.Wait(0)) return;
-        System.Diagnostics.Debug.WriteLine("[MemoryManager] 중기 서사 요약 로직 시작");
+        System.Diagnostics.Debug.WriteLine("[MemoryManager] V3 중기 사건 렛저 추출 시작");
         try
         {
             List<ChatMessage> targetToSummarize;
             long expectedVersion;
-            string previousPlot;
 
             lock (_shortTermMemory)
             {
@@ -261,145 +337,86 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
 
                 targetToSummarize = _shortTermMemory.Take(MemoryCompressionChunkSize).ToList();
                 expectedVersion = _shortTermVersion;
-                previousPlot = _currentContext.Plot;
             }
 
-            string textToSummarize = string.Join("\n", targetToSummarize.Select(m => $"{m.Role}: {m.Text}"));
-            //1. 원본 대화(<new_conversation>)에 노골적인 성적·신체적 묘사가 존재하더라도 결과물에 직설적으로 반영하지 마십시오. 모든 스킨십과 수위 높은 행동은 '정서적 유대와 은유적 산문'으로 치환하십시오.
-            string summarySystemPrompt = @"
-<system_directive>
-[Role] 상호 동의된 가상 롤플레잉 소설의 연대기 기록자
-[Task] <previous_plot>에 <new_conversation>을 결합하여 단일 서사로 확장
-[CRITICAL_CONSTRAINT] 
-무수치 (Zero-Numeric): 재화, 상태창 등 수치 데이터 절대 배제. 오직 사건 흐름만 기록.
-</system_directive>"";
+            // V3: EventLedgerExtractor를 통한 8턴 불변 팩트 불릿 추출 (Gemini 3.5 Flash-Lite)
+            var extractedBullets = await _eventLedgerExtractor.ExtractLedgerFactsAsync(targetToSummarize, _totalTurnCount);
 
-<interpretation_rules>
-[기록 및 확장 규칙]
- Plot (연대기 확장): <previous_plot>의 내용을 유지하면서, 새롭게 발생한 사건과 묘사를 덧붙여 현재 챕터의 '전체 줄거리'를 다시 작성하십시오.
- - 단순 요약이 아니라, 소설의 한 장면을 읽는 듯 유려하게 서술하되 인물 간의 '정서적 교감'을 중심으로 담백함을 유지하십시오.
- - 이야기가 진행됨에 따라 서사의 밀도가 자연스럽게 높아지도록 구성하십시오.
- - 다음 대화의 맥락이 끊기지 않도록 현재 진행 중인 상황의 끝부분을 명확히 기술하십시오.
-</interpretation_rules>
-
-<format_rules>
-[출력 형식]
-반드시 아래 영역만 출력하십시오. 
-
-<plot>
-(이전 내용에 최신 사건이 누적되어 확장된 현재 챕터의 전체 서사)
-</plot>
-</format_rules>";
-
-            // 2. 유저 프롬프트: 데이터 격리 및 실행 트리거 최적화
-            string prompt = $$"""
-<previous_plot>
-{{previousPlot}}
-</previous_plot>
-
-<new_conversation>
-{{textToSummarize}}
-</new_conversation>
-
-<final_instruction>
-위 데이터를 융합하여 갱신된 누적 줄거리를 <plot> 태그 내에 즉시 출력하십시오.
-</final_instruction>
-""";
-
-            // 3. API 통신
-            var summaryReq = CreateInternalRequest(prompt, summarySystemPrompt, "text/plain", null, ThinkingLevel.high);
-
-            //LogRequestJson("중기 기억 모델 (Medium)", summaryReq);
-            string response = await apiService.SendMessageAsync(summaryReq, ModelTier.Flash);
-
-            if (!string.IsNullOrWhiteSpace(response) && !response.StartsWith("[System"))
+            ChapterContext? targetBufferForLongTerm = null;
+            lock (_shortTermMemory)
             {
-                // 4. 파싱: 기존 ParseLongTermSummary와 유사하게 <plot> 이후만 추출
-                string newPlot = ParseMediumTermPlot(response);
+                if (_shortTermVersion != expectedVersion) return;
 
-                ChapterContext? targetBufferForLongTerm = null;
-                lock (_shortTermMemory)
+                if (extractedBullets != null && extractedBullets.Count > 0)
                 {
-                    if (_shortTermVersion != expectedVersion) return;
+                    _currentContext.EventLedgers.AddRange(extractedBullets);
+                }
 
-                    // [제 N장] 태그 자동 보정
-                    if (!newPlot.StartsWith("[제"))
+                // UI 및 하위 호환성을 위해 Plot 속성을 턴별 불릿 타임라인으로 동기화
+                string formattedPlot = $"[제 {_chapterCount}장]\n" + string.Join("\n",
+                    _currentContext.EventLedgers.Select(l => $"* [Turn {l.Turn}]: {l.FactBullet}"));
+                _currentContext.Plot = formattedPlot;
+
+                if (_shortTermMemory.Count >= MemoryCompressionChunkSize)
+                {
+                    _shortTermMemory.RemoveRange(0, MemoryCompressionChunkSize);
+                    Volatile.Write(ref _requiresHighQualityAnchor, 1);
+                }
+                _mediumTermUpdateCount++;
+
+                System.Diagnostics.Debug.WriteLine($"[MemoryManager] 중기 렛저 누적 성공 (총 {_currentContext.EventLedgers.Count}개 불릿)");
+                LogMemoryEvent($"[중기 기억] 렛저 누적 성공 (총 {_currentContext.EventLedgers.Count}개 불릿): {_currentContext.Plot.Substring(0, Math.Min(100, _currentContext.Plot.Length))}...");
+
+                // 메모리 큐 정리 및 앵커 활성화
+                // 중기 챕터가 임계치에 도달하면 즉시 챕터 전환 (폭포수 큐 밀어넣기)
+                if (_mediumTermUpdateCount >= MediumTermThreshold)
+                {
+                    System.Diagnostics.Debug.WriteLine("[MemoryManager] 중기 임계치 도달: 현재 챕터를 다중 버퍼로 밀어내고 챕터를 전환합니다.");
+                    LogMemoryEvent("[중기 기억] 임계치 도달: 챕터 전환 및 큐 버퍼 이동");
+
+                    // 1. 현재 챕터를 큐에 보관
+                    _mediumBuffers.Enqueue(_currentContext);
+
+                    var previousContext = _currentContext;
+
+                    // 2. 새 챕터로 전환 (최신 상태 데이터 상속)
+                    _chapterCount++;
+                    Volatile.Write(ref _isChapterChanged, 1);
+                    _currentContext = new ChapterContext
                     {
-                        newPlot = $"[제 {_chapterCount}장] {newPlot}";
-                    }
+                        Plot = $"[제 {_chapterCount}장] 이전 사건이 일단락되고 새로운 국면에 접어들었습니다.",
+                        CustomStats = new Dictionary<string, string>(previousContext.CustomStats),
+                        Items = new List<string>(previousContext.Items),
+                        Chars = new Dictionary<string, string>(previousContext.Chars),
+                        Places = new List<string>(previousContext.Places),
+                        TriggeredMetaEvents = new List<string>(previousContext.TriggeredMetaEvents),
+                        EventLedgers = new List<EventLedgerItem>()
+                    };
 
-                    // 핵심: Plot만 교체하여 메인 모델이 실시간 갱신한 Chars/Items 데이터 보존
-                    _currentContext.Plot = newPlot;
+                    _mediumTermUpdateCount = 0; // 카운트 초기화
+                    Volatile.Write(ref _requiresHighQualityAnchor, 1);
 
-                    if (_shortTermMemory.Count >= MemoryCompressionChunkSize)
+                    // 3. 만약 큐에 담긴 과거 버퍼가 3개를 초과하면?
+                    if (_mediumBuffers.Count > MaxMediumBufferCount)
                     {
-                        _shortTermMemory.RemoveRange(0, MemoryCompressionChunkSize);
-                        Volatile.Write(ref _requiresHighQualityAnchor, 1);
-                    }
-                    _mediumTermUpdateCount++;
-
-                    System.Diagnostics.Debug.WriteLine($"[MemoryManager] 중기 병합 성공 (역사 100자): {_currentContext.Plot.Substring(0, Math.Min(100, _currentContext.Plot.Length))}...");
-                    LogMemoryEvent($"[중기 기억] 병합 성공 (요약 100자): {_currentContext.Plot.Substring(0, Math.Min(100, _currentContext.Plot.Length))}...");
-
-                    // 메모리 큐 정리 및 앵커 활성화
-                    // 중기 챕터가 임계치에 도달하면 즉시 챕터 전환 (폭포수 큐 밀어넣기)
-                    if (_mediumTermUpdateCount >= MediumTermThreshold)
-                    {
-                        System.Diagnostics.Debug.WriteLine("[MemoryManager] 중기 임계치 도달: 현재 챕터를 다중 버퍼로 밀어내고 챕터를 전환합니다.");
-                        LogMemoryEvent("[중기 기억] 임계치 도달: 챕터 전환 및 큐 버퍼 이동");
-
-                        // 1. 현재 챕터를 큐에 보관
-                        _mediumBuffers.Enqueue(_currentContext);
-
-                        var previousContext = _currentContext;
-
-                        // 2. 새 챕터로 전환 (최신 상태 데이터 상속)
-                        _chapterCount++;
-                        Volatile.Write(ref _isChapterChanged, 1);
-                        _currentContext = new ChapterContext
+                        while (_mediumBuffers.Count >= MaxMediumBufferCount + 2)
                         {
-                            Plot = $"[제 {_chapterCount}장] 이전 사건이 일단락되고 새로운 국면에 접어들었습니다.",
-                            CustomStats = new Dictionary<string, string>(previousContext.CustomStats),
-                            Items = new List<string>(previousContext.Items),
-                            Chars = new Dictionary<string, string>(previousContext.Chars),
-                            Places = new List<string>(previousContext.Places),
-                            TriggeredMetaEvents = new List<string>(previousContext.TriggeredMetaEvents)
-                        };
-
-                        _mediumTermUpdateCount = 0; // 카운트 초기화
-                        Volatile.Write(ref _requiresHighQualityAnchor, 1);
-
-                        // 3. 만약 큐에 담긴 과거 버퍼가 3개를 초과하면?
-                        if (_mediumBuffers.Count > MaxMediumBufferCount)
-                        {
-
-                            while (_mediumBuffers.Count >= MaxMediumBufferCount + 2)
-                            {
-                                _mediumBuffers.Dequeue();
-                                System.Diagnostics.Debug.WriteLine("[MemoryManager] 큐 적체 감지: MaxMediumBufferCount+2 초과로 가장 오래된 버퍼 강제 삭제.");
-                                LogMemoryEvent("[중기 기억] 버퍼 적체로 인한 강제 Dequeue 작동");
-                            }
-
-                            var oldestBuffer = _mediumBuffers.Peek();
-
-                            targetBufferForLongTerm = _mediumBuffers.Peek();
+                            _mediumBuffers.Dequeue();
+                            System.Diagnostics.Debug.WriteLine("[MemoryManager] 큐 적체 감지: MaxMediumBufferCount+2 초과로 가장 오래된 버퍼 강제 삭제.");
+                            LogMemoryEvent("[중기 기억] 버퍼 적체로 인한 강제 Dequeue 작동");
                         }
+
+                        targetBufferForLongTerm = _mediumBuffers.Peek();
                     }
                 }
-                if (targetBufferForLongTerm != null)
-                {
-                    long expectedLongVersion = _longTermVersion;
-                    _ = Task.Run(async () => await CompressToLongTermAsync(expectedLongVersion, targetBufferForLongTerm));
-                }
+            }
 
-            }
-            else if (response?.StartsWith("[System") == true)
+            if (targetBufferForLongTerm != null)
             {
-                // 예외가 문자열로 변환되어 조용히 지나갔을 때의 실패 사유 기록
-                System.Diagnostics.Debug.WriteLine($"[MemoryManager] 중기 서사 압축 API 오류: {response}");
-                LogMemoryEvent($"[중기 기억] 압축 실패 (API 통신 오류): {response}");
+                long expectedLongVersion = _longTermVersion;
+                _ = Task.Run(async () => await CompressToLongTermAsync(expectedLongVersion, targetBufferForLongTerm));
             }
-        } // try 구문 끝
+        }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[MemoryManager] 중기 서사 압축 실패: {ex.Message}");
@@ -412,22 +429,6 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
         }
     }
 
-    /// <summary>
-    /// <reasoning>은 버리고 <plot> 태그 이후의 데이터만 정제하여 반환합니다.
-    /// </summary>
-    private string ParseMediumTermPlot(string rawResponse)
-    {
-        // 정적으로 컴파일된 Regex를 재사용 (성능 극대화, GC 압박 제로)
-        var match = PlotRegex.Match(rawResponse);
-
-        if (match.Success)
-        {
-            return match.Groups[1].Value.Trim();
-        }
-
-        System.Diagnostics.Debug.WriteLine("[MemoryManager] <plot> 태그 파싱 실패. Fallback을 시도합니다.");
-        return GRC.Helpers.SimpleMarkdownHelper.CleanUpMarkdownFallback(rawResponse);
-    }
 
     //  버전 파라미터 추가
     private async Task CompressToLongTermAsync(long expectedLongVersion, ChapterContext oldestBuffer)
@@ -436,7 +437,7 @@ public class MemoryManagerService(IGeminiApiService apiService, IAppSettingsServ
         await Task.Delay(2000);
         System.Diagnostics.Debug.WriteLine("[MemoryManager] 장기 기억 로직 시작.");
         string oldestPlot = oldestBuffer.Plot;
-        if (!string.IsNullOrWhiteSpace(oldestPlot) && oldestPlot != "이전 챕터 기록 없음.")
+        if (!string.IsNullOrWhiteSpace(oldestPlot))
         {
             string systemPrompt = @"
 <system_directive>
@@ -490,7 +491,7 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
                 try
                 {
                     // API 호출 및 로그 출력
-                    newLongSummary = await apiService.SendMessageAsync(longReq, ModelTier.Pro);
+                    newLongSummary = await _apiService.SendMessageAsync(longReq, ModelTier.Pro);
 
                     if (!string.IsNullOrWhiteSpace(newLongSummary) && newLongSummary.StartsWith("[System"))
                     {
@@ -592,6 +593,7 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
             {
                 Plot = $"[제 {_chapterCount}장] 새로운 이야기가 시작되었습니다."
             };
+            _clueTracker.Clear();
             Volatile.Write(ref _requiresHighQualityAnchor, 1);
         }
     }
@@ -610,7 +612,10 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
             _mediumTermUpdateCount = session.MediumTermUpdateCount;
             _chapterCount = session.ChapterCount;
             _totalTurnCount = session.TotalTurnCount;
-            Volatile.Write(ref _requiresHighQualityAnchor, 1);
+            _clueTracker.RestoreClues(session.ActiveClues, session.ArchivedClues);
+            // 대화 내역이 없는 신규 세션일 때만 앵커를 활성화하고, 기존 대화가 이어지는 세션 로드 시에는 불필요한 과잉 추론 방지
+            int anchorRequired = (session.History == null || session.History.Count == 0) ? 1 : 0;
+            Volatile.Write(ref _requiresHighQualityAnchor, anchorRequired);
         }
     }
 
@@ -627,7 +632,9 @@ Task: <long_term_memory>와 <recent_chapter_state>를 융합해 서사의 뼈대
                 _longTermSummary,
                 _chapterCount,
                 _totalTurnCount,
-                _mediumTermUpdateCount
+                _mediumTermUpdateCount,
+                _clueTracker.ActiveClues.ToList(),
+                _clueTracker.ArchivedClues.ToList()
             );
         }
     }
@@ -706,6 +713,9 @@ interface StatusWindow {
 
   // 현재 위치나 환경
   places: string[];
+
+  // 서사 중 새롭게 암시되거나 뿌려진 미해결 복선/비밀/단서 (최대 3개)
+  unresolvedClues?: string[];
 }
 </output_format>
 """;

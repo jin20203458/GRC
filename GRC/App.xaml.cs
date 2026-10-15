@@ -109,6 +109,11 @@ public partial class App : Application
         services.AddSingleton<IGoogleAuthService, GoogleAuthService>();
         services.AddSingleton<IAudioService, AudioService>();
         services.AddSingleton<ILorebookService, LorebookService>();
+        services.AddSingleton<IClueTracker, ClueTracker>();
+        services.AddSingleton<IHybridLorebookRetriever, HybridLorebookRetriever>();
+        services.AddSingleton<IGatedRAGRetriever, GatedRAGRetriever>();
+        services.AddSingleton<ICognitivePromptAssembler, CognitivePromptAssembler>();
+        services.AddSingleton<IEventLedgerExtractor, EventLedgerExtractor>();
         services.AddSingleton<IChatWorkflowService, ChatWorkflowService>();
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IDialogService, DialogService>();

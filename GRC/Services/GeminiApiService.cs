@@ -2,6 +2,7 @@ using GRC.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
@@ -350,6 +351,84 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
                 finalCandidateTokens,
                 finalThoughtsTokens,
                 finalTotalTokens));
+        }
+    }
+
+    public async Task<float[]> GetEmbeddingAsync(string text, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return Array.Empty<float>();
+
+        try
+        {
+            var settings = await appSettingsService.LoadSettingsAsync();
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "");
+
+            if (settings.UseVertexAI)
+            {
+                if (string.IsNullOrWhiteSpace(settings.ProjectId))
+                {
+                    System.Diagnostics.Debug.WriteLine("[GeminiApiService Error] Vertex AI Project ID가 설정되지 않았습니다.");
+                    return Array.Empty<float>();
+                }
+
+                string endpoint = $"https://aiplatform.googleapis.com/v1beta1/projects/{settings.ProjectId}/locations/global/publishers/google/models/text-embedding-004:predict";
+                httpRequest.RequestUri = new Uri(endpoint);
+
+                string token = await googleAuthService.GetGoogleAccessTokenAsync(cancellationToken);
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    System.Diagnostics.Debug.WriteLine("[GeminiApiService Error] 구글 액세스 토큰 획득에 실패했습니다.");
+                    return Array.Empty<float>();
+                }
+
+                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var payload = new VertexEmbedRequest([new VertexEmbedInstance(text)]);
+                httpRequest.Content = new StringContent(JsonSerializer.Serialize(payload, _jsonOptions), Encoding.UTF8, "application/json");
+
+                using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                    System.Diagnostics.Debug.WriteLine($"[GeminiApiService Error] Vertex AI 임베딩 호출 실패 ({(int)response.StatusCode}): {errorBody}");
+                    return Array.Empty<float>();
+                }
+
+                var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                var result = await JsonSerializer.DeserializeAsync<VertexEmbedResponse>(stream, _jsonOptions, cancellationToken);
+                return result?.Predictions?.FirstOrDefault()?.Embeddings?.Values ?? Array.Empty<float>();
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(settings.ApiKey))
+                {
+                    System.Diagnostics.Debug.WriteLine("[GeminiApiService Error] Gemini API Key가 설정되지 않았습니다.");
+                    return Array.Empty<float>();
+                }
+
+                string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={settings.ApiKey}";
+                httpRequest.RequestUri = new Uri(endpoint);
+
+                var payload = new EmbedContentRequest(new Content("user", [new Part(text)]));
+                httpRequest.Content = new StringContent(JsonSerializer.Serialize(payload, _jsonOptions), Encoding.UTF8, "application/json");
+
+                using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                    System.Diagnostics.Debug.WriteLine($"[GeminiApiService Error] AI Studio 임베딩 호출 실패 ({(int)response.StatusCode}): {errorBody}");
+                    return Array.Empty<float>();
+                }
+
+                var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                var result = await JsonSerializer.DeserializeAsync<EmbedContentResponse>(stream, _jsonOptions, cancellationToken);
+                return result?.Embedding?.Values ?? Array.Empty<float>();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[GeminiApiService Error] GetEmbeddingAsync 예외 발생: {ex.Message}");
+            return Array.Empty<float>();
         }
     }
 }

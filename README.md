@@ -18,7 +18,7 @@ GRC는 Google Gemini API를 활용하여 캐릭터 롤플레잉 및 소설 창�
 
 [![Download Latest Portable Release](https://img.shields.io/badge/Download-Latest_Portable_Release-brightgreen?style=for-the-badge&logo=github)](https://github.com/jin20203458/GRC/releases/latest)
 
-1. 위 다운로드 버튼을 클릭하여 `GRC_v1.0.0_Portable.zip` 파일을 다운로드합니다.
+1. 위 다운로드 버튼을 클릭하여 `GRC_v3.0.0_Portable.zip` 파일을 다운로드합니다.
 2. 다운로드한 ZIP 파일의 압축을 대상 폴더에 완전히 해제합니다.
 3. 압축이 해제된 폴더에서 `GRC.exe`를 더블 클릭하여 실행합니다.
 4. 초동 실행 안내 및 상세 사용 방법은 압축 파일 내 동봉된 `QUICK_START.txt` 또는 [02_user_quickstart_guide.md](https://github.com/jin20203458/Obsidian.Agent/blob/main/GRC/docs/02_user_quickstart_guide.md)를 참조하세요.
@@ -32,7 +32,7 @@ GRC는 Google Gemini API를 활용하여 캐릭터 롤플레잉 및 소설 창�
 프로젝트 전체 아키텍처 및 상세 구현 명세는 `Obsidian.Agent` 저장소에 중앙 집중화되어 관리됩니다. 아래 문서들은 개발자와 코딩 에이전트 모두가 참조하는 단일 진실의 원천(Single Source of Truth)입니다.
 
 - [00_project_overview.md](https://github.com/jin20203458/Obsidian.Agent/blob/main/GRC/docs/00_project_overview.md): GRC 프로젝트 정체성, 비전 및 계층 구조 개요
-- [01_grc_architecture.md](https://github.com/jin20203458/Obsidian.Agent/blob/main/GRC/docs/01_grc_architecture.md): 3단계 메모리 파이프라인, O(1) 파일 로거, 비차단 스트리밍 및 동기화 구현 명세
+- [01_grc_architecture.md](https://github.com/jin20203458/Obsidian.Agent/blob/main/GRC/docs/01_grc_architecture.md): Cognitive Core 3.0 메모리 파이프라인, O(1) 파일 로거, 비차단 스트리밍 및 동기화 구현 명세
 - [02_user_quickstart_guide.md](https://github.com/jin20203458/Obsidian.Agent/blob/main/GRC/docs/02_user_quickstart_guide.md): 초보자/비개발자 포터블 실행, SmartScreen 우회 및 API 키 가이드
 - [03_grc_user_guide.md](https://github.com/jin20203458/Obsidian.Agent/blob/main/GRC/docs/03_grc_user_guide.md): GRC 7대 핵심 기능 사용자 사용설명서 및 활용 가이드
 
@@ -40,7 +40,7 @@ GRC는 Google Gemini API를 활용하여 캐릭터 롤플레잉 및 소설 창�
 
 ## 핵심 기능 (Key Features)
 
-- **3단계 메모리 파이프라인**: 단기(최근 18턴) ➔ 중기(10턴 단위 챕터 요약) ➔ 장기(1,500자 단위 연대기 압축)로 구성된 계층적 캐시로 토큰 사용량을 최적화합니다.
+- **Cognitive Core 3.0 인지 메모리 엔진**: 불변 접두사 동결(Prefix-Frozen SystemInstruction), 8턴 불변 사건 팩트 렛저(Event Ledger) 및 768차원 시맨틱 임베딩, 살리언스 게이티드 RAG, 2계층 떡밥/단서 추적기(Clue Tracker), 시간 인식 관계망 투영을 통해 토큰 낭비와 문체 오염 없는 완벽한 장기 서사 일관성을 유지합니다.
 - **최신 Gemini 모델 & 추론 레벨 최적화**: 메인 서사와 세션 아키텍트에 `Gemini 3.8 Flash`(High Thinking), 백그라운드 스탯/추천 답글에 `Gemini 3.5 Flash Lite`(Medium Thinking), 장기 연대기 요약에 `Gemini 4.0 Pro`(`gemini-4-argon`)를 배치하여 반응 속도와 몰입감을 동시에 확보합니다.
 - **비차단(Non-blocking) 렌더링**: `System.Threading.Channels` 비동기 스트리밍 및 60FPS 배치 렌더링으로 타자 출력 시 UI 지연을 방지합니다.
 - **O(1) 파일 쓰기 최적화**: 전체 JSON 역직렬화 오버헤드 없이 바이너리 탐색(Seek)을 통해 배열 끝부분에 새 로그를 추가하는 고성능 로거를 구현했습니다.

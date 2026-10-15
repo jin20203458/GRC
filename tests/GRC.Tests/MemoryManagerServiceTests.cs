@@ -13,7 +13,7 @@ namespace GRC.Tests;
 
 public class MemoryManagerServiceTests
 {
-    private class FakeGeminiApiService : IGeminiApiService
+    internal class FakeGeminiApiService : IGeminiApiService
     {
         public string MockResponse { get; set; } = "<plot>챕터 줄거리 요약본입니다.</plot>";
         public int SendMessageCallCount { get; private set; }
@@ -36,15 +36,17 @@ public class MemoryManagerServiceTests
         {
             yield break;
         }
+
+        public Task<float[]> GetEmbeddingAsync(string text, CancellationToken cancellationToken = default)
+            => Task.FromResult(Array.Empty<float>());
     }
 
-    private class FakeLorebookService : ILorebookService
+    internal class FakeLorebookService : ILorebookService
     {
-        public string BuildLorebookInjection(List<LorebookEntry>? lorebooks, ChapterContext currentContext, IEnumerable<ChatMessage> recentMemory) => "";
         public Task<LorebookEntry?> ExtractMemoryToLorebookAsync(string messageText) => Task.FromResult<LorebookEntry?>(null);
     }
 
-    private class FakeAppSettingsService : IAppSettingsService
+    internal class FakeAppSettingsService : IAppSettingsService
     {
         public Task<AppSettings> LoadSettingsAsync() => Task.FromResult(new AppSettings("dummy-api-key"));
         public Task SaveSettingsAsync(AppSettings settings) => Task.CompletedTask;
@@ -69,8 +71,7 @@ public class MemoryManagerServiceTests
     {
         var fakeApi = new FakeGeminiApiService();
         var fakeSettings = new FakeAppSettingsService();
-        var fakeLorebook = new FakeLorebookService();
-        var service = new MemoryManagerService(fakeApi, fakeSettings, fakeLorebook);
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
         var preset = new CharacterPreset("Hero", "Fantasy World", "You are a heroic guide.");
 
         // 17턴 (임계치 18턴 미만) 누적
@@ -96,8 +97,7 @@ public class MemoryManagerServiceTests
             MockResponse = "<plot>성문이 열리고 원정대가 출정했다.</plot>"
         };
         var fakeSettings = new FakeAppSettingsService();
-        var fakeLorebook = new FakeLorebookService();
-        var service = new MemoryManagerService(fakeApi, fakeSettings, fakeLorebook)
+        var service = new MemoryManagerService(fakeApi, fakeSettings)
         {
             CompressionDelayMs = 10
         };
@@ -132,8 +132,7 @@ public class MemoryManagerServiceTests
             DelayTcs = new TaskCompletionSource<bool>()
         };
         var fakeSettings = new FakeAppSettingsService();
-        var fakeLorebook = new FakeLorebookService();
-        var service = new MemoryManagerService(fakeApi, fakeSettings, fakeLorebook)
+        var service = new MemoryManagerService(fakeApi, fakeSettings)
         {
             CompressionDelayMs = 10
         };
@@ -170,8 +169,7 @@ public class MemoryManagerServiceTests
     {
         var fakeApi = new FakeGeminiApiService();
         var fakeSettings = new FakeAppSettingsService();
-        var fakeLorebook = new FakeLorebookService();
-        var service = new MemoryManagerService(fakeApi, fakeSettings, fakeLorebook);
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
         var preset = new CharacterPreset("Hero", "Fantasy World", "You are a heroic guide.");
 
         const string initialScenario = "용사는 마왕성 입구의 거대한 철문 앞에 도달했다.";
@@ -193,8 +191,7 @@ public class MemoryManagerServiceTests
     {
         var fakeApi = new FakeGeminiApiService();
         var fakeSettings = new FakeAppSettingsService();
-        var fakeLorebook = new FakeLorebookService();
-        var service = new MemoryManagerService(fakeApi, fakeSettings, fakeLorebook);
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
 
         // 1. 초기 상태: 앵커 플래그는 true
         Assert.True(service.ConsumeAnchorFlag());
@@ -214,8 +211,7 @@ public class MemoryManagerServiceTests
     {
         var fakeApi = new FakeGeminiApiService();
         var fakeSettings = new FakeAppSettingsService();
-        var fakeLorebook = new FakeLorebookService();
-        var service = new MemoryManagerService(fakeApi, fakeSettings, fakeLorebook);
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
 
         // 초기 상태: false
         Assert.False(service.ConsumeChapterChangedFlag());
@@ -238,8 +234,7 @@ public class MemoryManagerServiceTests
     {
         var fakeApi = new FakeGeminiApiService();
         var fakeSettings = new FakeAppSettingsService();
-        var fakeLorebook = new FakeLorebookService();
-        var service = new MemoryManagerService(fakeApi, fakeSettings, fakeLorebook);
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
 
         // 1. 1차 상태 업데이트
         var payload1 = new StatusPayload
