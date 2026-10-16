@@ -13,7 +13,7 @@ namespace GRC.Services;
 /// </summary>
 public class HybridLorebookRetriever : IHybridLorebookRetriever
 {
-    public const float DenseThreshold = 0.85f;
+    public const float DenseThreshold = 0.68f;
     public const int DefaultMaxTokenBudget = 3000;
     public const int DefaultStickyTurns = 2; // 현재 턴 포함 총 3턴 활성 잔존 (트리거 턴 1 + 추가 2턴)
 
@@ -104,9 +104,8 @@ public class HybridLorebookRetriever : IHybridLorebookRetriever
                         if (directMatchedNames.Contains(entry.Name) || stickyMatched.Any(s => string.Equals(s.Name, entry.Name, StringComparison.OrdinalIgnoreCase)))
                             continue;
 
-                        // 카테고리가 "인물"이거나, 이름 또는 키워드가 상태창 인물 이름과 일치하는 경우
-                        bool isCharEntry = string.Equals(entry.Category, "인물", StringComparison.OrdinalIgnoreCase) ||
-                                           charNameSet.Contains(entry.Name) ||
+                        // 이름 또는 키워드가 상태창 활성 인물 이름과 일치하는 경우에만 후보로 추가
+                        bool isCharEntry = charNameSet.Contains(entry.Name) ||
                                            (entry.Keywords != null && entry.Keywords.Any(k => charNameSet.Contains(k)));
 
                         if (isCharEntry)

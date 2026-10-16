@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -21,7 +22,8 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
     private string GetModelName(ModelTier tier) => tier switch
@@ -57,6 +59,9 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
                 return "[System Error]: 구글 클라우드 Project ID가 설정되지 않았습니다.";
 
             string modelName = GetVertexModelName(overrideTier ?? settings.SelectedModel);
+            // 💡 [중요 엔드포인트 규격]: 최신 주력 LLM 모델(gemini-3.8-flash, gemini-4-argon, gemini-3.5-flash-lite)은
+            // Google Cloud 정책상 오직 전역 리전('locations/global') 엔드포인트에서만 서비스됩니다.
+            // 로컬 리전(예: us-central1)으로 호출할 경우 '404 NotFound (Publisher model was not found)' 오류가 발생합니다. (2026-10-15 실측 검증 완료)
             requestUri = $"https://aiplatform.googleapis.com/v1beta1/projects/{settings.ProjectId}/locations/global/publishers/google/models/{modelName}:generateContent";
 
             try
@@ -195,6 +200,7 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
             string modelName = GetVertexModelName(overrideTier ?? settings.SelectedModel);
             System.Diagnostics.Debug.WriteLine($"[Vertex AI 스트리밍 사용 모델]: {modelName}, 리전: global");
 
+            // 💡 [중요 엔드포인트 규격]: 최신 주력 LLM 모델은 전역('locations/global') 엔드포인트 전용입니다. (us-central1 호출 시 404 NotFound)
             requestUri = $"https://aiplatform.googleapis.com/v1beta1/projects/{settings.ProjectId}/locations/global/publishers/google/models/{modelName}:streamGenerateContent?alt=sse";
 
             // 💡 C# 문법 제한 해결: catch 문 밖에서 yield를 반환하기 위해 변수 사용
@@ -354,7 +360,7 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
         }
     }
 
-    public async Task<float[]> GetEmbeddingAsync(string text, CancellationToken cancellationToken = default)
+    public async Task<float[]> GetEmbeddingAsync(string text, string? taskType = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(text)) return Array.Empty<float>();
 
@@ -362,6 +368,7 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
         {
             var settings = await appSettingsService.LoadSettingsAsync();
             using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "");
+            string effectiveTaskType = string.IsNullOrWhiteSpace(taskType) ? "SEMANTIC_SIMILARITY" : taskType;
 
             if (settings.UseVertexAI)
             {
@@ -371,7 +378,12 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
                     return Array.Empty<float>();
                 }
 
-                string endpoint = $"https://aiplatform.googleapis.com/v1beta1/projects/{settings.ProjectId}/locations/global/publishers/google/models/text-embedding-004:predict";
+                // 💡 [중요 엔드포인트 및 모델 규격]:
+                // 1. 모델명: Vertex AI에서 'text-embedding-004'는 영어/코드 전용 모델이므로, 한글 입력 시 토큰 길이별 더미 벡터를 반환하는 결함이 발생합니다.
+                //    따라서 한국어/다국어 공식 특화 모델인 'text-multilingual-embedding-002'를 필히 사용해야 합니다.
+                // 2. 리전: Vertex AI 임베딩 모델은 'locations/asia-northeast3'(서울 리전, 약 500ms) 엔드포인트를 사용하여 태평양 횡단 지연시간(us-central1, 약 1,100ms)을 대폭 단축합니다.
+                // 3. 인코딩: C# 기본 유니코드 이스케이프(\uXXXX)를 방지하기 위해 JavaScriptEncoder.UnsafeRelaxedJsonEscaping이 필수적입니다.
+                string endpoint = $"https://asia-northeast3-aiplatform.googleapis.com/v1/projects/{settings.ProjectId}/locations/asia-northeast3/publishers/google/models/text-multilingual-embedding-002:predict";
                 httpRequest.RequestUri = new Uri(endpoint);
 
                 string token = await googleAuthService.GetGoogleAccessTokenAsync(cancellationToken);
@@ -383,19 +395,20 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
 
                 httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-                var payload = new VertexEmbedRequest([new VertexEmbedInstance(text)]);
-                httpRequest.Content = new StringContent(JsonSerializer.Serialize(payload, _jsonOptions), Encoding.UTF8, "application/json");
+                var payload = new VertexEmbedRequest([new VertexEmbedInstance(text, effectiveTaskType)]);
+                string reqBody = JsonSerializer.Serialize(payload, _jsonOptions);
+                httpRequest.Content = new StringContent(reqBody, Encoding.UTF8, "application/json");
 
                 using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
+                string resBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
                 if (!response.IsSuccessStatusCode)
                 {
-                    string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                    System.Diagnostics.Debug.WriteLine($"[GeminiApiService Error] Vertex AI 임베딩 호출 실패 ({(int)response.StatusCode}): {errorBody}");
+                    System.Diagnostics.Debug.WriteLine($"[GeminiApiService Error] Vertex AI 임베딩 호출 실패 ({(int)response.StatusCode}): {resBody}");
                     return Array.Empty<float>();
                 }
 
-                var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                var result = await JsonSerializer.DeserializeAsync<VertexEmbedResponse>(stream, _jsonOptions, cancellationToken);
+                var result = JsonSerializer.Deserialize<VertexEmbedResponse>(resBody, _jsonOptions);
                 return result?.Predictions?.FirstOrDefault()?.Embeddings?.Values ?? Array.Empty<float>();
             }
             else
@@ -406,10 +419,11 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
                     return Array.Empty<float>();
                 }
 
+                // 💡 AI Studio(generativelanguage.googleapis.com)에서는 'models/text-embedding-004'가 다국어 통합 모델로 정상 작동합니다.
                 string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={settings.ApiKey}";
                 httpRequest.RequestUri = new Uri(endpoint);
 
-                var payload = new EmbedContentRequest(new Content("user", [new Part(text)]));
+                var payload = new EmbedContentRequest(new Content("user", [new Part(text)]), TaskType: effectiveTaskType);
                 httpRequest.Content = new StringContent(JsonSerializer.Serialize(payload, _jsonOptions), Encoding.UTF8, "application/json");
 
                 using var response = await httpClient.SendAsync(httpRequest, cancellationToken);

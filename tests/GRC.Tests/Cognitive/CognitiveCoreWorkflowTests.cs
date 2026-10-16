@@ -39,72 +39,39 @@ public class CognitiveCoreWorkflowTests
     }
 
     [Fact]
-    public void UpdateContextStatus_WithUnresolvedClues_RegistersToClueTracker()
+    public void ExportAndRestoreSession_PreservesEventLedgers()
     {
         // Arrange
         var fakeApi = new FakeGeminiApiService();
         var fakeSettings = new FakeAppSettingsService();
-        var clueTracker = new ClueTracker();
         var service = new MemoryManagerService(
             fakeApi, fakeSettings,
             new CognitivePromptAssembler(),
             new EventLedgerExtractor(fakeApi),
-            clueTracker,
-            new HybridLorebookRetriever(),
-            new GatedRAGRetriever()
-        );
-
-        var payload = new StatusPayload
-        {
-            UnresolvedClues = ["지하실 바닥의 피 묻은 열쇠"]
-        };
-
-        // Act
-        service.UpdateContextStatus(payload);
-
-        // Assert
-        Assert.Single(clueTracker.ActiveClues);
-        Assert.Equal("지하실 바닥의 피 묻은 열쇠", clueTracker.ActiveClues[0].Clue);
-    }
-
-    [Fact]
-    public void ExportAndRestoreSession_PreservesCluesAndEventLedgers()
-    {
-        // Arrange
-        var fakeApi = new FakeGeminiApiService();
-        var fakeSettings = new FakeAppSettingsService();
-        var clueTracker = new ClueTracker();
-        var service = new MemoryManagerService(
-            fakeApi, fakeSettings,
-            new CognitivePromptAssembler(),
-            new EventLedgerExtractor(fakeApi),
-            clueTracker,
             new HybridLorebookRetriever(),
             new GatedRAGRetriever()
         );
         var preset = new CharacterPreset("Hero", "Fantasy World", "You are a heroic guide.");
 
-        // 상태 및 단서 등록
+        // 상태 및 렛저 등록
         service.UpdateContextStatus(new StatusPayload
         {
-            UnresolvedClues = ["오래된 가문의 문장"]
+            Places = ["성채 입구"]
         });
-        service.CurrentContext.EventLedgers.Add(new EventLedgerItem(1, "원정대가 숲에 진입함"));
+        service.CurrentContext.EventLedgers.Add(new EventLedgerItem("원정대가 숲에 진입함"));
 
         // Act 1: 세션 Export
         var exportedSession = service.ExportSession(preset);
 
-        Assert.NotNull(exportedSession.ActiveClues);
-        Assert.Single(exportedSession.ActiveClues);
-        Assert.Equal("오래된 가문의 문장", exportedSession.ActiveClues[0].Clue);
+        Assert.Equal("성채 입구", exportedSession.CurrentContext.Places[0]);
+        Assert.Single(exportedSession.CurrentContext.EventLedgers);
+        Assert.Equal("원정대가 숲에 진입함", exportedSession.CurrentContext.EventLedgers[0].FactBullet);
 
         // Act 2: 신규 서비스 인스턴스에 Restore
-        var newClueTracker = new ClueTracker();
         var newService = new MemoryManagerService(
             fakeApi, fakeSettings,
             new CognitivePromptAssembler(),
             new EventLedgerExtractor(fakeApi),
-            newClueTracker,
             new HybridLorebookRetriever(),
             new GatedRAGRetriever()
         );
@@ -112,8 +79,6 @@ public class CognitiveCoreWorkflowTests
         newService.RestoreSession(exportedSession);
 
         // Assert
-        Assert.Single(newClueTracker.ActiveClues);
-        Assert.Equal("오래된 가문의 문장", newClueTracker.ActiveClues[0].Clue);
         Assert.Single(newService.CurrentContext.EventLedgers);
         Assert.Equal("원정대가 숲에 진입함", newService.CurrentContext.EventLedgers[0].FactBullet);
     }
@@ -159,9 +124,9 @@ public class CognitiveCoreWorkflowTests
         Assert.Equal("원정대가 북쪽 관문에 도착했다.", session.CurrentContext.EventLedgers[0].FactBullet);
         Assert.Equal("기사단장이 밀서를 전했다.", session.CurrentContext.EventLedgers[1].FactBullet);
 
-        // Plot 속성에 타임라인 문자열로 포맷팅되었는지 검증
-        Assert.Contains("원정대가 북쪽 관문에 도착했다.", session.CurrentContext.Plot);
-        Assert.Contains("[Turn", session.CurrentContext.Plot);
+        // Plot 속성에 타임라인 문자열로 포맷팅되었는지 검증 (Turn 메타 태그 제외)
+        Assert.Contains("* 원정대가 북쪽 관문에 도착했다.", session.CurrentContext.Plot);
+        Assert.DoesNotContain("[Turn", session.CurrentContext.Plot);
         Assert.StartsWith("[제 1장]", session.CurrentContext.Plot);
     }
 
@@ -179,7 +144,6 @@ public class CognitiveCoreWorkflowTests
             preset,
             [new ChatMessage("user", "이전 대화", DateTime.Now)],
             new ChapterContext(),
-            [],
             "줄거리",
             1, 1, 0
         );
@@ -192,7 +156,6 @@ public class CognitiveCoreWorkflowTests
             preset,
             [],
             new ChapterContext(),
-            [],
             "줄거리",
             1, 0, 0
         );

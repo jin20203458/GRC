@@ -97,7 +97,8 @@ public record PromptFeedback(
 
 // AI Studio 전용 임베딩 DTO
 public record EmbedContentRequest(
-    [property: JsonPropertyName("content")] Content Content
+    [property: JsonPropertyName("content")] Content Content,
+    [property: JsonPropertyName("taskType")] string? TaskType = null
 );
 
 public record EmbedContentResponse(
@@ -114,7 +115,8 @@ public record VertexEmbedRequest(
 );
 
 public record VertexEmbedInstance(
-    [property: JsonPropertyName("content")] string Content
+    [property: JsonPropertyName("content")] string Content,
+    [property: JsonPropertyName("task_type")] string? TaskType = null
 );
 
 public record VertexEmbedResponse(

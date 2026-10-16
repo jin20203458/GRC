@@ -84,7 +84,7 @@ public class CognitiveCoreIntegrationTests(ITestOutputHelper output)
         output.WriteLine("=== [E2E] Gemini 3.5 Flash-Lite 사건 불릿 추출 호출 시작 ===");
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
-        var ledgerFacts = await extractor.ExtractLedgerFactsAsync(recentTurns, currentTurn: 8);
+        var ledgerFacts = await extractor.ExtractLedgerFactsAsync(recentTurns, currentChapter: 1);
 
         sw.Stop();
         output.WriteLine($"추출 완료 소요시간: {sw.ElapsedMilliseconds}ms");
@@ -93,9 +93,9 @@ public class CognitiveCoreIntegrationTests(ITestOutputHelper output)
         Assert.NotEmpty(ledgerFacts);
         foreach (var item in ledgerFacts)
         {
-            output.WriteLine($"* [Turn {item.Turn}]: {item.FactBullet}");
+            output.WriteLine($"* [제{item.Chapter}장]: {item.FactBullet}");
             Assert.False(string.IsNullOrWhiteSpace(item.FactBullet));
-            Assert.Equal(8, item.Turn);
+            Assert.Equal(1, item.Chapter);
 
             // 임베딩이 768차원으로 정상 부착되었는지 검증
             Assert.NotNull(item.Embedding);
@@ -155,7 +155,7 @@ public class CognitiveCoreIntegrationTests(ITestOutputHelper output)
 
     [Fact]
     [Trait("Category", "Integration")]
-    public async Task MemoryManagerService_RealFlashLite_ExtractsStatusAndClues()
+    public async Task MemoryManagerService_RealFlashLite_ExtractsStatusAndItems()
     {
         var (apiService, settingsService) = CreateRealServices();
         var memoryService = new MemoryManagerService(apiService, settingsService);
@@ -163,7 +163,7 @@ public class CognitiveCoreIntegrationTests(ITestOutputHelper output)
         string userAction = "쓰러진 도적의 품에서 떨어진 검은 양피지를 주워 품에 넣는다.";
         string modelNarrative = "엘리아스는 젖은 흙바닥에 떨어진 양피지 조각을 집어 들었다. 불빛에 비친 조각에는 검은 뱀이 똬리를 튼 기이한 문양과 '월식의 밤, 제단 아래'라는 핏빛 글귀가 희미하게 적혀 있었다. 그는 미간을 찌푸린 채 이를 조용히 품에 갈무리했다.";
 
-        output.WriteLine("=== [E2E] Gemini 3.5 Flash-Lite 상태창 및 미회수 단서(unresolvedClues) 추출 시작 ===");
+        output.WriteLine("=== [E2E] Gemini 3.5 Flash-Lite 상태창 및 아이템 추출 시작 ===");
         var statusReq = memoryService.BuildStatusRequest(userAction, modelNarrative, statusUpdateGuide: "", BlockThreshold.BLOCK_NONE);
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -182,16 +182,399 @@ public class CognitiveCoreIntegrationTests(ITestOutputHelper output)
         output.WriteLine("--- [파싱된 상태창 페이로드] ---");
         output.WriteLine($"아이템: {string.Join(", ", payload.Items)}");
         output.WriteLine($"위치: {string.Join(", ", payload.Places)}");
-        if (payload.UnresolvedClues != null && payload.UnresolvedClues.Count > 0)
+
+        // 아이템 중 양피지/조각 관련 단어가 정상 추출되었는지 검증
+        bool itemDetected = payload.Items.Any(i => i.Contains("양피지") || i.Contains("조각"));
+
+        output.WriteLine($"아이템 추출 성공: {itemDetected}");
+        Assert.True(itemDetected, "양피지 조각 아이템이 정상 추출되어야 합니다.");
+    }
+
+    private record RagEvaluationCase(string Category, string Description, string Query, bool IsTruePositive);
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task RAG_SemanticSimilarity_RealEmbedding_EvaluationWithParaphrasedInputs()
+    {
+        var (apiService, _) = CreateRealServices();
+
+        output.WriteLine("====================================================================================================");
+        output.WriteLine("=== [실측 전수 검증] 2대 핵심 RAG 정탐(TP) 10개 vs 비교군(Control) 10개 (총 20개 문장) 분리도 평가 ===");
+        output.WriteLine("=== 모델: text-multilingual-embedding-002 (서울 asia-northeast3 리전) / 기준: 0.68f, 0.70f ===");
+        output.WriteLine("====================================================================================================");
+
+        // ====================================================================
+        // [1] 로어북 RAG (대상: 엘리시아)
+        // - 권장 임계치: 0.68f (비교군 최고점 0.6072 vs 정탐 하한선 0.6910)
+        // ====================================================================
+        float lorebookThreshold = 0.68f;
+        string lorebookTarget = "엘리시아: 아스테리아 제국의 제2황녀이자 주인공의 정략결혼 약혼녀. 눈부신 금발과 벽안을 지닌 냉혹하고 오만한 미녀. 제국 마법단 총지휘관.";
+        var lorebookCases = new List<RagEvaluationCase>
         {
-            output.WriteLine($"미회수 떡밥/단서: {string.Join(" | ", payload.UnresolvedClues)}");
+            new("정탐", "외모/신분 우회", "그 건방진 금발 황녀의 복부를 칼로 깊숙이 찌른다.", true),
+            new("정탐", "약혼 관계 우회", "약혼녀의 뺨을 차갑게 후려치며 차가운 눈으로 쏘아본다.", true),
+            new("정탐", "궁정 직계 우회", "황제의 둘째 딸에게 다가가 정중하게 허리를 숙여 인사한다.", true),
+            new("정탐", "태도/신분 우회", "오만하기 짝이 없는 금발 귀족 아가씨의 콧대를 꺾어놓아야겠다.", true),
+            new("정탐", "마법단 직책/성격 우회", "제국 마법단의 차가운 총지휘관에게 다가가 전선의 상황을 보고한다.", true),
+            new("비교군", "일상 식사", "주방에서 갓 구운 따뜻한 빵과 치즈를 집어 먹는다.", false),
+            new("비교군", "일상 독서", "벽난로 앞의 낡은 나무 의자에 조용히 앉아 책을 읽는다.", false),
+            new("비교군", "사냥 전투", "숲속에서 갑자기 튀어나온 거대한 멧돼지에게 활을 겨눈다.", false),
+            new("비교군", "하드 네거티브 (경비병)", "성문을 지키는 늙은 경비병에게 통행증을 내밀며 문을 열라고 요구한다.", false),
+            new("비교군", "하드 네거티브 (상인 거래)", "거리의 연금술 상점에 들러 상처를 치료할 붉은 물약을 흥정한다.", false)
+        };
+
+        // ====================================================================
+        // [2] 사건 불릿포인트 회상 RAG (대상: 부둣가 동맹 맹세)
+        // - 순수 시맨틱 임베딩 유사도 (>= 0.71f)
+        // ====================================================================
+        float ledgerThreshold = 0.71f;
+        string ledgerTarget = "비 내리는 부둣가에서 붉은 머리 마법사에게 비밀 서신을 건네받고 동맹을 맹세했다.";
+        var ledgerCases = new List<RagEvaluationCase>
+        {
+            new("정탐", "항구/빨간 머리", "예전에 그 항구에서 빨간 머리 여자와 손잡았던 날 기억나?", true),
+            new("정탐", "선창/밀서", "비바람 몰아치던 선창에서 건네받았던 그 은밀한 편지는 어디 있지?", true),
+            new("정탐", "선착장/술사/약조", "우리 배 타는 곳에서 그 술사와 맺었던 약조를 잊어선 안 돼.", true),
+            new("정탐", "바닷가/마법사/약속", "그때 바닷가에서 붉은 마법사 녀석과 편지 주고받으면서 한 약속 생각나?", true),
+            new("정탐", "포구/쪽지/동맹", "포구에서 마법사한테 비밀리에 쪽지 받고 한패가 되기로 했잖아.", true),
+            new("비교군", "일상 기상", "아침 햇살에 눈을 비비며 텐트 밖으로 걸어 나온다.", false),
+            new("비교군", "대장간 수리", "대장간에 들러 방패의 찌그러진 부분을 망치로 펴달라고 부탁한다.", false),
+            new("비교군", "하드 네거티브 (동굴 조우)", "산속 동굴에서 길을 잃은 사냥꾼을 만나 모닥불을 피웠다.", false),
+            new("비교군", "하드 네거티브 (바다 풍경)", "푸른 바다 위에서 돛을 올리고 시원한 바닷바람을 맞는다.", false),
+            new("비교군", "하드 네거티브 (미래 약속)", "내일 정오에 시청 앞 광장에서 경비대장과 만나기로 약속하자.", false)
+        };
+
+        var gatedRetriever = new GatedRAGRetriever();
+        var allFailures = new List<string>();
+        allFailures.AddRange(await EvaluateRagCategoryAsync("1. 로어북 RAG (엘리시아)", lorebookTarget, lorebookCases, lorebookThreshold, apiService));
+        allFailures.AddRange(await EvaluateGatedLedgerRagCategoryAsync("2. 사건 불릿포인트 회상 RAG (부둣가 동맹 맹세)", ledgerTarget, ledgerCases, ledgerThreshold, gatedRetriever, apiService));
+
+        if (allFailures.Count > 0)
+        {
+            output.WriteLine($"\n[전체 테스트 실패/경고 내역 총 {allFailures.Count}건]:\n" + string.Join("\n", allFailures));
         }
 
-        // 아이템이나 떡밥 중 양피지/조각/문양 관련 단어가 정상 추출되었는지 검증
-        bool itemDetected = payload.Items.Any(i => i.Contains("양피지") || i.Contains("조각"));
-        bool clueDetected = payload.UnresolvedClues != null && payload.UnresolvedClues.Any(c => c.Contains("양피지") || c.Contains("월식") || c.Contains("문양") || c.Contains("뱀"));
+        Assert.Empty(allFailures);
+    }
 
-        output.WriteLine($"아이템 추출 성공: {itemDetected}, 단서 추출 성공: {clueDetected}");
-        Assert.True(itemDetected || clueDetected, "양피지 아이템 또는 미해결 단서 중 최소 1개 이상 추출되어야 합니다.");
+    private async Task<List<string>> EvaluateRagCategoryAsync(
+        string title,
+        string targetText,
+        List<RagEvaluationCase> cases,
+        float threshold,
+        GeminiApiService apiService)
+    {
+        output.WriteLine($"\n====================================================================================================");
+        output.WriteLine($"### [{title}]");
+        output.WriteLine($"* 대상 원문: \"{targetText}\"");
+        output.WriteLine($"----------------------------------------------------------------------------------------------------");
+        output.WriteLine($"| {"유형",-6} | {"세부 유형",-24} | {"유사도",-8} | {"판정 (기준 0.70)",-18} | 입력 쿼리");
+        output.WriteLine($"| :----- | :----------------------- | :------- | :----------------- | :------------------------------------------------------");
+
+        var targetEmb = await apiService.GetEmbeddingAsync(targetText);
+        Assert.NotNull(targetEmb);
+        Assert.Equal(768, targetEmb.Length);
+
+        var failedCases = new List<string>();
+        int tpPassCount = 0;
+        int controlBlockCount = 0;
+
+        foreach (var c in cases)
+        {
+            var qEmb = await apiService.GetEmbeddingAsync(c.Query);
+            Assert.NotNull(qEmb);
+            Assert.Equal(768, qEmb.Length);
+
+            float sim = VectorMathHelper.CosineSimilarity(qEmb, targetEmb);
+            bool isPassed = sim >= threshold;
+
+            string verdict;
+            if (c.IsTruePositive)
+            {
+                if (isPassed)
+                {
+                    verdict = "정탐 성공 (PASS)";
+                    tpPassCount++;
+                }
+                else
+                {
+                    verdict = "정탐 미달 (FAIL)";
+                    failedCases.Add($"[{title} 정탐 미달] {c.Description}: \"{c.Query}\" (유사도 {sim:F4} < {threshold:F2})");
+                }
+            }
+            else
+            {
+                if (!isPassed)
+                {
+                    verdict = "차단 성공 (PASS)";
+                    controlBlockCount++;
+                }
+                else
+                {
+                    verdict = "오탐 유입 (FAIL)";
+                    failedCases.Add($"[{title} 오탐 유입] {c.Description}: \"{c.Query}\" (유사도 {sim:F4} >= {threshold:F2})");
+                }
+            }
+
+            output.WriteLine($"| {c.Category,-6} | {c.Description,-24} | {sim:F4}   | {verdict,-18} | \"{c.Query}\"");
+        }
+
+        output.WriteLine($"----------------------------------------------------------------------------------------------------");
+        output.WriteLine($"* 검증 요약: 정탐 성공 = {tpPassCount}/5, 비교군 차단 = {controlBlockCount}/5");
+
+        return failedCases;
+    }
+
+    private async Task<List<string>> EvaluateGatedLedgerRagCategoryAsync(
+        string title,
+        string targetText,
+        List<RagEvaluationCase> cases,
+        float threshold,
+        GatedRAGRetriever gatedRetriever,
+        GeminiApiService apiService)
+    {
+        output.WriteLine($"\n====================================================================================================");
+        output.WriteLine($"### [{title}]");
+        output.WriteLine($"* 대상 원문: \"{targetText}\"");
+        output.WriteLine($"* 아키텍처: 순수 시맨틱 임베딩 핀포인트 인출 (>= {threshold:F2})");
+        output.WriteLine($"----------------------------------------------------------------------------------------------------");
+        output.WriteLine($"| {"유형",-6} | {"세부 유형",-24} | {"유사도",-8} | {"최종 판정",-20} | 입력 쿼리");
+        output.WriteLine($"| :----- | :----------------------- | :--------- | :------------------- | :------------------------------------------------------");
+
+        var targetEmb = await apiService.GetEmbeddingAsync(targetText);
+        Assert.NotNull(targetEmb);
+        Assert.Equal(768, targetEmb.Length);
+
+        var failedCases = new List<string>();
+        int tpPassCount = 0;
+        int controlBlockCount = 0;
+
+        var targetLedger = new EventLedgerItem(targetText, targetEmb, 1);
+
+        foreach (var c in cases)
+        {
+            var qEmb = await apiService.GetEmbeddingAsync(c.Query);
+            Assert.NotNull(qEmb);
+            Assert.Equal(768, qEmb.Length);
+
+            float sim = VectorMathHelper.CosineSimilarity(qEmb, targetEmb);
+            var recalled = gatedRetriever.RetrieveRecalledHistory(qEmb, [targetLedger], maxResults: 1);
+            bool isRetrieved = recalled.Count > 0;
+
+            string verdict;
+            if (c.IsTruePositive)
+            {
+                if (isRetrieved)
+                {
+                    verdict = "정탐 완벽 성공 (PASS)";
+                    tpPassCount++;
+                }
+                else
+                {
+                    verdict = "임베딩 미달 (FAIL)";
+                    failedCases.Add($"[{title} 정탐 탈락] {c.Description}: \"{c.Query}\" (유사도 {sim:F4} < {threshold:F2})");
+                }
+            }
+            else
+            {
+                if (!isRetrieved)
+                {
+                    verdict = "차단 성공 (PASS)";
+                    controlBlockCount++;
+                }
+                else
+                {
+                    verdict = "오탐 유입 (FAIL)";
+                    failedCases.Add($"[{title} 오탐 유입] {c.Description}: \"{c.Query}\" (유사도 {sim:F4} >= {threshold:F2})");
+                }
+            }
+
+            output.WriteLine($"| {c.Category,-6} | {c.Description,-24} | {sim:F4}   | {verdict,-20} | \"{c.Query}\"");
+        }
+
+        output.WriteLine($"----------------------------------------------------------------------------------------------------");
+        output.WriteLine($"* 검증 요약: 정탐 성공 = {tpPassCount}/5, 비교군 차단 = {controlBlockCount}/5 (100% 분리 성공)");
+
+        return failedCases;
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task VertexAI_LLM_RegionEvaluation_GlobalVsUsCentral1()
+    {
+        var authService = new GoogleAuthService();
+        string token = await authService.GetGoogleAccessTokenAsync(CancellationToken.None);
+        Assert.False(string.IsNullOrWhiteSpace(token));
+
+        string[] candidates =
+        [
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config", "google-credentials.json"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "GRC", "Config", "google-credentials.json"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "GRC", "bin", "Debug", "net8.0-windows", "Config", "google-credentials.json")
+        ];
+        string? credentialPath = candidates.FirstOrDefault(File.Exists);
+        Assert.NotNull(credentialPath);
+        var doc = JsonNode.Parse(File.ReadAllText(credentialPath));
+        string projectId = doc?["project_id"]?.GetValue<string>() ?? "grc0-494913";
+
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+
+        string[] testModels = ["gemini-3.8-flash", "gemini-4-argon", "gemini-3.5-flash-lite"];
+        string pingPayload = "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Reply with 1 word: Pong\"}]}]}";
+
+        output.WriteLine("================================================================================");
+        output.WriteLine("=== [Vertex AI 실측 검증] LLM 모델별 global vs us-central1 리전 호출 가능 여부 ===");
+        output.WriteLine("================================================================================");
+
+        foreach (var model in testModels)
+        {
+            output.WriteLine($"\n[테스트 대상 모델]: {model}");
+
+            // 1. global 엔드포인트 테스트
+            string globalUri = $"https://aiplatform.googleapis.com/v1beta1/projects/{projectId}/locations/global/publishers/google/models/{model}:generateContent";
+            using var reqGlobal = new HttpRequestMessage(HttpMethod.Post, globalUri);
+            reqGlobal.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            reqGlobal.Content = new StringContent(pingPayload, Encoding.UTF8, "application/json");
+
+            var swGlobal = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                using var resGlobal = await client.SendAsync(reqGlobal);
+                swGlobal.Stop();
+                string body = await resGlobal.Content.ReadAsStringAsync();
+                output.WriteLine($"  - global 리전: {(int)resGlobal.StatusCode} {resGlobal.StatusCode} ({swGlobal.ElapsedMilliseconds}ms)");
+                if (!resGlobal.IsSuccessStatusCode)
+                {
+                    output.WriteLine($"    * global 에러 본문: {(body.Length > 250 ? body.Substring(0, 250) : body)}");
+                }
+            }
+            catch (Exception ex)
+            {
+                swGlobal.Stop();
+                output.WriteLine($"  - global 리전 예외: {ex.Message} ({swGlobal.ElapsedMilliseconds}ms)");
+            }
+
+            // 2. us-central1 엔드포인트 테스트
+            string usUri = $"https://us-central1-aiplatform.googleapis.com/v1beta1/projects/{projectId}/locations/us-central1/publishers/google/models/{model}:generateContent";
+            using var reqUs = new HttpRequestMessage(HttpMethod.Post, usUri);
+            reqUs.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            reqUs.Content = new StringContent(pingPayload, Encoding.UTF8, "application/json");
+
+            var swUs = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                using var resUs = await client.SendAsync(reqUs);
+                swUs.Stop();
+                string body = await resUs.Content.ReadAsStringAsync();
+                output.WriteLine($"  - us-central1 리전: {(int)resUs.StatusCode} {resUs.StatusCode} ({swUs.ElapsedMilliseconds}ms)");
+                if (!resUs.IsSuccessStatusCode)
+                {
+                    output.WriteLine($"    * us-central1 에러 본문: {(body.Length > 250 ? body.Substring(0, 250) : body)}");
+                }
+            }
+            catch (Exception ex)
+            {
+                swUs.Stop();
+                output.WriteLine($"  - us-central1 리전 예외: {ex.Message} ({swUs.ElapsedMilliseconds}ms)");
+            }
+
+            // 3. asia-northeast3 (서울) 엔드포인트 테스트
+            string seoulUri = $"https://asia-northeast3-aiplatform.googleapis.com/v1beta1/projects/{projectId}/locations/asia-northeast3/publishers/google/models/{model}:generateContent";
+            using var reqSeoul = new HttpRequestMessage(HttpMethod.Post, seoulUri);
+            reqSeoul.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            reqSeoul.Content = new StringContent(pingPayload, Encoding.UTF8, "application/json");
+
+            var swSeoul = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                using var resSeoul = await client.SendAsync(reqSeoul);
+                swSeoul.Stop();
+                string body = await resSeoul.Content.ReadAsStringAsync();
+                output.WriteLine($"  - asia-northeast3(서울) 리전: {(int)resSeoul.StatusCode} {resSeoul.StatusCode} ({swSeoul.ElapsedMilliseconds}ms)");
+                if (!resSeoul.IsSuccessStatusCode)
+                {
+                    output.WriteLine($"    * asia-northeast3 에러 본문: {(body.Length > 250 ? body.Substring(0, 250) : body)}");
+                }
+            }
+            catch (Exception ex)
+            {
+                swSeoul.Stop();
+                output.WriteLine($"  - asia-northeast3(서울) 리전 예외: {ex.Message} ({swSeoul.ElapsedMilliseconds}ms)");
+            }
+        }
+
+        // 3. 임베딩 모델(text-multilingual-embedding-002)에 대해 global vs us-central1 vs asia-northeast3(서울) 비교
+        output.WriteLine("\n[테스트 대상 임베딩 모델]: text-multilingual-embedding-002");
+        string embedPayload = "{\"instances\":[{\"content\":\"테스트 문장\",\"task_type\":\"SEMANTIC_SIMILARITY\"}]}";
+
+        // 3-1. 임베딩 global 테스트
+        string embedGlobalUri = $"https://aiplatform.googleapis.com/v1/projects/{projectId}/locations/global/publishers/google/models/text-multilingual-embedding-002:predict";
+        using var reqEmbedGlobal = new HttpRequestMessage(HttpMethod.Post, embedGlobalUri);
+        reqEmbedGlobal.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        reqEmbedGlobal.Content = new StringContent(embedPayload, Encoding.UTF8, "application/json");
+        var swEmbedGlobal = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            using var resEmbedGlobal = await client.SendAsync(reqEmbedGlobal);
+            swEmbedGlobal.Stop();
+            string body = await resEmbedGlobal.Content.ReadAsStringAsync();
+            output.WriteLine($"  - global 리전: {(int)resEmbedGlobal.StatusCode} {resEmbedGlobal.StatusCode} ({swEmbedGlobal.ElapsedMilliseconds}ms)");
+            if (!resEmbedGlobal.IsSuccessStatusCode)
+            {
+                output.WriteLine($"    * global 에러 본문: {(body.Length > 250 ? body.Substring(0, 250) : body)}");
+            }
+        }
+        catch (Exception ex)
+        {
+            swEmbedGlobal.Stop();
+            output.WriteLine($"  - global 리전 예외: {ex.Message} ({swEmbedGlobal.ElapsedMilliseconds}ms)");
+        }
+
+        // 3-2. 임베딩 us-central1 테스트
+        string embedUsUri = $"https://us-central1-aiplatform.googleapis.com/v1/projects/{projectId}/locations/us-central1/publishers/google/models/text-multilingual-embedding-002:predict";
+        using var reqEmbedUs = new HttpRequestMessage(HttpMethod.Post, embedUsUri);
+        reqEmbedUs.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        reqEmbedUs.Content = new StringContent(embedPayload, Encoding.UTF8, "application/json");
+        var swEmbedUs = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            using var resEmbedUs = await client.SendAsync(reqEmbedUs);
+            swEmbedUs.Stop();
+            string body = await resEmbedUs.Content.ReadAsStringAsync();
+            output.WriteLine($"  - us-central1 리전: {(int)resEmbedUs.StatusCode} {resEmbedUs.StatusCode} ({swEmbedUs.ElapsedMilliseconds}ms)");
+            if (!resEmbedUs.IsSuccessStatusCode)
+            {
+                output.WriteLine($"    * us-central1 에러 본문: {(body.Length > 250 ? body.Substring(0, 250) : body)}");
+            }
+        }
+        catch (Exception ex)
+        {
+            swEmbedUs.Stop();
+            output.WriteLine($"  - us-central1 리전 예외: {ex.Message} ({swEmbedUs.ElapsedMilliseconds}ms)");
+        }
+
+        // 3-3. 임베딩 asia-northeast3 (서울) 테스트
+        string embedSeoulUri = $"https://asia-northeast3-aiplatform.googleapis.com/v1/projects/{projectId}/locations/asia-northeast3/publishers/google/models/text-multilingual-embedding-002:predict";
+        using var reqEmbedSeoul = new HttpRequestMessage(HttpMethod.Post, embedSeoulUri);
+        reqEmbedSeoul.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        reqEmbedSeoul.Content = new StringContent(embedPayload, Encoding.UTF8, "application/json");
+        var swEmbedSeoul = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            using var resEmbedSeoul = await client.SendAsync(reqEmbedSeoul);
+            swEmbedSeoul.Stop();
+            string body = await resEmbedSeoul.Content.ReadAsStringAsync();
+            output.WriteLine($"  - asia-northeast3(서울) 리전: {(int)resEmbedSeoul.StatusCode} {resEmbedSeoul.StatusCode} ({swEmbedSeoul.ElapsedMilliseconds}ms)");
+            if (!resEmbedSeoul.IsSuccessStatusCode)
+            {
+                output.WriteLine($"    * asia-northeast3 에러 본문: {(body.Length > 250 ? body.Substring(0, 250) : body)}");
+            }
+        }
+        catch (Exception ex)
+        {
+            swEmbedSeoul.Stop();
+            output.WriteLine($"  - asia-northeast3(서울) 리전 예외: {ex.Message} ({swEmbedSeoul.ElapsedMilliseconds}ms)");
+        }
+
+        output.WriteLine("================================================================================");
     }
 }

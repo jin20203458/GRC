@@ -11,13 +11,13 @@ using System.Threading.Tasks;
 namespace GRC.Services;
 
 /// <summary>
-/// 8턴 주기로 Gemini 3.5 Flash-Lite 모델을 호출하여 사건 팩트 불릿을 추출하고
-/// Google text-embedding-004 임베딩을 비동기 부착하는 구현체
+/// 4턴(8메시지) 주기로 Gemini 3.5 Flash-Lite 모델을 호출하여 사건 팩트 불릿을 추출하고
+/// Google 768차원 다국어 임베딩을 비동기 부착하는 구현체
 /// </summary>
 public class EventLedgerExtractor(IGeminiApiService apiService) : IEventLedgerExtractor
 {
     private const string ExtractionPromptTemplate =
-        "당신은 RPG 게임의 객관적 역사 서기관입니다. 아래 최근 대화에서 일어난 '실제 사건, 이동한 장소, 획득/사용한 아이템, 명시적 약속/계약'만을 1~2문장의 객관적 팩트 불릿(최대 3개)으로 추출하십시오.\n\n" +
+        "당신은 RPG 게임의 객관적 역사 서기관입니다. 아래 최근 대화에서 일어난 '실제 사건, 이동한 장소, 획득/사용한 아이템, 체결된 약속/맹세, 그리고 새롭게 드러난 중요 단서나 비밀'만을 1~2문장의 객관적 팩트 불릿(최대 3~5개)으로 추출하십시오.\n\n" +
         "[엄격한 제외 기준]:\n" +
         "- 문학적 미사여구, 날씨/분위기 묘사 제외\n" +
         "- 인물의 내면 심리 독백 및 단순 잡담 제외\n\n" +
@@ -33,7 +33,7 @@ public class EventLedgerExtractor(IGeminiApiService apiService) : IEventLedgerEx
 
     public async Task<List<EventLedgerItem>> ExtractLedgerFactsAsync(
         IEnumerable<ChatMessage> recentTurns,
-        int currentTurn,
+        int currentChapter = 1,
         CancellationToken cancellationToken = default)
     {
         if (recentTurns == null) return [];
@@ -71,14 +71,14 @@ public class EventLedgerExtractor(IGeminiApiService apiService) : IEventLedgerEx
             var bullets = ParseBulletsFromJson(responseJson);
             if (bullets.Count == 0) return [];
 
-            // 3. 각 불릿별 Google text-embedding-004 768차원 임베딩 비동기 부착
+            // 3. 각 불릿별 768차원 다국어 임베딩 비동기 부착
             var ledgerItems = new List<EventLedgerItem>();
             foreach (var bullet in bullets)
             {
                 float[]? embedding = null;
                 try
                 {
-                    var emb = await apiService.GetEmbeddingAsync(bullet, cancellationToken);
+                    var emb = await apiService.GetEmbeddingAsync(bullet, cancellationToken: cancellationToken);
                     if (emb != null && emb.Length == 768)
                     {
                         embedding = emb;
@@ -91,9 +91,9 @@ public class EventLedgerExtractor(IGeminiApiService apiService) : IEventLedgerEx
                 }
 
                 ledgerItems.Add(new EventLedgerItem(
-                    Turn: currentTurn,
                     FactBullet: bullet,
-                    Embedding: embedding
+                    Embedding: embedding,
+                    Chapter: currentChapter
                 ));
             }
 
@@ -145,12 +145,7 @@ public class EventLedgerExtractor(IGeminiApiService apiService) : IEventLedgerEx
         }
         catch
         {
-            // JSON 파싱 실패 시 <plot> 태그 추출 시도 (Fail-Safe Fallback)
-            var plotMatch = System.Text.RegularExpressions.Regex.Match(rawText, @"<plot\s*>(.*?)</plot\s*>", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-            if (plotMatch.Success && !string.IsNullOrWhiteSpace(plotMatch.Groups[1].Value))
-            {
-                result.Add(plotMatch.Groups[1].Value.Trim());
-            }
+            // JSON 파싱 실패 시 안전하게 빈 리스트 반환 (레거시 정규식 폴백 완전 제거)
         }
 
         return result;

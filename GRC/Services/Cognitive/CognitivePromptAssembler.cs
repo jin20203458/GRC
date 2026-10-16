@@ -78,12 +78,10 @@ public class CognitivePromptAssembler : ICognitivePromptAssembler
         // 3.2 8턴 불변 사건 렛저 (<internal_chronicle_facts>)
         if (cognitiveContext.LedgerFacts != null && cognitiveContext.LedgerFacts.Count > 0)
         {
+            int currentChapter = cognitiveContext.CurrentChapter > 0 ? cognitiveContext.CurrentChapter : 1;
             dynamicSb.AppendLine("<internal_chronicle_facts>");
-            dynamicSb.AppendLine("[지난 사건 기록]");
-            foreach (var fact in cognitiveContext.LedgerFacts.TakeLast(15))
-            {
-                dynamicSb.AppendLine($"- [Turn {fact.Turn}]: {fact.FactBullet}");
-            }
+            dynamicSb.AppendLine($"[최근 사건 흐름 - 위에서 아래로 시간순 (현재 제{currentChapter}장 진행 중)]");
+            AppendChapterGroupedFacts(dynamicSb, cognitiveContext.LedgerFacts.TakeLast(15));
             dynamicSb.AppendLine("</internal_chronicle_facts>\n");
         }
 
@@ -111,42 +109,16 @@ public class CognitivePromptAssembler : ICognitivePromptAssembler
         if (cognitiveContext.RecalledHistory != null && cognitiveContext.RecalledHistory.Count > 0)
         {
             dynamicSb.AppendLine("<recalled_history>");
-            dynamicSb.AppendLine("[과거 챕터 회상 기록]");
-            foreach (var recalled in cognitiveContext.RecalledHistory)
-            {
-                dynamicSb.AppendLine($"- [Turn {recalled.Turn}]: {recalled.FactBullet}");
-            }
+            dynamicSb.AppendLine("[떠오른 과거의 기억 - 현재 상태와 상충 시 현재 상태가 우선함]");
+            AppendChapterGroupedFacts(dynamicSb, cognitiveContext.RecalledHistory);
             dynamicSb.AppendLine("</recalled_history>\n");
-        }
-
-        // 3.6 잠복 복선 및 미해결 비밀 (<latent_secrets mode="STRICT_DORMANT">)
-        if (cognitiveContext.ActiveClues != null && cognitiveContext.ActiveClues.Count > 0)
-        {
-            dynamicSb.AppendLine("<latent_secrets mode=\"STRICT_DORMANT\">");
-            dynamicSb.AppendLine("[극비 잠복 정보 (플레이어가 직접 지목하여 추궁하지 않는 한 절대 자진 발설 금지)]");
-            foreach (var clue in cognitiveContext.ActiveClues)
-            {
-                dynamicSb.AppendLine($"- {clue.Clue}");
-            }
-            dynamicSb.AppendLine("</latent_secrets>\n");
-        }
-
-        // 3.7 Phase 5 확장 훅: 자율 서사 촉매 (<plot_catalyst>)
-        if (!string.IsNullOrWhiteSpace(cognitiveContext.PlotCatalyst))
-        {
-            dynamicSb.AppendLine("<plot_catalyst>");
-            dynamicSb.AppendLine(cognitiveContext.PlotCatalyst);
-            dynamicSb.AppendLine("</plot_catalyst>\n");
         }
 
         // 4. 최신 유저 액션 및 빈 입력(HTTP 400) 방어 로직
         string userActionText = latestUserMessage?.Text ?? string.Empty;
         if (string.IsNullOrWhiteSpace(userActionText))
         {
-            // Auto-Play 또는 빈 입력 시 PlotCatalyst가 있으면 채택, 없으면 안전 Fallback 주입
-            userActionText = !string.IsNullOrWhiteSpace(cognitiveContext.PlotCatalyst)
-                ? cognitiveContext.PlotCatalyst
-                : "(서사를 계속 진행하십시오.)";
+            userActionText = "(서사를 계속 진행하십시오.)";
         }
 
         dynamicSb.AppendLine("<current_action>");
@@ -165,5 +137,19 @@ public class CognitivePromptAssembler : ICognitivePromptAssembler
             SafetySettings: null,
             GenerationConfig: null
         );
+    }
+
+    private static void AppendChapterGroupedFacts(StringBuilder sb, IEnumerable<EventLedgerItem> items)
+    {
+        int lastChapter = -1;
+        foreach (var item in items)
+        {
+            if (item.Chapter > 0 && item.Chapter != lastChapter)
+            {
+                sb.AppendLine($"[제{item.Chapter}장]");
+                lastChapter = item.Chapter;
+            }
+            sb.AppendLine($"- {item.FactBullet}");
+        }
     }
 }

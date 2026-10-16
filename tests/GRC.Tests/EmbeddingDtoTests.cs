@@ -83,16 +83,15 @@ public class EmbeddingDtoTests
     [Fact]
     public void CognitiveMemoryModels_RecordProperties_WorkProperly()
     {
-        var ledgerItem = new EventLedgerItem(8, "유적에서 흑철검을 발견함", [0.1f, 0.2f]);
-        Assert.Equal(8, ledgerItem.Turn);
+        var ledgerItem = new EventLedgerItem("유적에서 흑철검을 발견함", [0.1f, 0.2f], 1);
         Assert.Equal("유적에서 흑철검을 발견함", ledgerItem.FactBullet);
+        Assert.Equal(1, ledgerItem.Chapter);
         Assert.NotNull(ledgerItem.Embedding);
         Assert.Equal(2, ledgerItem.Embedding.Length);
 
-        var entitySlot = new EntitySlotItem("엘리아스", "45%", "신뢰 형성 단계", "마력 고갈로 쇠약함");
+        var entitySlot = new EntitySlotItem("엘리아스", "마력 고갈로 쇠약함", "45%");
         Assert.Equal("엘리아스", entitySlot.Name);
-        Assert.Equal("45%", entitySlot.StatValue);
-        Assert.Equal("신뢰 형성 단계", entitySlot.MentalStage);
         Assert.Equal("마력 고갈로 쇠약함", entitySlot.ConditionDesc);
+        Assert.Equal("45%", entitySlot.StatValue);
     }
 }

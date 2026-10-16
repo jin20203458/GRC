@@ -20,5 +20,5 @@ public interface IGeminiApiService
     /// <summary>
     /// 텍스트에 대한 임베딩 벡터(Google text-embedding-004, 768차원)를 비동기로 받아옵니다.
     /// </summary>
-    Task<float[]> GetEmbeddingAsync(string text, CancellationToken cancellationToken = default);
+    Task<float[]> GetEmbeddingAsync(string text, string? taskType = null, CancellationToken cancellationToken = default);
 }

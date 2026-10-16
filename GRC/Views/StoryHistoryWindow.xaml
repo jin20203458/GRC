@@ -1,4 +1,4 @@
-﻿<Window
+<Window
     x:Class="GRC.Views.StoryHistoryWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -45,31 +45,6 @@
                                 Foreground="#C5CDD9"
                                 LineHeight="20"
                                 Text="{Binding CurrentChapterPlot}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-
-                    <!--  이전 챕터  -->
-                    <Border
-                        Margin="0,0,0,10"
-                        Padding="12"
-                        Background="#AA1A1D24"
-                        BorderBrush="#442A2D35"
-                        BorderThickness="1"
-                        CornerRadius="8">
-                        <StackPanel>
-                            <!--  🌟 색상 통일: 제목(#D1D1D1), 본문(#C5CDD9)  -->
-                            <TextBlock
-                                Margin="0,0,0,6"
-                                FontSize="15"
-                                FontWeight="Bold"
-                                Foreground="#D1D1D1"
-                                Text="지나간 서사들" />
-                            <TextBlock
-                                FontSize="13"
-                                Foreground="#C5CDD9"
-                                LineHeight="20"
-                                Text="{Binding PrevChapterPlot}"
                                 TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>

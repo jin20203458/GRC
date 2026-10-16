@@ -26,7 +26,7 @@ public class EventLedgerExtractorTests
             yield return responseJson;
         }
 
-        public Task<float[]> GetEmbeddingAsync(string text, CancellationToken cancellationToken = default)
+        public Task<float[]> GetEmbeddingAsync(string text, string? taskType = null, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(dummyEmbedding ?? new float[768]);
         }
@@ -50,17 +50,15 @@ public class EventLedgerExtractorTests
         };
 
         // Act
-        var result = await extractor.ExtractLedgerFactsAsync(turns, currentTurn: 8);
+        var result = await extractor.ExtractLedgerFactsAsync(turns, currentChapter: 1);
 
         // Assert
         Assert.Equal(2, result.Count);
-        Assert.Equal(8, result[0].Turn);
         Assert.Equal("안개 숲에서 부러진 백은 반지를 습득함", result[0].FactBullet);
         Assert.NotNull(result[0].Embedding);
         Assert.Equal(768, result[0].Embedding!.Length);
         Assert.Equal(0.5f, result[0].Embedding![0]);
 
-        Assert.Equal(8, result[1].Turn);
         Assert.Equal("동굴 제단에서 발렌티 가문 인장 반지를 발견함", result[1].FactBullet);
     }
 
@@ -75,11 +73,10 @@ public class EventLedgerExtractorTests
         var turns = new List<ChatMessage> { new("user", "여관에 방을 잡자.", DateTime.Now) };
 
         // Act
-        var result = await extractor.ExtractLedgerFactsAsync(turns, currentTurn: 16);
+        var result = await extractor.ExtractLedgerFactsAsync(turns, currentChapter: 1);
 
         // Assert
         Assert.Single(result);
-        Assert.Equal(16, result[0].Turn);
         Assert.Equal("성내 여관에 은신처를 마련함", result[0].FactBullet);
     }
 
@@ -93,7 +90,7 @@ public class EventLedgerExtractorTests
         var turns = new List<ChatMessage> { new("user", "테스트", DateTime.Now) };
 
         // Act
-        var result = await extractor.ExtractLedgerFactsAsync(turns, currentTurn: 8);
+        var result = await extractor.ExtractLedgerFactsAsync(turns);
 
         // Assert - 크래시 없이 빈 리스트 반환
         Assert.Empty(result);
@@ -107,9 +104,28 @@ public class EventLedgerExtractorTests
         var extractor = new EventLedgerExtractor(apiService);
 
         // Act
-        var result = await extractor.ExtractLedgerFactsAsync([], currentTurn: 8);
+        var result = await extractor.ExtractLedgerFactsAsync([]);
 
         // Assert
         Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task ExtractLedgerFactsAsync_AssignsSpecifiedChapterToItems()
+    {
+        // Arrange
+        string json = "{\n  \"bullets\": [\"2장의 중요 사건 발생\"]\n}";
+        var apiService = new FakeGeminiApiService(json);
+        var extractor = new EventLedgerExtractor(apiService);
+
+        var turns = new List<ChatMessage> { new("user", "행동", DateTime.Now) };
+
+        // Act - Chapter: 3 전달
+        var result = await extractor.ExtractLedgerFactsAsync(turns, currentChapter: 3);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal(3, result[0].Chapter);
+        Assert.Equal("2장의 중요 사건 발생", result[0].FactBullet);
     }
 }

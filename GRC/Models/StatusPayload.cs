@@ -13,9 +13,6 @@ public class StatusPayload
     public Dictionary<string, string> Chars { get; set; } = new();
     public List<string> Items { get; set; } = new();
     public List<string> Places { get; set; } = new();
-
-    [JsonPropertyName("unresolvedClues")]
-    public List<string>? UnresolvedClues { get; set; }
 }
 
 public class CharacterStatusUI

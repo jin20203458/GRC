@@ -185,15 +185,16 @@ public class HybridLorebookRetrieverTests
     }
 
     [Fact]
-    public void Retrieve_ActiveCharReplenishment_FillsRemainingBudget()
+    public void Retrieve_ActiveCharReplenishment_FillsRemainingBudgetAndExcludesInactiveCharacters()
     {
-        // Arrange - 직접 매칭 사물 로어북 1개 + 상태창 인물 로어북 2개
+        // Arrange - 직접 매칭 사물 로어북 1개 + 활성 인물 2개 + 비활성 조연 인물 1개(카일)
         var retriever = new HybridLorebookRetriever();
         var lorebooks = new List<LorebookEntry>
         {
             new("성배", ["성배"], "성스러운 은제 성배", "아이템", Priority: 10),
             new("루시엘", ["루시엘"], "은발 벽안의 마법사", "인물", Priority: 8),
-            new("세레나", ["세레나"], "붉은 머리의 여기사", "인물", Priority: 7)
+            new("세레나", ["세레나"], "붉은 머리의 여기사", "인물", Priority: 7),
+            new("카일", ["카일"], "1장 마을 경비병", "인물", Priority: 9) // Priority가 높아도 activeChars에 없으면 인출 금지
         };
 
         var activeChars = new List<string> { "루시엘", "세레나" };
@@ -201,11 +202,12 @@ public class HybridLorebookRetrieverTests
         // Act - 유저는 "성배"만 언급함
         var result = retriever.Retrieve("성배에 와인을 가득 채운다.", null, lorebooks, activeCharNames: activeChars, maxTokenBudget: 3000);
 
-        // Assert - 1순위 성배 + 3순위 상태창 인물 2명(루시엘, 세레나) 모두 3000토큰 내에 안전하게 패킹됨
+        // Assert - 1순위 성배 + 3순위 활성 인물 2명(루시엘, 세레나)만 인출되고 비활성 인물(카일)은 제외됨
         Assert.Equal(3, result.Count);
         Assert.Equal("성배", result[0].Name);    // 1순위 직접 매칭
-        Assert.Equal("루시엘", result[1].Name);  // 3순위 상태창 인물 (Priority 8)
-        Assert.Equal("세레나", result[2].Name);  // 3순위 상태창 인물 (Priority 7)
+        Assert.Equal("루시엘", result[1].Name);  // 3순위 상태창 활성 인물 (Priority 8)
+        Assert.Equal("세레나", result[2].Name);  // 3순위 상태창 활성 인물 (Priority 7)
+        Assert.DoesNotContain(result, r => r.Name == "카일");
     }
 
     [Fact]

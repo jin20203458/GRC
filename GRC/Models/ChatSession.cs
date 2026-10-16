@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text.Json.Serialization;
 
 namespace GRC.Models;
 
@@ -10,11 +9,8 @@ public record ChatSession(
     CharacterPreset Preset,
     List<ChatMessage> History,             // 단기 기억 (최대 20턴)
     ChapterContext CurrentContext,         // 현재 챕터 상태 (중기 기억)
-    List<ChapterContext> PrevContexts,
-    string LongTermSummary,                 // 장기 기억 (전체 줄거리)
+    string LongTermSummary,                // 장기 기억 (전체 연대기 줄거리)
     int ChapterCount = 1,
     int TotalTurnCount = 0,
-    int MediumTermUpdateCount = 0,
-    List<ClueSlotItem>? ActiveClues = null,
-    List<ClueSlotItem>? ArchivedClues = null
+    int MediumTermUpdateCount = 0
 );
