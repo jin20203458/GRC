@@ -145,7 +145,7 @@ public class EventLedgerExtractor(IGeminiApiService apiService) : IEventLedgerEx
         }
         catch
         {
-            // JSON 파싱 실패 시 안전하게 빈 리스트 반환 (레거시 정규식 폴백 완전 제거)
+            // JSON 파싱 실패 시 안전하게 빈 리스트 반환
         }
 
         return result;

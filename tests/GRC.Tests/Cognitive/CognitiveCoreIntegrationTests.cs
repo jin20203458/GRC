@@ -68,7 +68,7 @@ public class CognitiveCoreIntegrationTests(ITestOutputHelper output)
         var (apiService, _) = CreateRealServices();
         var extractor = new EventLedgerExtractor(apiService);
 
-        // 8턴 분량의 샘플 대화 구성
+        // 4턴(8개 메시지) 분량의 샘플 대화 구성
         var recentTurns = new List<ChatMessage>
         {
             new("user", "성문 앞 경비병에게 통행증을 제시한다.", DateTime.Now.AddMinutes(-10)),

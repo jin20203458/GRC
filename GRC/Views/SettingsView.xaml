@@ -45,7 +45,7 @@
                 Text="환경 설정" />
         </Grid>
 
-        <!--  💡 항목이 늘어나 화면을 벗어날 수 있으므로 ScrollViewer로 감싸줍니다  -->
+        <!--  스크롤 영역  -->
         <ScrollViewer
             Grid.Row="1"
             HorizontalScrollBarVisibility="Disabled"
@@ -55,7 +55,7 @@
                 Margin="0,0,0,20"
                 HorizontalAlignment="Center">
 
-                <!--  💡 추가된 Vertex AI 스위치  -->
+                <!--  Vertex AI 스위치  -->
                 <CheckBox
                     Margin="0,0,0,20"
                     Content="Google Cloud Vertex AI 인증 방식 사용"
@@ -63,7 +63,7 @@
                     Foreground="White"
                     IsChecked="{Binding UseVertexAI}" />
 
-                <!--  💡 추가된 구글 클라우드 Project ID  -->
+                <!--  구글 클라우드 Project ID  -->
                 <TextBlock
                     Margin="0,0,0,8"
                     FontWeight="SemiBold"
@@ -77,7 +77,7 @@
                     Foreground="White"
                     Text="{Binding ProjectId, UpdateSourceTrigger=PropertyChanged}" />
 
-                <!--  기존 API Key 항목  -->
+                <!--  API Key 항목  -->
                 <DockPanel Margin="0,0,0,8">
                     <TextBlock
                         FontWeight="SemiBold"

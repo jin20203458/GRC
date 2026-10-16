@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -12,7 +12,7 @@ public static class WindowTitleBarBehavior
 
     private const int DWMWA_CAPTION_COLOR = 35;
 
-    // 💡 추가: 비활성 상태(클릭 해제 시)에서도 다크 테마를 유지하게 해주는 속성
+    // 비활성 상태(클릭 해제 시)에서도 다크 테마를 유지하는 속성
     private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
 
     public static readonly DependencyProperty EnableDarkTitleBarProperty =
@@ -42,11 +42,11 @@ public static class WindowTitleBarBehavior
 
             if (hwnd != IntPtr.Zero)
             {
-                // 1. 💡 창 전체를 다크 모드로 강제 설정 (비활성 시 흰색으로 풀리는 현상 방지)
+                // 1. 창 전체를 다크 모드로 강제 설정 (비활성 시 흰색으로 풀리는 현상 방지)
                 int useImmersiveDarkMode = 1;
                 DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useImmersiveDarkMode, sizeof(int));
 
-                // 2. 기존 로직: 상단 헤더 색상인 #202123(BGR: 0x00232120)으로 활성 색상 칠하기
+                // 2. 상단 헤더 배경색(#202123)과 DWM 캡션 색상 동기화
                 int darkColorValue = 0x00232120;
                 DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, ref darkColorValue, sizeof(int));
             }

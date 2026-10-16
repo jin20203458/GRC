@@ -1,5 +1,5 @@
 <project_philosophy>
-Focus: Windows-native .NET 8.0 WPF desktop client with Cognitive Core 3.0 (Prefix-Frozen SystemInstruction, Event Ledger fact extraction with 768-dim embeddings, Bi-Temporal Entity Projection, Gated Salience RAG, Two-Tier Clue Tracking), non-blocking System.Threading.Channels streaming, and O(1) file persistence for Gemini roleplay.
+Focus: Windows-native .NET 8.0 WPF desktop client with Cognitive Core 3.0 (Prefix-Frozen SystemInstruction, Single Event Ledger with 768-dim embeddings, Bi-Temporal Entity Projection, Hybrid Lorebook & Gated Salience RAG), non-blocking System.Threading.Channels streaming, and O(1) file persistence for Gemini roleplay.
 </project_philosophy>
 
 <engineering_rules>

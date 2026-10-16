@@ -32,7 +32,6 @@ public static class FullHistoryLogger
         string logPath = GetLogPath(sessionFileName);
         await _fileLock.WaitAsync(); // 문이 열릴 때까지 대기
 
-        //  여기서부터 수정됨 (기존 try-catch 블록 통째로 교체) 
         int retryCount = 0;
         int maxRetries = 3;
 
@@ -40,7 +39,7 @@ public static class FullHistoryLogger
         {
             try
             {
-                // 1. 파일이 아예 없거나 빈 배열(`[]`) 수준으로 작으면 기존처럼 새 배열로 생성
+                // 1. 파일이 없거나 비어있는 경우 새 배열로 생성
                 if (!File.Exists(logPath) || new FileInfo(logPath).Length <= 4)
                 {
                     var initialHistory = new List<ChatMessage> { message };

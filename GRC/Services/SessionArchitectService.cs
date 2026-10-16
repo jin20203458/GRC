@@ -16,15 +16,18 @@ public class SessionArchitectService : ISessionArchitectService
     private readonly IGeminiApiService _apiService;
     private readonly ISessionService _sessionService;
     private readonly IPresetStorageService _presetService;
+    private readonly ILorebookService _lorebookService;
 
     public SessionArchitectService(
         IGeminiApiService apiService,
         ISessionService sessionService,
-        IPresetStorageService presetService)
+        IPresetStorageService presetService,
+        ILorebookService lorebookService)
     {
         _apiService = apiService;
         _sessionService = sessionService;
         _presetService = presetService;
+        _lorebookService = lorebookService;
     }
 
     public async IAsyncEnumerable<string> GeneratePlanAsync(
@@ -584,14 +587,17 @@ public class SessionArchitectService : ISessionArchitectService
         // 1. 세션명 결정 (세계관 개요나 컨셉에서 추출)
         string sessionName = ExtractSessionName(session.Plan.WorldviewOutline ?? session.Plan.Concept);
 
-        // 2. CharacterPreset 생성
+        // 2. CharacterPreset 생성 (생성된 로어북의 768차원 시맨틱 임베딩 자동 부착)
+        var rawLorebooks = session.GeneratedLorebooks ?? new();
+        var embeddedLorebooks = await _lorebookService.EnsureEmbeddingsAsync(rawLorebooks);
+
         var preset = new CharacterPreset(
             Name: sessionName,
             Worldview: session.GeneratedWorldview ?? "",
             SystemPrompt: session.GeneratedSystemPrompt ?? "",
             Temperature: null,
             MaxOutputTokens: 8192,
-            Lorebooks: session.GeneratedLorebooks ?? new(),
+            Lorebooks: embeddedLorebooks,
             CustomStats: session.GeneratedStats ?? new(),
             StatusUpdateGuide: session.GeneratedStatusGuide ?? ""
         );
@@ -646,12 +652,15 @@ public class SessionArchitectService : ISessionArchitectService
 
         string fileName = session.ExistingSessionFileName;
 
-        // 1. 프리셋 업데이트
+        // 1. 프리셋 업데이트 (신규 로어북의 768차원 시맨틱 임베딩 자동 부착)
+        var targetLorebooks = session.GeneratedLorebooks ?? session.ExistingPreset.Lorebooks;
+        var embeddedLorebooks = await _lorebookService.EnsureEmbeddingsAsync(targetLorebooks);
+
         var updatedPreset = session.ExistingPreset with
         {
             Worldview = session.GeneratedWorldview ?? session.ExistingPreset.Worldview,
             SystemPrompt = session.GeneratedSystemPrompt ?? session.ExistingPreset.SystemPrompt,
-            Lorebooks = session.GeneratedLorebooks ?? session.ExistingPreset.Lorebooks,
+            Lorebooks = embeddedLorebooks,
             CustomStats = session.GeneratedStats ?? session.ExistingPreset.CustomStats,
             StatusUpdateGuide = session.GeneratedStatusGuide ?? session.ExistingPreset.StatusUpdateGuide
         };

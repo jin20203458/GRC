@@ -14,7 +14,7 @@ public class PresetStorageService : IPresetStorageService
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
-    // 💡 [핵심 추가] 세션 파일명에 따라 알맞은 저장 경로를 계산하는 헬퍼 메서드
+    // 세션 파일명에 따라 알맞은 저장 경로를 계산하는 헬퍼 메서드
     private string GetFilePath(string? sessionFileName)
     {
         if (string.IsNullOrEmpty(sessionFileName))

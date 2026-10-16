@@ -46,6 +46,8 @@ public class MemoryManagerServiceTests
     internal class FakeLorebookService : ILorebookService
     {
         public Task<LorebookEntry?> ExtractMemoryToLorebookAsync(string messageText) => Task.FromResult<LorebookEntry?>(null);
+        public Task<List<LorebookEntry>> EnsureEmbeddingsAsync(IEnumerable<LorebookEntry>? lorebooks, CancellationToken cancellationToken = default)
+            => Task.FromResult(lorebooks?.ToList() ?? new List<LorebookEntry>());
     }
 
     internal class FakeAppSettingsService : IAppSettingsService

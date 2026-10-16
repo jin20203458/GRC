@@ -64,7 +64,7 @@ public class MemoryManagerService : IMemoryManagerService
     {
         return Interlocked.Exchange(ref _isChapterChanged, 0) == 1;
     }
-    // 메모리 압축 시 한 번에 처리할 대화 메시지 수 (예: 10개씩)
+    // 메모리 압축 시 한 번에 처리할 대화 메시지 수 (8개 메시지 = 4턴)
     private const int MemoryCompressionChunkSize = 8;
 
     // [1단계: 단기 기억] - 최근 대화의 날것(Raw)
@@ -82,7 +82,7 @@ public class MemoryManagerService : IMemoryManagerService
     private int _chapterCount = 1;
     private int _totalTurnCount = 0;
 
-    // 현재 롤북 텍스트 
+    // 현재 로어북 텍스트
     public string CurrentLorebookText { get; private set; } = string.Empty;
     public string CurrentSessionFileName { get; set; } = string.Empty;
     public void UpdateContextStatus(StatusPayload payload, bool replaceCustomStats = false)
@@ -169,7 +169,7 @@ public class MemoryManagerService : IMemoryManagerService
             }
         }
 
-        // (2) 하이브리드 로어북 검색 (Sparse 정규식 OR Dense 0.85, 최대 3,000토큰 동적 패킹, 3턴 잔존 및 상태창 인물 보충)
+        // (2) 하이브리드 로어북 검색 (Sparse 정규식 OR Dense 시맨틱 임베딩, 최대 3,000토큰 동적 패킹, 3턴 잔존 및 상태창 인물 보충)
         List<LorebookEntry> matchedLorebooks = [];
         if (preset.Lorebooks != null && preset.Lorebooks.Count > 0)
         {
@@ -178,13 +178,7 @@ public class MemoryManagerService : IMemoryManagerService
             {
                 if (_currentContext.Chars != null && _currentContext.Chars.Count > 0)
                 {
-                    // 조연 누적에 따른 로어북 예산 고갈 방지: 최근 단기 기억(최근 4개 메시지) 또는 현재 입력에 등장한 인물만 활성 인물로 간주
-                    string currentInputText = effectiveUserMessage.Text ?? string.Empty;
-                    activeChars = _currentContext.Chars.Keys
-                        .Where(name => !string.IsNullOrWhiteSpace(name) &&
-                            (currentInputText.Contains(name, StringComparison.OrdinalIgnoreCase) ||
-                             _shortTermMemory.TakeLast(4).Any(m => m.Text != null && m.Text.Contains(name, StringComparison.OrdinalIgnoreCase))))
-                        .ToList();
+                    activeChars = _currentContext.Chars.Keys.ToList();
                 }
             }
 
@@ -287,9 +281,6 @@ public class MemoryManagerService : IMemoryManagerService
             )
         };
 
-
-        // LogRequestJson("메인 챗 모델 (Main)", request);
-
         return request;
     }
 
@@ -327,7 +318,7 @@ public class MemoryManagerService : IMemoryManagerService
                 expectedVersion = _shortTermVersion;
             }
 
-            // V3: EventLedgerExtractor를 통한 8턴 불변 팩트 불릿 추출 (Gemini 3.5 Flash-Lite)
+            // V3: EventLedgerExtractor를 통한 4턴(8개 메시지) 불변 팩트 불릿 추출 (Gemini 3.5 Flash-Lite)
             var extractedBullets = await _eventLedgerExtractor.ExtractLedgerFactsAsync(targetToSummarize, _chapterCount);
 
             ChapterContext? targetBufferForLongTerm = null;
@@ -340,9 +331,9 @@ public class MemoryManagerService : IMemoryManagerService
                     _currentContext.EventLedgers.AddRange(extractedBullets);
                 }
 
-                // UI 및 하위 호환성을 위해 Plot 속성을 현재 챕터 불릿 타임라인으로 동기화 (Turn 메타 태그 제외)
+                // 현재 챕터 불릿들을 타임라인 문자열로 조합하여 Plot에 동기화 (서사 열람 UI 표시 및 80턴 장기 연대기 압축 입력용)
                 var currentChapterBullets = _currentContext.EventLedgers
-                    .Where(l => l.Chapter == _chapterCount || (_chapterCount == 1 && l.Chapter == 0))
+                    .Where(l => l.Chapter == _chapterCount)
                     .Select(l => $"* {l.FactBullet}");
                 string formattedPlot = $"[제 {_chapterCount}장]\n" + string.Join("\n", currentChapterBullets);
                 _currentContext.Plot = formattedPlot;
@@ -371,7 +362,7 @@ public class MemoryManagerService : IMemoryManagerService
                     Volatile.Write(ref _isChapterChanged, 1);
                     _currentContext = new ChapterContext
                     {
-                        Plot = $"[제 {_chapterCount}장] 이전 사건이 일단락되고 새로운 국면에 접어들었습니다.",
+                        Plot = $"[제 {_chapterCount}장]\n(새로운 챕터의 사건이 기록되는 중입니다.)",
                         CustomStats = new Dictionary<string, string>(previousContext.CustomStats),
                         Items = new List<string>(previousContext.Items),
                         Chars = new Dictionary<string, string>(previousContext.Chars),
@@ -383,7 +374,7 @@ public class MemoryManagerService : IMemoryManagerService
                     _mediumTermUpdateCount = 0; // 카운트 초기화
                     Volatile.Write(ref _requiresHighQualityAnchor, 1);
 
-                    // 3. 챕터 전환 즉시 장기 연대기(Pro 모델) 요약 병합 트리거 (240턴 지연 제거)
+                    // 3. 챕터 전환 즉시 장기 연대기(Pro 모델) 요약 병합 트리거
                     targetBufferForLongTerm = previousContext;
                 }
             }
@@ -406,8 +397,6 @@ public class MemoryManagerService : IMemoryManagerService
         }
     }
 
-
-    //  버전 파라미터 추가
     private async Task CompressToLongTermAsync(long expectedLongVersion, ChapterContext oldestBuffer)
     {
         string? newLongSummary = null;

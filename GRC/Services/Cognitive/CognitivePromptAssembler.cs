@@ -75,7 +75,7 @@ public class CognitivePromptAssembler : ICognitivePromptAssembler
             dynamicSb.AppendLine("</macro_chronicle>\n");
         }
 
-        // 3.2 8턴 불변 사건 렛저 (<internal_chronicle_facts>)
+        // 3.2 최근 사건 팩트 불릿 상시 노출 (<internal_chronicle_facts>, 최대 15개)
         if (cognitiveContext.LedgerFacts != null && cognitiveContext.LedgerFacts.Count > 0)
         {
             int currentChapter = cognitiveContext.CurrentChapter > 0 ? cognitiveContext.CurrentChapter : 1;

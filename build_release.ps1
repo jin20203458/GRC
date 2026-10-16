@@ -1,8 +1,8 @@
 # GRC (GenAI Roleplay Chat) Release Build Automation Script
-# usage: .\build_release.ps1 -Version "1.0.0"
+# usage: .\build_release.ps1 -Version "3.0.0"
 
 param (
-    [string]$Version = "1.0.0"
+    [string]$Version = "3.0.0"
 )
 
 $ErrorActionPreference = "Stop"

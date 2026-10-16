@@ -31,6 +31,7 @@ public partial class ChatViewModel : ObservableObject
 
     // 현재 열려있는 세션의 파일명을 기억 (자동 저장 시 덮어쓰기 용도)
     private string _currentFileName = string.Empty;
+    private bool _isSessionActive;
 
     // 네비게이션 이벤트 (MainViewModel로 '뒤로 가기' 신호 전달)
     public event Action? RequestGoBack;
@@ -143,13 +144,13 @@ public partial class ChatViewModel : ObservableObject
     {
         IsBusy = true;
         ChatHistory.Clear();
+        _isSessionActive = true;
 
         // 1. 공간 할당 (Provisioning): 단기/중기/장기 메모리를 백지화하고 세션 버전을 올려 이전 요약 무효화
         _memoryService.Clear();
 
         try
         {
-            // [기존 코드 위치 (157~160번째 줄 부근)]
             if (string.IsNullOrEmpty(fileName))
             {
                 var basePreset = await _presetService.LoadPresetAsync();
@@ -226,6 +227,74 @@ public partial class ChatViewModel : ObservableObject
 
                 LongTermSummaryText = currentSession.LongTermSummary;
                 CurrentChapterPlot = currentSession.CurrentContext?.Plot ?? "기록 없음";
+
+                // 기존 세션에 임베딩이 없는 로어북이 존재할 경우 백그라운드에서 자동 백필
+                if (CurrentPreset.Lorebooks != null && CurrentPreset.Lorebooks.Any(l => l.Embedding == null || l.Embedding.Length != 768))
+                {
+                    string targetFileName = _currentFileName;
+                    var targetLorebooks = CurrentPreset.Lorebooks.ToList();
+
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var updatedLores = await _lorebookService.EnsureEmbeddingsAsync(targetLorebooks);
+
+                            // 1. 세션 활성 상태 및 대상 파일 일치 여부 검증 (세션을 나갔거나 다른 세션으로 전환된 경우 무효화)
+                            if (!_isSessionActive || _currentFileName != targetFileName || CurrentPreset?.Lorebooks == null)
+                            {
+                                return;
+                            }
+
+                            // 2. 백그라운드 임베딩 생성 중 사용자가 로어북을 추가/수정/삭제했을 수 있으므로,
+                            //    전체 덮어쓰기 대신 현재 로어북 목록에 생성된 임베딩만 안전하게 병합
+                            var embeddingLookup = updatedLores
+                                .Where(l => l.Embedding != null && l.Embedding.Length == 768)
+                                .GroupBy(l => (l.Name, l.Content))
+                                .ToDictionary(g => g.Key, g => g.First().Embedding);
+
+                            bool anyUpdated = false;
+                            var mergedLorebooks = CurrentPreset.Lorebooks.Select(current =>
+                            {
+                                if (current.Embedding == null || current.Embedding.Length != 768)
+                                {
+                                    if (embeddingLookup.TryGetValue((current.Name, current.Content), out var emb))
+                                    {
+                                        anyUpdated = true;
+                                        return current with { Embedding = emb };
+                                    }
+                                }
+                                return current;
+                            }).ToList();
+
+                            if (anyUpdated && _isSessionActive && _currentFileName == targetFileName && CurrentPreset != null)
+                            {
+                                if (Application.Current?.Dispatcher != null)
+                                {
+                                    await Application.Current.Dispatcher.InvokeAsync(() =>
+                                    {
+                                        CurrentPreset = CurrentPreset with { Lorebooks = mergedLorebooks };
+                                    });
+                                }
+                                else
+                                {
+                                    CurrentPreset = CurrentPreset with { Lorebooks = mergedLorebooks };
+                                }
+
+                                await _presetService.SavePresetAsync(_currentFileName, CurrentPreset);
+
+                                var updatedSession = _memoryService.ExportSession(CurrentPreset);
+                                await _sessionService.SaveSessionAsync(_currentFileName, updatedSession);
+
+                                System.Diagnostics.Debug.WriteLine("[ChatViewModel] 로어북 시맨틱 임베딩 백필 및 세션 저장 완료");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[ChatViewModel] 로어북 임베딩 백필 실패: {ex.Message}");
+                        }
+                    });
+                }
             }
             IsBusy = false;
             //  초기 화면부터 랜덤 배경을 적용
@@ -264,10 +333,9 @@ public partial class ChatViewModel : ObservableObject
             {
                 if (firstMsg != null && firstMsg.Role == "user" && firstMsg.Text.StartsWith("[초기 상황]\n"))
                 {
-                    // [기존 로직] 시나리오가 이미 존재하면 텍스트만 덮어쓰기
+                    // 초기 시나리오 메시지 UI 및 백엔드 세션 메모리 갱신
                     firstMsg.Text = $"[초기 상황]\n{result.Value.InitialScenario}";
 
-                    // 💡 [수정된 부분] Timestamp가 아닌 Role과 텍스트 접두사로 확실하게 백엔드 메모리 검색
                     var memMsg = currentSession.History.FirstOrDefault(m =>
                         m.Role == "user" &&
                         (m.Text.StartsWith("[초기 상황]\n") || m.Text.StartsWith("[초기 상황 설정]\n")));
@@ -276,7 +344,7 @@ public partial class ChatViewModel : ObservableObject
                 }
                 else
                 {
-                    // [신규 로직] 초기 시나리오가 없던 빈 세션이라면 맨 앞에 새롭게 주입
+                    // 초기 시나리오가 없는 빈 세션인 경우 최초 메시지로 주입
                     string scenarioMessage = $"[초기 상황]\n{result.Value.InitialScenario}";
                     ChatHistory.Insert(0, new ChatMessage("user", scenarioMessage, DateTime.Now));
                     _memoryService.InjectInitialScenario(result.Value.InitialScenario);
@@ -298,6 +366,7 @@ public partial class ChatViewModel : ObservableObject
     [RelayCommand]
     private void GoBack()
     {
+        _isSessionActive = false;
         RequestGoBack?.Invoke();
     }
 
@@ -461,7 +530,7 @@ public partial class ChatViewModel : ObservableObject
             LongTermSummaryText = currentSession.LongTermSummary;
             CurrentChapterPlot = currentSession.CurrentContext?.Plot ?? "기록 없음";
 
-            // 👇 [신규 추가] 타이핑이 끝난 후 준비된 프리페치 추천 답변 즉시 노출
+            // 타이핑 완료 후 사전 생성된 추천 답변 즉시 노출
             if (IsSuggestionEnabled)
             {
                 if (_prefetchedSuggestions != null && _prefetchedSuggestions.Count > 0)
@@ -763,7 +832,6 @@ public partial class ChatViewModel : ObservableObject
     private void UseSuggestion(string suggestion)
     {
         InputText = suggestion;
-        //  클릭 즉시 바로 전송되길 원하신다면 아래 코드를 주석 해제하세요.
         _ = SendMessageAsync();
     }
 
@@ -788,7 +856,10 @@ public partial class ChatViewModel : ObservableObject
 
         if (finalLorebooks != null)
         {
-            CurrentPreset = CurrentPreset with { Lorebooks = finalLorebooks };
+            // 신규/수정된 로어북 항목의 768차원 시맨틱 임베딩 비동기 자동 생성
+            var embeddedLorebooks = await _lorebookService.EnsureEmbeddingsAsync(finalLorebooks);
+
+            CurrentPreset = CurrentPreset with { Lorebooks = embeddedLorebooks };
             await _presetService.SavePresetAsync(_currentFileName, CurrentPreset);
 
             var updatedSession = _memoryService.ExportSession(CurrentPreset);

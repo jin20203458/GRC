@@ -43,7 +43,11 @@ public partial class EditLorebookWindow : Window, INotifyPropertyChanged
                     KeywordsString = string.Join(", ", lore.Keywords), // 리스트를 쉼표 문자열로 변환
                     Content = lore.Content,
                     Category = lore.Category,
-                    Priority = lore.Priority.ToString()
+                    Priority = lore.Priority.ToString(),
+                    OriginalName = lore.Name,
+                    OriginalKeywordsString = string.Join(", ", lore.Keywords),
+                    OriginalContent = lore.Content,
+                    ExistingEmbedding = lore.Embedding
                 });
             }
         }
@@ -98,15 +102,33 @@ public partial class EditLorebookWindow : Window, INotifyPropertyChanged
     private void BtnSave_Click(object sender, RoutedEventArgs e)
     {
         // 2. 편집된 데이터들을 다시 불변 객체(Record)인 LorebookEntry 리스트로 변환하여 저장
-        FinalLorebooks = LorebookItems.Select(item => new LorebookEntry(
-            Name: item.Name ?? "이름 없음",
-            Keywords: string.IsNullOrWhiteSpace(item.KeywordsString)
-                        ? new List<string>()
-                        : item.KeywordsString.Split(',').Select(k => k.Trim()).Where(k => !string.IsNullOrEmpty(k)).ToList(),
-            Content: item.Content ?? "",
-            Category: item.Category ?? "기타",
-            Priority: int.TryParse(item.Priority, out int p) ? p : 0
-        )).ToList();
+        FinalLorebooks = LorebookItems.Select(item =>
+        {
+            string name = item.Name ?? "이름 없음";
+            var keywords = string.IsNullOrWhiteSpace(item.KeywordsString)
+                ? new List<string>()
+                : item.KeywordsString.Split(',').Select(k => k.Trim()).Where(k => !string.IsNullOrEmpty(k)).ToList();
+            string content = item.Content ?? "";
+            string category = item.Category ?? "기타";
+            int priority = int.TryParse(item.Priority, out int p) ? p : 0;
+
+            // 내용(이름, 키워드, 본문)이 변경되지 않았다면 기존 임베딩을 그대로 보존 (API 비용 절감)
+            bool isUntouched = item.ExistingEmbedding != null &&
+                               string.Equals(item.Name, item.OriginalName, StringComparison.Ordinal) &&
+                               string.Equals(item.KeywordsString, item.OriginalKeywordsString, StringComparison.Ordinal) &&
+                               string.Equals(item.Content, item.OriginalContent, StringComparison.Ordinal);
+
+            float[]? embedding = isUntouched ? item.ExistingEmbedding : null;
+
+            return new LorebookEntry(
+                Name: name,
+                Keywords: keywords,
+                Content: content,
+                Category: category,
+                Priority: priority,
+                Embedding: embedding
+            );
+        }).ToList();
 
         DialogResult = true; // ChatViewModel에 true 반환
         Close();
@@ -176,6 +198,11 @@ public class EditableLorebookEntry : INotifyPropertyChanged
             OnPropertyChanged(nameof(Priority));
         }
     }
+
+    public string OriginalName { get; init; } = string.Empty;
+    public string OriginalKeywordsString { get; init; } = string.Empty;
+    public string OriginalContent { get; init; } = string.Empty;
+    public float[]? ExistingEmbedding { get; init; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
     protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

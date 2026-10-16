@@ -48,7 +48,7 @@ public class HybridLorebookRetrieverTests
             new("흑철검", ["흑철검"], "고대 드워프가 제련한 검", "아이템", Priority: 10, Embedding: entryEmbedding)
         };
 
-        // Act - 유저는 "검은색 철검"이라고 입력하여 키워드 매칭 실패하지만, Dense 유사도 1.0 >= 0.85 만족
+        // Act - 유저는 "검은색 철검"이라고 입력하여 키워드 매칭 실패하지만, Dense 유사도 1.0 >= DenseThreshold(0.68) 만족
         var result = retriever.Retrieve("그는 검은색 철검을 바라보았다.", queryEmbedding, lorebooks);
 
         // Assert
@@ -113,7 +113,7 @@ public class HybridLorebookRetrieverTests
         // Act - 유저 입력에 '공통키워드'가 있어 6개 모두 매칭됨 (총 토큰 약 240T <= 2000T)
         var result = retriever.Retrieve("공통키워드에 대해 이야기한다.", null, lorebooks, maxTokenBudget: 2000);
 
-        // Assert - 기존 3개 고정 상한을 넘어 6개 모두 안전하게 패킹됨
+        // Assert - 토큰 예산 내에서 6개 모두 안전하게 패킹됨
         Assert.Equal(6, result.Count);
         Assert.Equal("설정1", result[0].Name);
         Assert.Equal("설정6", result[5].Name);
@@ -234,5 +234,49 @@ public class HybridLorebookRetrieverTests
         Assert.Equal("고대전함", result[0].Name);
         Assert.Equal("비행마법", result[1].Name);
         Assert.DoesNotContain(result, r => r.Name == "루시엘");
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task EnsureEmbeddingsAsync_GeneratesMissingEmbeddings_AndPreservesExisting()
+    {
+        // Arrange
+        var fakeApi = new MemoryManagerServiceTests.FakeGeminiApiService
+        {
+            MockEmbedding = CreateDummyVector(0.05f)
+        };
+
+        var lorebookService = new LorebookService(fakeApi);
+
+        var existingVector = CreateDummyVector(0.01f);
+        var lorebooks = new List<LorebookEntry>
+        {
+            new("기존항목", ["키워드1"], "기존 본문", "일반", Priority: 5, Embedding: existingVector),
+            new("신규항목", ["키워드2"], "신규 본문", "아이템", Priority: 3, Embedding: null)
+        };
+
+        // Act
+        var result = await lorebookService.EnsureEmbeddingsAsync(lorebooks);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        // 기존 항목은 임베딩을 그대로 보존 (API 미호출)
+        Assert.Same(existingVector, result[0].Embedding);
+        // 신규 항목은 768차원 벡터가 채워짐
+        Assert.NotNull(result[1].Embedding);
+        var emb = result[1].Embedding!;
+        Assert.Equal(768, emb.Length);
+        Assert.Equal(0.05f, emb[0]);
+    }
+
+    [Fact]
+    public void BuildEmbeddingSourceText_FormatsNameKeywordsAndContentProperly()
+    {
+        var entryWithKeywords = new LorebookEntry("흑철검", ["드워프검", "고대명검"], "단단한 검", "아이템");
+        string text1 = LorebookService.BuildEmbeddingSourceText(entryWithKeywords);
+        Assert.Equal("흑철검 (드워프검, 고대명검): 단단한 검", text1);
+
+        var entryWithoutKeywords = new LorebookEntry("세계수", [], "거대한 나무", "세계관");
+        string text2 = LorebookService.BuildEmbeddingSourceText(entryWithoutKeywords);
+        Assert.Equal("세계수: 거대한 나무", text2);
     }
 }

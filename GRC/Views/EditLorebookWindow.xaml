@@ -1,4 +1,4 @@
-﻿<Window
+<Window
     x:Class="GRC.Views.EditLorebookWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -22,7 +22,6 @@
                 <ResourceDictionary Source="pack://application:,,,/Themes/ModernStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!--  💡 텍스트박스 입력 글꼴 크기 축소 (13.5 -> 12.5)  -->
             <Style TargetType="TextBox">
                 <Setter Property="Background" Value="#22FFFFFF" />
                 <Setter Property="Foreground" Value="#F2F2F2" />
@@ -217,7 +216,6 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <!--  💡 안내 라벨 폰트 축소 (13 -> 11.5) 및 아래쪽 여백 조절  -->
                 <TextBlock
                     Grid.Row="0"
                     Margin="0,0,0,4"

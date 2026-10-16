@@ -21,7 +21,7 @@ public class StreamingState
     public string PendingBuffer { get; set; } = "";
     public bool IsTagMode { get; set; } = false;
 
-    // 💡 [최적화 핵심] 성능 개선을 위해 추가된 속성들
+    // 60FPS UI 일괄 렌더링용 큐 및 버퍼
     // 1글자씩 넘어오는 문자를 임시로 담아둘 스레드 안전한 바구니(Queue)
     public ConcurrentQueue<char> CharQueue { get; } = new ConcurrentQueue<char>();
     // 모니터 주사율(16ms)에 맞춰 일괄 렌더링을 지시할 타이머
@@ -68,7 +68,7 @@ public static class StatefulStreamingHelper
                 panel.SetValue(StateProperty, state);
                 panel.Children.Clear();
 
-                //  [최적화 핵심] 16ms(약 60FPS) 주기로 작동하는 렌더링 전용 타이머 세팅
+                // 16ms(약 60FPS) 주기로 작동하는 렌더링 전용 타이머 세팅
                 state.RenderTimer = new DispatcherTimer(DispatcherPriority.Render, panel.Dispatcher)
                 {
                     Interval = TimeSpan.FromMilliseconds(16)
@@ -288,7 +288,7 @@ public static class StatefulStreamingHelper
                 state.CurrentRunBuffer.Append(state.PendingBuffer);
                 state.PendingBuffer = "";
             }
-            // 기존 1글자마다 직접 UI(Run.Text)를 조작하던 것을 StringBuilder 버퍼에 조립하는 것으로 대체
+            // UI 스레드 부하 방지를 위해 StringBuilder 버퍼에 조립 후 일괄 반영
             state.CurrentRunBuffer.Append(c);
         }
 

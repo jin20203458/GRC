@@ -19,7 +19,6 @@
         <!--  배경 오버레이  -->
         <Border Background="#D4050505" />
 
-        <!--  기존에 있던 Margin="20" 제거  -->
         <Grid>
             <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
 

@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 namespace GRC.Services;
 
 /// <summary>
-/// 병렬 합집합(Sparse OR Dense 0.85) 하이브리드 로어북 검색기 구현체
+/// 병렬 합집합(Sparse 정규식 OR Dense 시맨틱 임베딩) 하이브리드 로어북 검색기 구현체
 /// </summary>
 public class HybridLorebookRetriever : IHybridLorebookRetriever
 {
@@ -34,7 +34,7 @@ public class HybridLorebookRetriever : IHybridLorebookRetriever
 
         lock (_syncRoot)
         {
-            // [1단계] 이번 턴 직접 매칭 (Sparse 정규식 OR Dense 시맨틱 임베딩 >= 0.85)
+            // [1단계] 이번 턴 직접 매칭 (Sparse 정규식 OR Dense 시맨틱 임베딩 >= DenseThreshold)
             var directMatched = new List<LorebookEntry>();
             if (!string.IsNullOrWhiteSpace(userQuery))
             {

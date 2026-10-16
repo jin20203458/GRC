@@ -52,7 +52,7 @@ public class MessageRoleplayConverter : IMultiValueConverter
             {
                 chunks.Add(new MessageChunk { Type = ChunkType.ModelInnerThought, Text = part.Trim('\r', '\n') });
             }
-            // 2. 가볍고 빠른 첫 글자 체크로 변경
+            // 2. 첫 글자 빠른 검사
             else if (part.Length > 0 && (part[0] == '"' || part[0] == '“' || part[0] == '”'))
             {
                 chunks.Add(new MessageChunk { Type = ChunkType.ModelDialogue, Text = part.Trim('\r', '\n') });

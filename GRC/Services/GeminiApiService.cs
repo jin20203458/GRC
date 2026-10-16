@@ -59,7 +59,7 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
                 return "[System Error]: 구글 클라우드 Project ID가 설정되지 않았습니다.";
 
             string modelName = GetVertexModelName(overrideTier ?? settings.SelectedModel);
-            // 💡 [중요 엔드포인트 규격]: 최신 주력 LLM 모델(gemini-3.8-flash, gemini-4-argon, gemini-3.5-flash-lite)은
+            // [중요 엔드포인트 규격]: 최신 주력 LLM 모델(gemini-3.8-flash, gemini-4-argon, gemini-3.5-flash-lite)은
             // Google Cloud 정책상 오직 전역 리전('locations/global') 엔드포인트에서만 서비스됩니다.
             // 로컬 리전(예: us-central1)으로 호출할 경우 '404 NotFound (Publisher model was not found)' 오류가 발생합니다. (2026-10-15 실측 검증 완료)
             requestUri = $"https://aiplatform.googleapis.com/v1beta1/projects/{settings.ProjectId}/locations/global/publishers/google/models/{modelName}:generateContent";
@@ -200,10 +200,10 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
             string modelName = GetVertexModelName(overrideTier ?? settings.SelectedModel);
             System.Diagnostics.Debug.WriteLine($"[Vertex AI 스트리밍 사용 모델]: {modelName}, 리전: global");
 
-            // 💡 [중요 엔드포인트 규격]: 최신 주력 LLM 모델은 전역('locations/global') 엔드포인트 전용입니다. (us-central1 호출 시 404 NotFound)
+            // [중요 엔드포인트 규격]: 최신 주력 LLM 모델은 전역('locations/global') 엔드포인트 전용입니다. (us-central1 호출 시 404 NotFound)
             requestUri = $"https://aiplatform.googleapis.com/v1beta1/projects/{settings.ProjectId}/locations/global/publishers/google/models/{modelName}:streamGenerateContent?alt=sse";
 
-            // 💡 C# 문법 제한 해결: catch 문 밖에서 yield를 반환하기 위해 변수 사용
+            // C# 문법 제한 해결: catch 문 밖에서 yield를 반환하기 위해 변수 사용
             string? authErrorMessage = null;
             try
             {
@@ -378,7 +378,7 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
                     return Array.Empty<float>();
                 }
 
-                // 💡 [중요 엔드포인트 및 모델 규격]:
+                // [중요 엔드포인트 및 모델 규격]:
                 // 1. 모델명: Vertex AI에서 'text-embedding-004'는 영어/코드 전용 모델이므로, 한글 입력 시 토큰 길이별 더미 벡터를 반환하는 결함이 발생합니다.
                 //    따라서 한국어/다국어 공식 특화 모델인 'text-multilingual-embedding-002'를 필히 사용해야 합니다.
                 // 2. 리전: Vertex AI 임베딩 모델은 'locations/asia-northeast3'(서울 리전, 약 500ms) 엔드포인트를 사용하여 태평양 횡단 지연시간(us-central1, 약 1,100ms)을 대폭 단축합니다.
@@ -419,7 +419,7 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
                     return Array.Empty<float>();
                 }
 
-                // 💡 AI Studio(generativelanguage.googleapis.com)에서는 'models/text-embedding-004'가 다국어 통합 모델로 정상 작동합니다.
+                // AI Studio(generativelanguage.googleapis.com)에서는 'models/text-embedding-004'가 다국어 통합 모델로 정상 작동합니다.
                 string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={settings.ApiKey}";
                 httpRequest.RequestUri = new Uri(endpoint);
 

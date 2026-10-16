@@ -7,7 +7,7 @@ namespace GRC.Views;
 
 public partial class NewSessionSetupWindow : Window
 {
-    // 💡 화면에 바인딩될 동적 스탯 리스트
+    // 화면에 바인딩될 동적 스탯 리스트
     public ObservableCollection<StatInputItem> StatItems { get; set; } = new();
 
     // 입력 데이터 모델
@@ -22,7 +22,6 @@ public partial class NewSessionSetupWindow : Window
     public string InputStatusUpdateGuide => StatusUpdateGuideTextBox.Text;
     public string InputScenario => ScenarioTextBox.Text;
 
-    // 💡 기존 텍스트박스 값을 읽어오던 것을 리스트 조립으로 변경 (다른 파일 수정 불필요)
     public string InputCustomStats
     {
         get

@@ -85,7 +85,23 @@ model: 검을 쥐는 순간, 머릿속에 낯선 기억의 파편들이 쏟아�
                 throw new Exception("AI가 올바른 형태의 데이터(JSON)를 생성하지 못했습니다. 다시 시도해 주세요.");
             }
 
-            return extractedMemory;
+            // 5. 추출된 기억 로어북의 768차원 시맨틱 임베딩 자동 부착
+            float[]? embedding = null;
+            try
+            {
+                string embText = BuildEmbeddingSourceText(extractedMemory);
+                var emb = await apiService.GetEmbeddingAsync(embText, taskType: "RETRIEVAL_DOCUMENT");
+                if (emb != null && emb.Length == 768)
+                {
+                    embedding = emb;
+                }
+            }
+            catch
+            {
+                embedding = null;
+            }
+
+            return extractedMemory with { Embedding = embedding };
         }
         catch (Exception ex)
         {
@@ -93,5 +109,68 @@ model: 검을 쥐는 순간, 머릿속에 낯선 기억의 파편들이 쏟아�
             // ViewModel에서 잡아 UI 알림을 띄울 수 있도록 예외를 다시 던짐
             throw;
         }
+    }
+
+    public async Task<List<LorebookEntry>> EnsureEmbeddingsAsync(
+        System.Collections.Generic.IEnumerable<LorebookEntry>? lorebooks,
+        System.Threading.CancellationToken cancellationToken = default)
+    {
+        if (lorebooks == null) return [];
+
+        var list = lorebooks.ToList();
+        if (list.Count == 0) return [];
+
+        var results = new List<LorebookEntry>(list.Count);
+
+        foreach (var entry in list)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                results.Add(entry);
+                continue;
+            }
+
+            // 이미 768차원 유효 임베딩이 존재하면 API 호출 없이 그대로 보존
+            if (entry.Embedding != null && entry.Embedding.Length == 768)
+            {
+                results.Add(entry);
+                continue;
+            }
+
+            // 신규이거나 임베딩이 없는 항목에 대해 768차원 벡터 발급
+            float[]? embedding = null;
+            try
+            {
+                string sourceText = BuildEmbeddingSourceText(entry);
+                if (!string.IsNullOrWhiteSpace(sourceText))
+                {
+                    var emb = await apiService.GetEmbeddingAsync(sourceText, taskType: "RETRIEVAL_DOCUMENT", cancellationToken: cancellationToken);
+                    if (emb != null && emb.Length == 768)
+                    {
+                        embedding = emb;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LorebookService] '{entry.Name}' 임베딩 생성 실패 (Graceful Degradation): {ex.Message}");
+                embedding = null;
+            }
+
+            results.Add(entry with { Embedding = embedding });
+        }
+
+        return results;
+    }
+
+    public static string BuildEmbeddingSourceText(LorebookEntry entry)
+    {
+        string keywords = entry.Keywords != null && entry.Keywords.Count > 0
+            ? string.Join(", ", entry.Keywords.Where(k => !string.IsNullOrWhiteSpace(k)))
+            : string.Empty;
+
+        return string.IsNullOrWhiteSpace(keywords)
+            ? $"{entry.Name}: {entry.Content}".Trim()
+            : $"{entry.Name} ({keywords}): {entry.Content}".Trim();
     }
 }

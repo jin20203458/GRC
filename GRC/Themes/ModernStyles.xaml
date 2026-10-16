@@ -548,7 +548,7 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <!--  👇 [새로 추가] 2~3단계에서 만든 헬퍼가 부착될 '스트리밍 전용 말풍선'  -->
+            <!--  스트리밍 전용 말풍선 패널  -->
             <StackPanel
                 x:Name="StreamingPanel"
                 Margin="0,4,0,4"
@@ -558,7 +558,7 @@
         </Grid>
 
         <DataTemplate.Triggers>
-            <!--  [기존 코드] 메시지 등장 시 페이드인/슬라이드업 애니메이션 트리거  -->
+            <!--  메시지 등장 시 페이드인/슬라이드업 애니메이션 트리거  -->
             <EventTrigger RoutedEvent="FrameworkElement.Loaded">
                 <BeginStoryboard>
                     <Storyboard>
@@ -579,13 +579,12 @@
                 </BeginStoryboard>
             </EventTrigger>
 
-            <!--  👇 [새로 추가] 스와프(Swap) 작동을 위한 조건 트리거  -->
+            <!--  스트리밍 상태 시 패널 표시 트리거  -->
             <MultiDataTrigger>
                 <MultiDataTrigger.Conditions>
                     <Condition Binding="{Binding Role}" Value="model" />
                     <Condition Binding="{Binding Text}" Value="" />
                 </MultiDataTrigger.Conditions>
-                <!--  👇 TargetName을 StreamingPanel로 변경  -->
                 <Setter TargetName="StreamingPanel" Property="Visibility" Value="Visible" />
             </MultiDataTrigger>
         </DataTemplate.Triggers>
