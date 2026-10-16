@@ -20,7 +20,7 @@ public class SessionListViewModelTests
         public Task<ChatSession?> LoadSessionAsync(string fileName)
         {
             var preset = new CharacterPreset("Hero", "Fantasy World", "Guide");
-            var session = new ChatSession(preset, new List<ChatMessage>(), new ChapterContext(), new List<ChapterContext>(), "");
+            var session = new ChatSession(preset, new List<ChatMessage>(), new ChapterContext(), "");
             return Task.FromResult<ChatSession?>(session);
         }
 

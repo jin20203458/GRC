@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace GRC.Models;
 
@@ -10,5 +10,6 @@ public record LorebookEntry(
     List<string> Keywords,        // 스캔 시 반응할 트리거 키워드들 (예: ["칼리고", "안개", "검은 연기"])
     string Content,               // 프롬프트에 주입될 실제 설정 내용
     string Category,            // 카테고리 (예: "인물", "장소", "아이템", "세계관") - 상태창 연동 시 활용
-    int Priority = 0
+    int Priority = 0,
+    float[]? Embedding = null   // [신규] 768차원 시맨틱 벡터 (선택적 기본값)
 );

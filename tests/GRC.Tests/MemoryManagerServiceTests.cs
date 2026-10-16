@@ -13,9 +13,9 @@ namespace GRC.Tests;
 
 public class MemoryManagerServiceTests
 {
-    private class FakeGeminiApiService : IGeminiApiService
+    internal class FakeGeminiApiService : IGeminiApiService
     {
-        public string MockResponse { get; set; } = "<plot>챕터 줄거리 요약본입니다.</plot>";
+        public string MockResponse { get; set; } = "{\n  \"bullets\": [\"챕터 줄거리 요약본입니다.\"]\n}";
         public int SendMessageCallCount { get; private set; }
         public TaskCompletionSource<bool>? DelayTcs { get; set; }
 
@@ -36,20 +36,36 @@ public class MemoryManagerServiceTests
         {
             yield break;
         }
+
+        public float[]? MockEmbedding { get; set; }
+
+        public Task<float[]> GetEmbeddingAsync(string text, string? taskType = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(MockEmbedding ?? Array.Empty<float>());
     }
 
-    private class FakeLorebookService : ILorebookService
+    internal class FakeLorebookService : ILorebookService
     {
-        public string BuildLorebookInjection(List<LorebookEntry>? lorebooks, ChapterContext currentContext, IEnumerable<ChatMessage> recentMemory) => "";
         public Task<LorebookEntry?> ExtractMemoryToLorebookAsync(string messageText) => Task.FromResult<LorebookEntry?>(null);
     }
 
-    private class FakeAppSettingsService : IAppSettingsService
+    internal class FakeAppSettingsService : IAppSettingsService
     {
         public Task<AppSettings> LoadSettingsAsync() => Task.FromResult(new AppSettings("dummy-api-key"));
         public Task SaveSettingsAsync(AppSettings settings) => Task.CompletedTask;
         public bool IsCredentialFileExists() => true;
         public Task<bool> CopyCredentialFileAsync(string sourceFilePath) => Task.FromResult(true);
+    }
+
+    internal class SpyHybridLorebookRetriever : IHybridLorebookRetriever
+    {
+        public List<string>? LastActiveCharNames { get; private set; }
+        public List<LorebookEntry> Retrieve(string userQuery, float[]? queryEmbedding, IEnumerable<LorebookEntry> allLorebooks, IEnumerable<string>? activeCharNames = null, int maxTokenBudget = 3000)
+        {
+            LastActiveCharNames = activeCharNames?.ToList();
+            return [];
+        }
+
+        public void ClearSticky() { }
     }
 
     private static async Task<bool> WaitForConditionAsync(Func<bool> condition, int timeoutMs = 7000, int pollIntervalMs = 100)
@@ -69,8 +85,7 @@ public class MemoryManagerServiceTests
     {
         var fakeApi = new FakeGeminiApiService();
         var fakeSettings = new FakeAppSettingsService();
-        var fakeLorebook = new FakeLorebookService();
-        var service = new MemoryManagerService(fakeApi, fakeSettings, fakeLorebook);
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
         var preset = new CharacterPreset("Hero", "Fantasy World", "You are a heroic guide.");
 
         // 17턴 (임계치 18턴 미만) 누적
@@ -93,11 +108,10 @@ public class MemoryManagerServiceTests
     {
         var fakeApi = new FakeGeminiApiService
         {
-            MockResponse = "<plot>성문이 열리고 원정대가 출정했다.</plot>"
+            MockResponse = "{\n  \"bullets\": [\"성문이 열리고 원정대가 출정했다.\"]\n}"
         };
         var fakeSettings = new FakeAppSettingsService();
-        var fakeLorebook = new FakeLorebookService();
-        var service = new MemoryManagerService(fakeApi, fakeSettings, fakeLorebook)
+        var service = new MemoryManagerService(fakeApi, fakeSettings)
         {
             CompressionDelayMs = 10
         };
@@ -128,12 +142,11 @@ public class MemoryManagerServiceTests
     {
         var fakeApi = new FakeGeminiApiService
         {
-            MockResponse = "<plot>지연되어 도착한 구버전 줄거리 요약</plot>",
+            MockResponse = "{\n  \"bullets\": [\"지연되어 도착한 구버전 줄거리 요약\"]\n}",
             DelayTcs = new TaskCompletionSource<bool>()
         };
         var fakeSettings = new FakeAppSettingsService();
-        var fakeLorebook = new FakeLorebookService();
-        var service = new MemoryManagerService(fakeApi, fakeSettings, fakeLorebook)
+        var service = new MemoryManagerService(fakeApi, fakeSettings)
         {
             CompressionDelayMs = 10
         };
@@ -170,8 +183,7 @@ public class MemoryManagerServiceTests
     {
         var fakeApi = new FakeGeminiApiService();
         var fakeSettings = new FakeAppSettingsService();
-        var fakeLorebook = new FakeLorebookService();
-        var service = new MemoryManagerService(fakeApi, fakeSettings, fakeLorebook);
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
         var preset = new CharacterPreset("Hero", "Fantasy World", "You are a heroic guide.");
 
         const string initialScenario = "용사는 마왕성 입구의 거대한 철문 앞에 도달했다.";
@@ -193,8 +205,7 @@ public class MemoryManagerServiceTests
     {
         var fakeApi = new FakeGeminiApiService();
         var fakeSettings = new FakeAppSettingsService();
-        var fakeLorebook = new FakeLorebookService();
-        var service = new MemoryManagerService(fakeApi, fakeSettings, fakeLorebook);
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
 
         // 1. 초기 상태: 앵커 플래그는 true
         Assert.True(service.ConsumeAnchorFlag());
@@ -214,8 +225,7 @@ public class MemoryManagerServiceTests
     {
         var fakeApi = new FakeGeminiApiService();
         var fakeSettings = new FakeAppSettingsService();
-        var fakeLorebook = new FakeLorebookService();
-        var service = new MemoryManagerService(fakeApi, fakeSettings, fakeLorebook);
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
 
         // 초기 상태: false
         Assert.False(service.ConsumeChapterChangedFlag());
@@ -238,8 +248,7 @@ public class MemoryManagerServiceTests
     {
         var fakeApi = new FakeGeminiApiService();
         var fakeSettings = new FakeAppSettingsService();
-        var fakeLorebook = new FakeLorebookService();
-        var service = new MemoryManagerService(fakeApi, fakeSettings, fakeLorebook);
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
 
         // 1. 1차 상태 업데이트
         var payload1 = new StatusPayload
@@ -287,4 +296,165 @@ public class MemoryManagerServiceTests
         Assert.Equal("각성 상태", service.CurrentContext.CustomStats["Status"]);
         Assert.False(service.CurrentContext.CustomStats.ContainsKey("HP"));
     }
+
+    [Fact]
+    public async Task BuildNarrativeRequestAsync_ExcludesVisible15LedgersFromRAGPool()
+    {
+        // Arrange
+        var fakeApi = new FakeGeminiApiService();
+        var fakeSettings = new FakeAppSettingsService();
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
+
+        var preset = new CharacterPreset(
+            Name: "테스트",
+            Worldview: "세계관",
+            SystemPrompt: "시스템",
+            Temperature: 0.7f,
+            MaxOutputTokens: 1000
+        );
+
+        // 현재 챕터에 렛저 10개 추가 (상시 노출 15개 이하)
+        for (int i = 1; i <= 10; i++)
+        {
+            service.CurrentContext.EventLedgers.Add(new EventLedgerItem($"현재 사건 {i}", Chapter: 1));
+        }
+
+        // Act - 과거 앵커 질문 ("옛날 약속 기억나?")
+        var request = await service.BuildNarrativeRequestAsync(
+            new ChatMessage("user", "옛날 그 약속 기억나?", DateTime.Now), preset);
+
+        // Assert - 10개는 상시 노출 영역(<internal_chronicle_facts>)에 있으므로,
+        // <recalled_history>에 중복 인출되지 않아야 함 (태그 미생성)
+        var userPart = request.Contents[^1].Parts[0].Text!;
+        Assert.Contains("<internal_chronicle_facts>", userPart);
+        Assert.DoesNotContain("<recalled_history>", userPart);
+    }
+
+    [Fact]
+    public async Task BuildNarrativeRequestAsync_WhenLedgersExceed15_IncludesPushedOutLedgersInRAGPool()
+    {
+        // Arrange
+        var fakeApi = new FakeGeminiApiService();
+        var fakeSettings = new FakeAppSettingsService();
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
+
+        var preset = new CharacterPreset(
+            Name: "테스트",
+            Worldview: "세계관",
+            SystemPrompt: "시스템",
+            Temperature: 0.7f,
+            MaxOutputTokens: 1000
+        );
+
+        // 현재 챕터에 렛저 18개 추가 (1~3번은 15개 밖으로 밀려남)
+        for (int i = 1; i <= 18; i++)
+        {
+            service.CurrentContext.EventLedgers.Add(new EventLedgerItem($"사건 기록 {i}", Chapter: 1));
+        }
+
+        // Act - 유저 입력
+        var request = await service.BuildNarrativeRequestAsync(
+            new ChatMessage("user", "다음 행동을 진행한다.", DateTime.Now), preset);
+
+        var userPart = request.Contents[^1].Parts[0].Text!;
+        // 상시 노출 영역에는 최근 15개(4~18번)만 노출되어야 함 (Turn 메타 태그 제외)
+        Assert.DoesNotContain("[Turn", userPart);
+        Assert.Contains("- 사건 기록 18", userPart);
+        // 1~3번은 상시 노출(최근 15개)에서 밀려났으므로 포함되지 않아야 함
+        string normalizedUserPart = userPart.Replace("\r\n", "\n");
+        Assert.DoesNotContain("- 사건 기록 1\n", normalizedUserPart);
+        Assert.DoesNotContain("- 사건 기록 2\n", normalizedUserPart);
+        Assert.DoesNotContain("- 사건 기록 3\n", normalizedUserPart);
+    }
+
+    [Fact]
+    public async Task BuildNarrativeRequestAsync_WhenUserRecallsPushedOutLedger_RecallsOnlyPushedOutLedgerViaRAG()
+    {
+        // Arrange - 768차원 임베딩을 제공하는 Fake API 설정
+        var targetEmb = new float[768];
+        for (int i = 0; i < 768; i++) targetEmb[i] = 1.0f / MathF.Sqrt(768);
+
+        var otherEmb = new float[768];
+        otherEmb[0] = 1.0f; // targetEmb와 다른 방향
+
+        var fakeApi = new FakeGeminiApiService { MockEmbedding = targetEmb };
+        var fakeSettings = new FakeAppSettingsService();
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
+
+        var preset = new CharacterPreset(
+            Name: "테스트",
+            Worldview: "세계관",
+            SystemPrompt: "시스템",
+            Temperature: 0.7f,
+            MaxOutputTokens: 1000
+        );
+
+        // 1번 렛저: 밀려날 대상이며 targetEmb를 장착 (과거의 펜던트 약속)
+        service.CurrentContext.EventLedgers.Add(new EventLedgerItem("루시엘과 맹세한 푸른 펜던트의 서약", targetEmb, Chapter: 1));
+
+        // 2~18번 렛저들: 상시 노출 영역에 들어갈 최근 17개 렛저들 (otherEmb 장착)
+        for (int i = 2; i <= 18; i++)
+        {
+            service.CurrentContext.EventLedgers.Add(new EventLedgerItem($"사건 기록 {i}", otherEmb, Chapter: 1));
+        }
+
+        // Act - 유저가 질문형이 아닌 순수 평서문 행동으로 과거 아이템 조작 ("루시엘에게 푸른 펜던트를 건넨다.")
+        // 키워드 게이트(ShouldTriggerRAG)를 거치지 않고 순수 시맨틱 임베딩 유사도로 RAG가 직결 발동해야 함
+        var request = await service.BuildNarrativeRequestAsync(
+            new ChatMessage("user", "루시엘에게 푸른 펜던트를 건넨다.", DateTime.Now), preset);
+
+        var userPart = request.Contents[^1].Parts[0].Text!;
+
+        // Assert 1: RAG 태그(<recalled_history>)가 프롬프트에 정상 생성되어야 함
+        Assert.Contains("<recalled_history>", userPart);
+        Assert.DoesNotContain("[Turn", userPart);
+
+        // Assert 2: 상시 노출에서 밀려났던 1번 렛저가 RAG를 통해 <recalled_history> 안으로 쏙 소환되어야 함!
+        Assert.Contains("루시엘과 맹세한 푸른 펜던트의 서약", userPart);
+
+        // Assert 3: 상시 노출 영역(<internal_chronicle_facts>)에는 1번 렛저가 없고, 최신 15개(4~18번)만 존재해야 함
+        int internalStartIndex = userPart.IndexOf("<internal_chronicle_facts>");
+        int internalEndIndex = userPart.IndexOf("</internal_chronicle_facts>");
+        string internalSection = userPart.Substring(internalStartIndex, internalEndIndex - internalStartIndex);
+        Assert.DoesNotContain("루시엘과 맹세한 푸른 펜던트의 서약", internalSection);
+        Assert.Contains("- 사건 기록 18", internalSection);
+    }
+
+    [Fact]
+    public void RestoreSession_RestoresStateCorrectly()
+    {
+        // Arrange
+        var fakeApi = new FakeGeminiApiService();
+        var fakeSettings = new FakeAppSettingsService();
+        var service = new MemoryManagerService(fakeApi, fakeSettings);
+        var preset = new CharacterPreset("Hero", "World", "System");
+
+        var currentContext = new ChapterContext
+        {
+            EventLedgers = [
+                new(FactBullet: "1장 불릿 1", Chapter: 1),
+                new(FactBullet: "2장 불릿 1", Chapter: 2)
+            ]
+        };
+
+        var session = new ChatSession(
+            Preset: preset,
+            History: [new ChatMessage("user", "대화", DateTime.Now)],
+            CurrentContext: currentContext,
+            LongTermSummary: "요약",
+            ChapterCount: 2,
+            TotalTurnCount: 3,
+            MediumTermUpdateCount: 1
+        );
+
+        // Act
+        service.RestoreSession(session);
+
+        // Assert
+        Assert.Equal(2, service.CurrentContext.EventLedgers.Count);
+        Assert.Equal("1장 불릿 1", service.CurrentContext.EventLedgers[0].FactBullet);
+        Assert.Equal("2장 불릿 1", service.CurrentContext.EventLedgers[1].FactBullet);
+        Assert.Equal("요약", service.ExportSession(preset).LongTermSummary);
+    }
 }
+

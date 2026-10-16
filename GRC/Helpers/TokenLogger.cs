@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,9 +14,6 @@ public static class TokenLogger
     private static readonly SemaphoreSlim _lock = new(1, 1);
     private static string GetLogPath(string sessionId)
     {
-        if (sessionId.EndsWith(".json"))
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", sessionId.Replace(".json", "_TokenLog.csv"));
-
         string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", sessionId);
         if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
         return Path.Combine(dir, "TokenLog.csv");

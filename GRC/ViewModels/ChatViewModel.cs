@@ -94,12 +94,9 @@ public partial class ChatViewModel : ObservableObject
     public ObservableCollection<CustomStatUI> CustomStatsUIList { get; } = [];
 
 
-    // 장기 기억, 이전 챕터, 현재 챕터를 UI에 보여주기 위한 프로퍼티
+    // 장기 기억 및 현재 챕터를 UI에 보여주기 위한 프로퍼티
     [ObservableProperty]
     private string _longTermSummaryText = string.Empty;
-
-    [ObservableProperty]
-    private string _prevChapterPlot = string.Empty;
 
     [ObservableProperty]
     private string _currentChapterPlot = string.Empty;
@@ -228,12 +225,6 @@ public partial class ChatViewModel : ObservableObject
                 UpdateStatusUI(currentSession.CurrentContext?.CustomStats, currentSession.CurrentContext?.Chars, currentSession.CurrentContext?.Items, currentSession.CurrentContext?.Places);
 
                 LongTermSummaryText = currentSession.LongTermSummary;
-
-                // 여기에 다중 버퍼 로직 적용
-                PrevChapterPlot = currentSession.PrevContexts != null && currentSession.PrevContexts.Any()
-                    ? string.Join("\n\n", currentSession.PrevContexts.Select(ctx => ctx.Plot))
-                    : "기록 없음";
-
                 CurrentChapterPlot = currentSession.CurrentContext?.Plot ?? "기록 없음";
             }
             IsBusy = false;
@@ -468,9 +459,6 @@ public partial class ChatViewModel : ObservableObject
             CurrentChapter = currentSession.ChapterCount;
             CurrentTurn = currentSession.TotalTurnCount;
             LongTermSummaryText = currentSession.LongTermSummary;
-            PrevChapterPlot = currentSession.PrevContexts != null && currentSession.PrevContexts.Any()
-                ? string.Join("\n\n", currentSession.PrevContexts.Select(ctx => ctx.Plot))
-                : "기록 없음";
             CurrentChapterPlot = currentSession.CurrentContext?.Plot ?? "기록 없음";
 
             // 👇 [신규 추가] 타이핑이 끝난 후 준비된 프리페치 추천 답변 즉시 노출
@@ -709,9 +697,6 @@ public partial class ChatViewModel : ObservableObject
         CurrentChapter = emptySession.ChapterCount;
         CurrentTurn = emptySession.TotalTurnCount;
         LongTermSummaryText = emptySession.LongTermSummary;
-        PrevChapterPlot = emptySession.PrevContexts != null && emptySession.PrevContexts.Any()
-            ? string.Join("\n\n", emptySession.PrevContexts.Select(ctx => ctx.Plot))
-            : "기록 없음";
         CurrentChapterPlot = emptySession.CurrentContext?.Plot ?? "기록 없음";
 
         UpdateStatusUI(emptySession.CurrentContext?.CustomStats, emptySession.CurrentContext?.Chars, emptySession.CurrentContext?.Items, emptySession.CurrentContext?.Places);

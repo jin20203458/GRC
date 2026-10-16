@@ -79,9 +79,7 @@ public partial class SessionListViewModel : ObservableObject
                     var preview = lastMsg.Length > 30 ? lastMsg[..30] + "..." : lastMsg;
 
                     // 파일 수정 시간 가져오기
-                    string targetFilePath = file.EndsWith(".json")
-                        ? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", file)
-                        : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", file, "Session.json");
+                    string targetFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", file, "Session.json");
 
                     var fileInfo = new FileInfo(targetFilePath);
 

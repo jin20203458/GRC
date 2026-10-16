@@ -90,3 +90,40 @@ public record UsageMetadata(
 public record PromptFeedback(
     [property: JsonPropertyName("blockReason")] string BlockReason
 );
+
+// ==========================================
+// [Embedding DTO (text-embedding-004)]
+// ==========================================
+
+// AI Studio 전용 임베딩 DTO
+public record EmbedContentRequest(
+    [property: JsonPropertyName("content")] Content Content,
+    [property: JsonPropertyName("taskType")] string? TaskType = null
+);
+
+public record EmbedContentResponse(
+    [property: JsonPropertyName("embedding")] ContentEmbedding Embedding
+);
+
+public record ContentEmbedding(
+    [property: JsonPropertyName("values")] float[] Values
+);
+
+// Vertex AI 전용 임베딩 DTO
+public record VertexEmbedRequest(
+    [property: JsonPropertyName("instances")] List<VertexEmbedInstance> Instances
+);
+
+public record VertexEmbedInstance(
+    [property: JsonPropertyName("content")] string Content,
+    [property: JsonPropertyName("task_type")] string? TaskType = null
+);
+
+public record VertexEmbedResponse(
+    [property: JsonPropertyName("predictions")] List<VertexEmbedPrediction> Predictions
+);
+
+public record VertexEmbedPrediction(
+    [property: JsonPropertyName("embeddings")] ContentEmbedding Embeddings
+);
+

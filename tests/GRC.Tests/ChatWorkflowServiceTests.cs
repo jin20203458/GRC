@@ -23,6 +23,9 @@ public class ChatWorkflowServiceTests
         {
             yield break;
         }
+
+        public Task<float[]> GetEmbeddingAsync(string text, string? taskType = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(Array.Empty<float>());
     }
 
     private class FakeMemoryManagerService : IMemoryManagerService
@@ -45,7 +48,7 @@ public class ChatWorkflowServiceTests
         public void RestoreSession(ChatSession session) { }
         public void InjectInitialScenario(string scenarioText) { }
         public ChatSession ExportSession(CharacterPreset currentPreset)
-            => new(currentPreset, new List<ChatMessage>(), new ChapterContext(), new List<ChapterContext>(), "");
+            => new(currentPreset, new List<ChatMessage>(), new ChapterContext(), "");
         public void UpdateContextStatus(StatusPayload payload, bool replaceCustomStats = false) { }
     }
 

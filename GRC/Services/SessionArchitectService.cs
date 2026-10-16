@@ -620,7 +620,6 @@ public class SessionArchitectService : ISessionArchitectService
             Preset: preset,
             History: history,
             CurrentContext: chapterContext,
-            PrevContexts: new List<ChapterContext>(),
             LongTermSummary: "아직 요약된 줄거리가 없습니다.",
             ChapterCount: 1,
             TotalTurnCount: 0,
@@ -702,7 +701,8 @@ public class SessionArchitectService : ISessionArchitectService
                     Chars = currentContext.Chars,
                     Items = currentContext.Items,
                     Places = currentContext.Places,
-                    TriggeredMetaEvents = currentContext.TriggeredMetaEvents
+                    TriggeredMetaEvents = currentContext.TriggeredMetaEvents,
+                    EventLedgers = currentContext.EventLedgers
                 }
             };
 

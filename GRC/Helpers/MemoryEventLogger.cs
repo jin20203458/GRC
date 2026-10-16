@@ -14,18 +14,9 @@ public static class MemoryEventLogger
             string targetSessionId = !string.IsNullOrEmpty(sessionId) ? sessionId : TokenLogger.CurrentSessionFileName;
             if (string.IsNullOrEmpty(targetSessionId)) return;
 
-            string logPath;
-            // TokenLogger의 GetLogPath 로직 참고 (하위 호환성 및 새 폴더 분기 대응)
-            if (targetSessionId.EndsWith(".json"))
-            {
-                logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", targetSessionId.Replace(".json", "_MemoryLog.txt"));
-            }
-            else
-            {
-                string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", targetSessionId);
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                logPath = Path.Combine(dir, "MemoryLog.txt");
-            }
+            string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sessions", targetSessionId);
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            string logPath = Path.Combine(dir, "MemoryLog.txt");
 
             string logLine = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {logMessage}\n";
             await File.AppendAllTextAsync(logPath, logLine);

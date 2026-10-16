@@ -74,6 +74,7 @@
     <PackageReference Include="Google.Cloud.TextToSpeech.V1" Version="3.18.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
+    <PackageReference Include="System.Numerics.Tensors" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
