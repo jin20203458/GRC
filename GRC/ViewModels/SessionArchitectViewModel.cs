@@ -34,7 +34,7 @@ public partial class SessionArchitectViewModel : ObservableObject
     private bool _editMode;  // 기존 세션 수정 모드 여부
 
     [ObservableProperty]
-    private bool _isAutoMode;  // true: 완전 자율루프 / false: 휴먼루프(기존)
+    private bool _isAutoMode = true;  // 기본값 true: 원클릭 스포일러 프리 자동 완주 모드
 
     [ObservableProperty]
     private AgentPlan? _plan; // 파싱된 전체 계획
@@ -56,7 +56,7 @@ public partial class SessionArchitectViewModel : ObservableObject
         Messages.Add(new ArchitectMessage
         {
             Role = "assistant",
-            Text = "안녕하세요! AI 세션 아키텍트입니다. 만들고 싶으신 TRPG 세션의 장르, 세계관, 분위기 등의 컨셉을 자유롭게 알려주세요. 제가 세션 기획안 수립부터 파일 생성까지 전 과정을 도와드리겠습니다.\n\n예: \"다크 판타지, 타락한 신전과 성녀, 고딕 분위기, 이단 심판관과 마녀 사냥\"\n\n↻ 하단의 **자동** 토글을 켜면 컨셉 입력만으로 6단계를 자동 완주합니다.",
+            Text = "안녕하세요! AI 세션 아키텍트 2.0입니다. 플레이하고 싶은 TRPG 세션의 장르, 분위기, 시작 컨셉을 자유롭게 입력해 주세요.\n\n예: \"평소엔 밝고 유쾌한 아카데미 학원물이지만, 학원 도시 이면에는 어두운 비밀이 도사린 서브컬처 판타지\"\n\n현재 **자동** 모드가 켜져 있어, 컨셉만 입력하시면 스포일러 없이 세계관·로어북·오프닝까지 최고 품질로 자동 완성 후 바로 시작됩니다. (단계별로 직접 검수하며 수정하려면 우측 하단 **자동** 토글을 꺼주세요.)",
             Timestamp = DateTime.Now
         });
     }
@@ -94,7 +94,7 @@ public partial class SessionArchitectViewModel : ObservableObject
             _cts.Cancel();
             IsBusy = false;
 
-            // 자율 모드 중 중단 시 수동 모드로 전환하여 유저에게 제어권 반환 (A안)
+            // 자율 모드 중 중단 시 수동 모드로 전환하여 유저에게 제어권 반환
             if (IsAutoMode)
             {
                 IsAutoMode = false;
@@ -161,13 +161,13 @@ public partial class SessionArchitectViewModel : ObservableObject
                     Plan = parsedPlan;
                     _session.Plan = parsedPlan;
 
-                    // 계획 요약 카드를 메시지로 추가
+                    // 자율 모드에서는 스포일러 방지 요약 카드만 표시, 수동 모드에서는 전체 기획안 표시
                     Messages.Add(new ArchitectMessage
                     {
                         Role = "assistant",
-                        Text = GetPlanSummaryMarkdown(parsedPlan),
+                        Text = IsAutoMode ? GetAutoPlanSummaryMarkdown(parsedPlan) : GetPlanSummaryMarkdown(parsedPlan),
                         RelatedStep = AgentStep.PlanReview,
-                        HasActionButtons = !IsAutoMode, // 자율 모드에서는 승인 버튼 비노출
+                        HasActionButtons = !IsAutoMode,
                         Timestamp = DateTime.Now
                     });
 
@@ -208,7 +208,6 @@ public partial class SessionArchitectViewModel : ObservableObject
                 bool success = ProcessStepContent(originalStep, revisedText);
                 if (success)
                 {
-                    // 기존 동일 단계에 속하는 메시지의 ActionButtons 비활성화 처리
                     DisablePreviousActionButtons(originalStep);
 
                     Messages.Add(new ArchitectMessage
@@ -234,7 +233,6 @@ public partial class SessionArchitectViewModel : ObservableObject
             }
             else
             {
-                // 자유 대화 (그 외 예외 상황)
                 Messages.Add(new ArchitectMessage
                 {
                     Role = "assistant",
@@ -245,7 +243,6 @@ public partial class SessionArchitectViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            // 중단 시 상태 복구
             if (CurrentStep == AgentStep.Planning) CurrentStep = AgentStep.Idle;
             else if (IsGenStep(CurrentStep)) CurrentStep = GetReviewStepFromGen(CurrentStep);
         }
@@ -257,7 +254,6 @@ public partial class SessionArchitectViewModel : ObservableObject
                 Text = $"에러 발생: {ex.Message}",
                 Timestamp = DateTime.Now
             });
-            // 이전 상태 복구
             if (CurrentStep == AgentStep.Planning) CurrentStep = AgentStep.Idle;
             else if (IsGenStep(CurrentStep)) CurrentStep = GetReviewStepFromGen(CurrentStep);
         }
@@ -306,7 +302,7 @@ public partial class SessionArchitectViewModel : ObservableObject
 
                 if (success)
                 {
-                    // ── 자가 검토 단계 ──
+                    // ── 자가 검토 단계 (Evaluator-Optimizer) ──
                     BusyMessage = GetBusyMessage(reviewStep, isReviewing: true);
 
                     var (pass, feedback) = await _architectService.ReviewStepContentAsync(
@@ -315,15 +311,14 @@ public partial class SessionArchitectViewModel : ObservableObject
 
                     if (!pass && feedback != null)
                     {
-                        // 검토 실패: 시스템 메시지로 피드백 결과 표시
                         Messages.Add(new ArchitectMessage
                         {
                             Role = "system",
-                            Text = $"↻ 자가 검토 결과 수정 필요: {feedback}",
+                            Text = $"자가 검수 보완 진행: {feedback}",
                             Timestamp = DateTime.Now
                         });
 
-                        // 1회 자동 수정 (기존 ReviseContentAsync 재활용)
+                        // 1회 자동 리파인
                         BusyMessage = GetBusyMessage(reviewStep, isRevising: true);
                         var reviseStream = _architectService.ReviseContentAsync(
                             reviewStep, GetCurrentStepContent(reviewStep), feedback,
@@ -331,11 +326,9 @@ public partial class SessionArchitectViewModel : ObservableObject
 
                         var revisedContentText = await ConsumeStreamAsync(reviseStream, _cts!.Token);
 
-                        // 재파싱
                         success = ProcessStepContent(reviewStep, revisedContentText);
                         if (!success)
                         {
-                            // 재수정 후에도 파싱 실패 → 수동 모드 전환
                             IsAutoMode = false;
                             CurrentStep = reviewStep;
                             Messages.Add(new ArchitectMessage
@@ -348,35 +341,32 @@ public partial class SessionArchitectViewModel : ObservableObject
                         }
                     }
 
-                // 카드 추가 및 다음 단계 진행
-                Messages.Add(new ArchitectMessage
+                    // 자율 모드: 스포일러 방지 완료 요약 배지만 출력하고 다음 단계로 즉시 진행
+                    Messages.Add(new ArchitectMessage
+                    {
+                        Role = "assistant",
+                        Text = GetAutoStepCompletionSummary(reviewStep),
+                        RelatedStep = reviewStep,
+                        HasActionButtons = false,
+                        Timestamp = DateTime.Now
+                    });
+                    CurrentStep = reviewStep;
+                }
+                else
                 {
-                    Role = "assistant",
-                    Text = GetStepDisplayContent(reviewStep),
-                    RelatedStep = reviewStep,
-                    HasActionButtons = false, // 자율 모드에서는 버튼 없음
-                    Timestamp = DateTime.Now
-                });
-                CurrentStep = reviewStep;
-            }
-            else
-            {
-                // 파싱 실패 → 수동 모드 전환하여 유저에게 제어권 반환
-                Messages.Add(new ArchitectMessage
-                {
-                    Role = "system",
-                    Text = $"자동 생성 중 파싱 오류가 발생하여 수동 모드로 전환합니다.\n\nAI 응답:\n{stepContentText}",
-                    Timestamp = DateTime.Now
-                });
-                IsAutoMode = false;
-                CurrentStep = reviewStep;
-                return;
-            }
-
+                    Messages.Add(new ArchitectMessage
+                    {
+                        Role = "system",
+                        Text = $"자동 생성 중 파싱 오류가 발생하여 수동 모드로 전환합니다.\n\nAI 응답:\n{stepContentText}",
+                        Timestamp = DateTime.Now
+                    });
+                    IsAutoMode = false;
+                    CurrentStep = reviewStep;
+                    return;
+                }
             }
             catch (OperationCanceledException)
             {
-                // 중단 시 Cancel()에서 이미 수동 전환 처리됨
                 return;
             }
         }
@@ -399,12 +389,10 @@ public partial class SessionArchitectViewModel : ObservableObject
         AgentStep nextGenStep = GetNextGenStep(CurrentStep);
         if (nextGenStep == AgentStep.Complete)
         {
-            // 모든 검토 완료 -> 최종 세션 파일 적용
             await ApplySessionAsync();
             return;
         }
 
-        // ActionButtons 비활성화
         DisablePreviousActionButtons(CurrentStep);
 
         _cts = new CancellationTokenSource();
@@ -439,7 +427,6 @@ public partial class SessionArchitectViewModel : ObservableObject
 
         try
         {
-            // 다음 단계 생성 시작
             var stream = _architectService.GenerateStepContentAsync(nextGenStep, _session.Plan!, _session, null, _cts.Token);
             var stepContentText = await ConsumeStreamAsync(stream, _cts.Token);
 
@@ -465,13 +452,11 @@ public partial class SessionArchitectViewModel : ObservableObject
                     Text = $"컨텐츠 생성 파싱에 실패했습니다. AI 응답:\n\n{stepContentText}\n\n요구 사항을 다시 입력하거나 새로 시도해 주세요.",
                     Timestamp = DateTime.Now
                 });
-                // 이전 검토 단계로 롤백
-                CurrentStep = GetReviewStepFromGen(nextGenStep) - 2; // (Gen / Review는 2단계 차이가 나므로 역산)
+                CurrentStep = GetReviewStepFromGen(nextGenStep) - 2;
             }
         }
         catch (OperationCanceledException)
         {
-            // 중단 시 이전 검토 단계로 롤백
             CurrentStep = GetReviewStepFromGen(nextGenStep) - 2;
         }
         catch (Exception ex)
@@ -482,7 +467,6 @@ public partial class SessionArchitectViewModel : ObservableObject
                 Text = $"에러 발생: {ex.Message}",
                 Timestamp = DateTime.Now
             });
-            // 원래 상태로 복원
             CurrentStep = GetReviewStepFromGen(nextGenStep) - 2;
         }
         finally
@@ -511,7 +495,7 @@ public partial class SessionArchitectViewModel : ObservableObject
                 Messages.Add(new ArchitectMessage
                 {
                     Role = "assistant",
-                    Text = "🎉 기존 세션에 성공적으로 변경 사항이 적용되었습니다! 잠시 후 세션이 리로드됩니다.",
+                    Text = "기존 세션에 성공적으로 변경 사항이 적용되었습니다. 잠시 후 세션이 리로드됩니다.",
                     Timestamp = DateTime.Now
                 });
             }
@@ -521,15 +505,14 @@ public partial class SessionArchitectViewModel : ObservableObject
                 Messages.Add(new ArchitectMessage
                 {
                     Role = "assistant",
-                    Text = "🎉 새로운 세션이 정상적으로 생성되었습니다! 플레이 리스트에서 확인하실 수 있습니다.",
+                    Text = "새로운 세션이 생성되었습니다. 잠시 후 첫 장면으로 진입합니다.",
                     Timestamp = DateTime.Now
                 });
             }
 
             CurrentStep = AgentStep.Complete;
             
-            // 2초 정도 메시지를 보여준 뒤 화면을 닫고 세션을 전환하게끔 대기
-            await Task.Delay(2000);
+            await Task.Delay(1500);
             SessionCreated?.Invoke(fileName);
         }
         catch (Exception ex)
@@ -540,7 +523,7 @@ public partial class SessionArchitectViewModel : ObservableObject
                 Text = $"세션 적용 중 치명적 오류 발생: {ex.Message}",
                 Timestamp = DateTime.Now
             });
-            CurrentStep = AgentStep.PromptReview; // 직전 단계로 복귀
+            CurrentStep = AgentStep.PromptReview;
         }
         finally
         {
@@ -599,7 +582,7 @@ public partial class SessionArchitectViewModel : ObservableObject
         AgentStep.LorebookReview => AgentStep.StatusGen,
         AgentStep.StatusReview => AgentStep.ScenarioGen,
         AgentStep.ScenarioReview => AgentStep.PromptGen,
-        AgentStep.PromptReview => AgentStep.Complete, // 끝
+        AgentStep.PromptReview => AgentStep.Complete,
         _ => AgentStep.Idle
     };
 
@@ -611,7 +594,14 @@ public partial class SessionArchitectViewModel : ObservableObject
         AgentStep.PlanReview => JsonSerializer.Serialize(_session.Plan),
         AgentStep.WorldviewReview => _session.GeneratedWorldview ?? "",
         AgentStep.LorebookReview => JsonSerializer.Serialize(_session.GeneratedLorebooks),
-        AgentStep.StatusReview => JsonSerializer.Serialize(new { stats = _session.GeneratedStats, guide = _session.GeneratedStatusGuide }),
+        AgentStep.StatusReview => JsonSerializer.Serialize(new StatusDesignPayload
+        {
+            Stats = _session.GeneratedStats ?? new(),
+            Guide = _session.GeneratedStatusGuide ?? "",
+            InitialChars = _session.GeneratedInitialChars ?? new(),
+            InitialPlaces = _session.GeneratedInitialPlaces ?? [],
+            InitialItems = _session.GeneratedInitialItems ?? []
+        }),
         AgentStep.ScenarioReview => _session.GeneratedScenario ?? "",
         AgentStep.PromptReview => _session.GeneratedSystemPrompt ?? "",
         _ => ""
@@ -636,12 +626,12 @@ public partial class SessionArchitectViewModel : ObservableObject
                 return false;
 
             case AgentStep.WorldviewReview:
-                _session.GeneratedWorldview = rawResponse.Trim();
+                _session.GeneratedWorldview = SessionArchitectService.SanitizeWorldview(rawResponse);
                 return !string.IsNullOrWhiteSpace(_session.GeneratedWorldview);
 
             case AgentStep.LorebookReview:
                 var lorebooks = _architectService.ParseLorebooks(rawResponse);
-                if (lorebooks != null)
+                if (lorebooks != null && lorebooks.Count > 0)
                 {
                     _session.GeneratedLorebooks = lorebooks;
                     return true;
@@ -649,21 +639,33 @@ public partial class SessionArchitectViewModel : ObservableObject
                 return false;
 
             case AgentStep.StatusReview:
-                var statusDesign = _architectService.ParseStatusDesign(rawResponse);
-                if (statusDesign != null)
+                var fullPayload = _architectService.ParseStatusDesignPayload(rawResponse);
+                if (fullPayload != null)
                 {
-                    _session.GeneratedStats = statusDesign.Value.Stats;
-                    _session.GeneratedStatusGuide = statusDesign.Value.Guide;
+                    _session.GeneratedStats = fullPayload.Stats;
+                    _session.GeneratedStatusGuide = fullPayload.Guide;
+                    _session.GeneratedInitialChars = fullPayload.InitialChars;
+                    _session.GeneratedInitialPlaces = fullPayload.InitialPlaces;
+                    _session.GeneratedInitialItems = fullPayload.InitialItems;
+                    return true;
+                }
+                var legacyDesign = _architectService.ParseStatusDesign(rawResponse);
+                if (legacyDesign != null)
+                {
+                    _session.GeneratedStats = legacyDesign.Value.Stats;
+                    _session.GeneratedStatusGuide = legacyDesign.Value.Guide;
                     return true;
                 }
                 return false;
 
             case AgentStep.ScenarioReview:
-                _session.GeneratedScenario = rawResponse.Trim();
+                _session.GeneratedScenario = SessionArchitectService.SanitizeScenario(rawResponse);
                 return !string.IsNullOrWhiteSpace(_session.GeneratedScenario);
 
             case AgentStep.PromptReview:
-                _session.GeneratedSystemPrompt = rawResponse.Trim();
+                _session.GeneratedSystemPrompt = rawResponse.Trim().StartsWith("<system>", StringComparison.OrdinalIgnoreCase)
+                    ? rawResponse.Trim()
+                    : SessionArchitectService.CompileHybridSystemPrompt(rawResponse, _session.Plan);
                 return !string.IsNullOrWhiteSpace(_session.GeneratedSystemPrompt);
 
             default:
@@ -672,7 +674,34 @@ public partial class SessionArchitectViewModel : ObservableObject
     }
 
     /// <summary>
-    /// UI에 렌더링할 단계별 마크다운/텍스트를 구성합니다.
+    /// 자율 모드 실행 시 스포일러 없이 진행 현황만 간결하게 안내하는 마크다운을 생성합니다.
+    /// </summary>
+    private string GetAutoPlanSummaryMarkdown(AgentPlan plan)
+    {
+        var sb = new StringBuilder();
+        string title = !string.IsNullOrWhiteSpace(plan.SessionTitle) ? plan.SessionTitle : "신규 롤플레잉 세션";
+        sb.AppendLine($"### [1/6] 서사 청사진 수립 완료: {title}");
+        if (!string.IsNullOrWhiteSpace(plan.SurfaceTone))
+            sb.AppendLine($"- **일상/표면 호흡:** {plan.SurfaceTone}");
+        if (!string.IsNullOrWhiteSpace(plan.CoreWeight))
+            sb.AppendLine($"- **서사/갈등 무게감:** {plan.CoreWeight}");
+        sb.AppendLine($"- **설계 규모:** 로어북 **{plan.LorebookPlan.Count}건**, 추적 스탯 **{plan.StatsPlan.Count}건**");
+        sb.AppendLine("\n*(스포일러 방지를 위해 세부 로어북과 심층 세계관 본문은 화면에 미리 노출하지 않고 백그라운드에서 생성합니다.)*");
+        return sb.ToString();
+    }
+
+    private string GetAutoStepCompletionSummary(AgentStep reviewStep) => reviewStep switch
+    {
+        AgentStep.WorldviewReview => "### [2/6] 마스터 세계관 구축 완료\n- `<master_setting>` 전용 4대 섹션 고밀도 레퍼런스가 생성 및 정제되었습니다.",
+        AgentStep.LorebookReview => $"### [3/6] 로어북 심층 생성 완료\n- 총 **{_session.GeneratedLorebooks?.Count ?? 0}개**의 인물/장소/세계관 로어북과 대사 샘플이 병렬 생성되었습니다.",
+        AgentStep.StatusReview => $"### [4/6] 상태창 및 Turn 0 초기 컨텍스트 시딩 완료\n- 추적 스탯 **{_session.GeneratedStats?.Count ?? 0}개** 및 초기 등장인물/장소/소지품 연동이 완료되었습니다.",
+        AgentStep.ScenarioReview => "### [5/6] 오프닝 시나리오 집필 완료\n- 세계관과 등장인물 말투가 반영된 첫 직면 장면이 준비되었습니다.",
+        AgentStep.PromptReview => "### [6/6] 하이브리드 시스템 지시문 컴파일 완료\n- 코어 행동 헌법과 장르 맞춤 연출 수칙이 결합되었습니다.",
+        _ => "단계 완료"
+    };
+
+    /// <summary>
+    /// 수동 검토 모드에서 UI에 렌더링할 단계별 상세 마크다운/텍스트를 구성합니다.
     /// </summary>
     private string GetStepDisplayContent(AgentStep reviewStep) => reviewStep switch
     {
@@ -688,12 +717,18 @@ public partial class SessionArchitectViewModel : ObservableObject
     private string GetPlanSummaryMarkdown(AgentPlan plan)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("### AI 설계 계획안");
-        sb.AppendLine($"**테마 및 개요:** {plan.WorldviewOutline}\n");
+        sb.AppendLine($"### AI 설계 계획안: {plan.SessionTitle}");
+        if (!string.IsNullOrWhiteSpace(plan.SurfaceTone))
+            sb.AppendLine($"- **일상/표면 호흡:** {plan.SurfaceTone}");
+        if (!string.IsNullOrWhiteSpace(plan.CoreWeight))
+            sb.AppendLine($"- **배경/갈등 무게감:** {plan.CoreWeight}");
+        if (!string.IsNullOrWhiteSpace(plan.PcInitialPosition))
+            sb.AppendLine($"- **주인공 초기 입지:** {plan.PcInitialPosition}");
+        sb.AppendLine($"- **세계관 아웃라인:** {plan.WorldviewOutline}\n");
         sb.AppendLine("#### 생성 예정 로어북 항목");
         foreach (var item in plan.LorebookPlan)
         {
-            sb.AppendLine($"- **{item.Name}** ({item.Category}): {item.Brief}");
+            sb.AppendLine($"- **{item.Name}** ({item.Category}, 우선순위 {item.Priority}): {item.Brief}");
         }
         sb.AppendLine("\n#### 설계 예정 스탯창 구성");
         sb.AppendLine(string.Join(", ", plan.StatsPlan.Select(s => $"`{s}`")));
@@ -725,6 +760,14 @@ public partial class SessionArchitectViewModel : ObservableObject
         {
             sb.AppendLine($"- **{stat.Key}**: `{stat.Value}`");
         }
+        if (_session.GeneratedInitialChars != null && _session.GeneratedInitialChars.Count > 0)
+        {
+            sb.AppendLine("\n#### [Turn 0 등장인물 초기 상태]");
+            foreach (var ch in _session.GeneratedInitialChars)
+            {
+                sb.AppendLine($"- **{ch.Key}**: {ch.Value}");
+            }
+        }
         sb.AppendLine("\n#### [스탯 업데이트 가이드라인]");
         sb.AppendLine(guide);
         return sb.ToString();
@@ -736,9 +779,6 @@ public partial class SessionArchitectViewModel : ObservableObject
         {
             msg.HasActionButtons = false;
         }
-        // WPF UI 바인딩 갱신용 (ObservableCollection 내부 값 변경 시 알림)
-        // 리스트를 리셋하거나 강제 PropertyChanged가 아니라서 DataTemplate 내 바인딩이 작동하게
-        // 객체 참조를 교체해 주는 것이 깔끔합니다.
         for (int i = 0; i < Messages.Count; i++)
         {
             if (Messages[i].RelatedStep == step)
@@ -764,31 +804,28 @@ public partial class SessionArchitectViewModel : ObservableObject
         {
             (_, _, true)                       => "AI가 검토 피드백을 바탕으로 수정하는 중",
             (_, true, _)                       => "AI가 생성 결과를 자가 검토하는 중",
-            (AgentStep.Planning, _, _)         => "AI가 기획안 설계 계획을 수립하는 중",
-            (AgentStep.WorldviewGen, _, _)     => "AI가 세계관을 구성하는 중",
-            (AgentStep.LorebookGen, _, _)      => "AI가 로어북 데이터를 생성하는 중",
-            (AgentStep.StatusGen, _, _)        => "AI가 상태창을 설계하는 중",
-            (AgentStep.ScenarioGen, _, _)      => "AI가 초기 시나리오를 집필하는 중",
-            (AgentStep.PromptGen, _, _)        => "AI가 시스템 지시문을 작성하는 중",
-            (AgentStep.Applying, _, _)         => "세션 파일을 저장하고 적용하는 중",
+            (AgentStep.Planning, _, _)         => "Pro 모델이 2축 서사 구조 및 기획안을 설계하는 중",
+            (AgentStep.WorldviewGen, _, _)     => "Pro 모델이 고밀도 마스터 세계관을 구축하는 중",
+            (AgentStep.LorebookGen, _, _)      => "Pro 모델이 로어북 배치를 병렬 심층 생성하는 중",
+            (AgentStep.StatusGen, _, _)        => "Pro 모델이 상태창 및 Turn 0 컨텍스트를 시딩하는 중",
+            (AgentStep.ScenarioGen, _, _)      => "Pro 모델이 오프닝 시나리오를 집필하는 중",
+            (AgentStep.PromptGen, _, _)        => "하이브리드 시스템 지시문을 컴파일하는 중",
+            (AgentStep.Applying, _, _)         => "768차원 임베딩 발급 및 세션 파일을 적용하는 중",
             _                                  => "AI가 답변을 구성하는 중"
         };
 
     /// <summary>
     /// IAsyncEnumerable 스트리밍을 소비하여 최종 완성된 전체 텍스트를 반환합니다.
-    /// (실시간 타이핑 UI가 제거됨에 따라 단순 문자열 결합으로 최적화 및 백그라운드 스레드 격리)
     /// </summary>
     private async Task<string> ConsumeStreamAsync(
         IAsyncEnumerable<string> stream, CancellationToken ct)
     {
-        // UI 스레드 프리징 방지를 위해 백그라운드 스레드에서 스트림 수신 및 문자열 조립 수행
         return await Task.Run(async () =>
         {
             var sb = new StringBuilder();
 
             try
             {
-                // ConfigureAwait(false)를 통해 이후 반복도 메인 스레드 컨텍스트를 강제하지 않음
                 await foreach (var chunk in stream.WithCancellation(ct).ConfigureAwait(false))
                 {
                     sb.Append(chunk);

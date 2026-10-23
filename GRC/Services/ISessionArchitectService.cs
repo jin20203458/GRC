@@ -34,6 +34,7 @@ public interface ISessionArchitectService
     AgentPlan? ParsePlan(string rawResponse);
     List<LorebookEntry>? ParseLorebooks(string rawResponse);
     (Dictionary<string, string> Stats, string Guide)? ParseStatusDesign(string rawResponse);
+    StatusDesignPayload? ParseStatusDesignPayload(string rawResponse);
     
     /// <summary>
     /// 자율 모드에서 각 단계의 생성 결과물을 자가 검토합니다.

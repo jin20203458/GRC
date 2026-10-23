@@ -1,26 +1,88 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace GRC.Models;
 
 /// <summary>
-/// 에이전트의 전체 작업 계획. 유저 컨셉으로부터 AI가 생성한 청사진.
+/// 에이전트의 전체 작업 계획. 유저 컨셉으로부터 AI가 생성한 서사 설계 청사진(Blueprint).
 /// </summary>
 public class AgentPlan
 {
-    public string Concept { get; set; } = "";           // 유저 원본 컨셉 입력
-    public string WorldviewOutline { get; set; } = "";   // 세계관 개요 (1-2줄 요약)
-    public List<LorebookPlanItem> LorebookPlan { get; set; } = []; // 로어북 항목 계획
-    public List<string> StatsPlan { get; set; } = [];    // 스탯 이름 계획 리스트
-    public string ScenarioOutline { get; set; } = "";    // 시나리오 개요 (1-2줄)
-    public string PromptOutline { get; set; } = "";      // 시스템 프롬프트 스타일 개요
+    [JsonIgnore]
+    public string Concept { get; set; } = "";                      // 유저 원본 컨셉 입력
+
+    [JsonPropertyName("sessionTitle")]
+    public string SessionTitle { get; set; } = "";                 // 세션 고유 제목
+
+    [JsonPropertyName("surfaceTone")]
+    public string SurfaceTone { get; set; } = "";                  // 일상/표면 호흡 (대화 템포, 평소 분위기)
+
+    [JsonPropertyName("coreWeight")]
+    public string CoreWeight { get; set; } = "";                   // 세계관/갈등의 무게감 및 핵심 서사 동력
+
+    [JsonPropertyName("pcInitialPosition")]
+    public string PcInitialPosition { get; set; } = "";            // 주인공(PC)의 초기 위상 및 직면 과제
+
+    [JsonPropertyName("worldviewOutline")]
+    public string WorldviewOutline { get; set; } = "";             // 세계관 핵심 아웃라인
+
+    [JsonPropertyName("lorebookPlan")]
+    public List<LorebookPlanItem> LorebookPlan { get; set; } = []; // 로어북 항목 정밀 기획 리스트
+
+    [JsonPropertyName("statsPlan")]
+    public List<string> StatsPlan { get; set; } = [];              // 스탯 이름 계획 리스트
+
+    [JsonPropertyName("scenarioOutline")]
+    public string ScenarioOutline { get; set; } = "";              // 초기 시작 시나리오 및 첫 직면 상황 설계
+
+    [JsonPropertyName("promptOutline")]
+    public string PromptOutline { get; set; } = "";                // GM 서술 스타일, 문체 톤앤매너 디렉팅
 }
 
 public class LorebookPlanItem
 {
+    [JsonPropertyName("name")]
     public string Name { get; set; } = "";
-    public string Category { get; set; } = "";  // 인물, 장소, 아이템, 세계관
-    public string Brief { get; set; } = "";     // 한 줄 설명
+
+    [JsonPropertyName("category")]
+    public string Category { get; set; } = "";      // 인물, 장소, 아이템, 세계관
+
+    [JsonPropertyName("brief")]
+    public string Brief { get; set; } = "";         // 핵심 요약 설명
+
+    [JsonPropertyName("surfaceRole")]
+    public string SurfaceRole { get; set; } = "";   // 외양, 표면적 위상 및 일상 태도
+
+    [JsonPropertyName("innerDepth")]
+    public string InnerDepth { get; set; } = "";    // 내면의 입체성, 동기, 역린 또는 서사적 훅
+
+    [JsonPropertyName("keywords")]
+    public List<string> Keywords { get; set; } = []; // 검색 트리거용 순수 명사 키워드
+
+    [JsonPropertyName("priority")]
+    public int Priority { get; set; } = 0;          // 검색 우선순위 (낮을수록 최우선: 0=핵심, 1=주요, 2=일반, 3=배경)
+}
+
+/// <summary>
+/// 상태창 및 Turn 0 초기 컨텍스트 시딩 설계 결과 모델
+/// </summary>
+public class StatusDesignPayload
+{
+    [JsonPropertyName("stats")]
+    public Dictionary<string, string> Stats { get; set; } = new();
+
+    [JsonPropertyName("guide")]
+    public string Guide { get; set; } = "";
+
+    [JsonPropertyName("initialChars")]
+    public Dictionary<string, string> InitialChars { get; set; } = new();
+
+    [JsonPropertyName("initialPlaces")]
+    public List<string> InitialPlaces { get; set; } = [];
+
+    [JsonPropertyName("initialItems")]
+    public List<string> InitialItems { get; set; } = [];
 }
 
 /// <summary>
@@ -70,6 +132,9 @@ public class ArchitectSession
     public List<LorebookEntry>? GeneratedLorebooks { get; set; }
     public Dictionary<string, string>? GeneratedStats { get; set; }
     public string? GeneratedStatusGuide { get; set; }
+    public Dictionary<string, string>? GeneratedInitialChars { get; set; }
+    public List<string>? GeneratedInitialPlaces { get; set; }
+    public List<string>? GeneratedInitialItems { get; set; }
     public string? GeneratedScenario { get; set; }
     public string? GeneratedSystemPrompt { get; set; }
     
