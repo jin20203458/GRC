@@ -26,7 +26,8 @@ public interface ISessionArchitectService
     /// </summary>
     IAsyncEnumerable<string> ReviseContentAsync(
         AgentStep step, string previousContent, string userFeedback,
-        AgentPlan plan, CancellationToken ct = default);
+        AgentPlan plan, ArchitectSession? session = null,
+        CancellationToken ct = default);
     
     /// <summary>
     /// AI 응답 텍스트로부터 구조화된 데이터를 파싱합니다.
@@ -34,7 +35,8 @@ public interface ISessionArchitectService
     AgentPlan? ParsePlan(string rawResponse);
     List<LorebookEntry>? ParseLorebooks(string rawResponse);
     (Dictionary<string, string> Stats, string Guide)? ParseStatusDesign(string rawResponse);
-    StatusDesignPayload? ParseStatusDesignPayload(string rawResponse);
+    StatusDesignPayload? ParseStatusDesignPayload(
+        string rawResponse, IEnumerable<LorebookEntry>? lorebooks = null);
     
     /// <summary>
     /// 자율 모드에서 각 단계의 생성 결과물을 자가 검토합니다.

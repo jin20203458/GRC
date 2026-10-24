@@ -50,13 +50,24 @@ public class DialogService(IServiceProvider serviceProvider) : IDialogService
     public void RunOnUIThread(Action action)
     {
         var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher == null || dispatcher.CheckAccess())
+        if (dispatcher == null || dispatcher.CheckAccess() || !dispatcher.Thread.IsAlive || dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
         {
             action();
         }
         else
         {
-            dispatcher.Invoke(action);
+            try
+            {
+                var op = dispatcher.InvokeAsync(action);
+                if (!op.Task.Wait(TimeSpan.FromMilliseconds(500)))
+                {
+                    action();
+                }
+            }
+            catch (Exception)
+            {
+                action();
+            }
         }
     }
 
@@ -194,13 +205,20 @@ public class DialogService(IServiceProvider serviceProvider) : IDialogService
     {
         RunOnUIThread(() =>
         {
-            var windowsToClose = Application.Current?.Windows.OfType<Window>()
-                .Where(w => w is StatusWindow || w is StoryHistoryWindow || w is SessionArchitectWindow)
-                .ToList();
-
-            if (windowsToClose != null)
+            try
             {
-                foreach (var w in windowsToClose) w.Close();
+                var windowsToClose = Application.Current?.Windows.OfType<Window>()
+                    .Where(w => w is StatusWindow || w is StoryHistoryWindow || w is SessionArchitectWindow)
+                    .ToList();
+
+                if (windowsToClose != null)
+                {
+                    foreach (var w in windowsToClose) w.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DialogService] CloseAuxiliaryWindows exception ignored: {ex.Message}");
             }
         });
     }

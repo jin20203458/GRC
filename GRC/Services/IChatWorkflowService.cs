@@ -16,9 +16,7 @@ public class ChatStreamResult
 
 public interface IChatWorkflowService
 {
-    string? GetMetaDirective(string inputText, bool isFastForwardEnabled, 
-        Dictionary<string, string>? currentStats, List<string>? triggeredEvents, 
-        bool isChapterChanged = false);
+    string? GetMetaDirective(string inputText, bool isFastForwardEnabled, bool isChapterChanged = false);
 
     Task<ChatStreamResult> ProcessChatStreamAsync(
         ChatMessage finalUserMessage,
@@ -28,6 +26,7 @@ public interface IChatWorkflowService
         Func<string, string, Task<string>>? onDialoguePrefetch,
         Func<string, Task>? onAudioReady,
         Func<ChatStreamResult, Task>? onDownloadComplete,
-        Action<StatusPayload>? onStatusUpdated,
-        CancellationToken cancellationToken);
+        Func<StatusPayload, Task>? onStatusUpdated,
+        CancellationToken cancellationToken,
+        Action<Task>? onStatusTaskStarted = null);
 }

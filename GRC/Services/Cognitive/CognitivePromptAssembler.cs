@@ -13,18 +13,29 @@ namespace GRC.Services;
 /// </summary>
 public class CognitivePromptAssembler : ICognitivePromptAssembler
 {
-    private const string FormatRule =
-        "\n\n[문체 및 서술 기본 원칙]\n" +
-        "- 문학적 소설 산문체(대화는 큰따옴표, 행동과 심리는 서술문)로 깊이 있게 묘사하십시오.\n" +
-        "- 시스템 메타 수치, 개조식 불릿 기호, 데이터베이스 태그를 본문에 노출하지 마십시오.\n" +
-        "- 제공된 배경 맥락과 비밀은 서사의 인과적 일관성을 유지하는 데만 자연스럽게 활용하십시오.";
+    private const string FormatRule = """
 
-    private const string FinalInstruction =
-        "\n\n<final_instruction>\n" +
-        "- 앞서 제공된 배경 맥락, 세계관, 과거 기억, 잠복 비밀을 철저히 숙지하여 서사의 일관성을 유지하십시오.\n" +
-        "- [문체 오염 절대 방지]: 요약본이나 개조식 불릿 형태를 절대 모방하지 말고, 순수한 문학적 산문 소설 형식으로 생생하게 이어가십시오.\n" +
-        "- 잠복 비밀(<latent_secrets>)은 플레이어가 직접 지목하여 추궁하거나 수색하지 않는 한 절대 자진하여 폭로하거나 입 밖으로 꺼내지 마십시오.\n" +
-        "</final_instruction>";
+
+<style_constraints>
+1. 대사는 큰따옴표 " ", 독백 및 속마음은 낫표 「 」, 행동과 배경은 기호 없는 순수 평문으로 표기하십시오.
+2. 마크다운 강조(*별표* 등), 개조식 불릿, 시스템 메타 수치 및 태그를 본문에 일절 출력하지 마십시오.
+
+<example>
+바람이 스산하게 창문을 두드렸다. 방 안은 기묘하리만치 조용했다.
+"누구 계신가요?"
+목소리가 허공에 흩어지자, 어둠이 더 짙어지는 기분이 들었다.
+「아무도 없는 건가.」
+</example>
+</style_constraints>
+""";
+
+    private const string FinalInstruction = """
+
+
+<final_instruction>
+상단에 제공된 참조 태그들의 개조식·요약 형태를 모방하지 말고, <current_action>에 이어지는 다음 장면을 소설 산문 본문으로만 서술하십시오.
+</final_instruction>
+""";
 
     public GeminiRequest AssemblePrompt(
         CharacterPreset preset,
@@ -79,8 +90,7 @@ public class CognitivePromptAssembler : ICognitivePromptAssembler
         if (cognitiveContext.LedgerFacts != null && cognitiveContext.LedgerFacts.Count > 0)
         {
             int currentChapter = cognitiveContext.CurrentChapter > 0 ? cognitiveContext.CurrentChapter : 1;
-            dynamicSb.AppendLine("<internal_chronicle_facts>");
-            dynamicSb.AppendLine($"[최근 사건 흐름 - 위에서 아래로 시간순 (현재 제{currentChapter}장 진행 중)]");
+            dynamicSb.AppendLine($"<internal_chronicle_facts current_chapter=\"{currentChapter}\">");
             AppendChapterGroupedFacts(dynamicSb, cognitiveContext.LedgerFacts.TakeLast(15));
             dynamicSb.AppendLine("</internal_chronicle_facts>\n");
         }
@@ -93,11 +103,18 @@ public class CognitivePromptAssembler : ICognitivePromptAssembler
             dynamicSb.AppendLine();
         }
 
-        // 3.4 세계관 로어북 (<world_lore>)
+        // 3.4 현재 상태 및 환경 (<current_state>)
+        string currentStateXml = FormatCurrentState(cognitiveContext.CustomStats, cognitiveContext.Items, cognitiveContext.Places);
+        if (!string.IsNullOrWhiteSpace(currentStateXml))
+        {
+            dynamicSb.AppendLine(currentStateXml);
+            dynamicSb.AppendLine();
+        }
+
+        // 3.5 세계관 로어북 (<world_lore>)
         if (cognitiveContext.RetrievedLores != null && cognitiveContext.RetrievedLores.Count > 0)
         {
             dynamicSb.AppendLine("<world_lore>");
-            dynamicSb.AppendLine("[참조 세계관 지식]");
             foreach (var lore in cognitiveContext.RetrievedLores)
             {
                 dynamicSb.AppendLine($"- {lore.Name}: {lore.Content}");
@@ -105,13 +122,19 @@ public class CognitivePromptAssembler : ICognitivePromptAssembler
             dynamicSb.AppendLine("</world_lore>\n");
         }
 
-        // 3.5 게이팅 RAG 회상 사건 (<recalled_history>)
+        // 3.6 게이팅 RAG 회상 사건 (<recalled_history>)
         if (cognitiveContext.RecalledHistory != null && cognitiveContext.RecalledHistory.Count > 0)
         {
-            dynamicSb.AppendLine("<recalled_history>");
-            dynamicSb.AppendLine("[떠오른 과거의 기억 - 현재 상태와 상충 시 현재 상태가 우선함]");
+            dynamicSb.AppendLine("<recalled_history priority=\"secondary\">");
             AppendChapterGroupedFacts(dynamicSb, cognitiveContext.RecalledHistory);
             dynamicSb.AppendLine("</recalled_history>\n");
+        }
+
+        // 3.7 메타 지침 (<meta_directive>) - 이벤트 발동 시에만 독립 태그로 조립
+        if (!string.IsNullOrWhiteSpace(cognitiveContext.MetaDirective))
+        {
+            dynamicSb.AppendLine(cognitiveContext.MetaDirective);
+            dynamicSb.AppendLine();
         }
 
         // 4. 최신 유저 액션 및 빈 입력(HTTP 400) 방어 로직
@@ -151,5 +174,29 @@ public class CognitivePromptAssembler : ICognitivePromptAssembler
             }
             sb.AppendLine($"- {item.FactBullet}");
         }
+    }
+
+    private static string FormatCurrentState(
+        Dictionary<string, string>? customStats,
+        List<string>? items,
+        List<string>? places)
+    {
+        var sb = new StringBuilder();
+        if (places != null && places.Count > 0)
+        {
+            sb.AppendLine($"- 현재 위치: {string.Join(", ", places)}");
+        }
+        if (customStats != null && customStats.Count > 0)
+        {
+            sb.AppendLine($"- 주요 수치: {string.Join(", ", customStats.Select(kv => $"{kv.Key}: {kv.Value}"))}");
+        }
+        if (items != null && items.Count > 0)
+        {
+            sb.AppendLine($"- 소지품: {string.Join(", ", items)}");
+        }
+
+        if (sb.Length == 0) return string.Empty;
+
+        return $"<current_state>\n{sb.ToString().TrimEnd()}\n</current_state>";
     }
 }

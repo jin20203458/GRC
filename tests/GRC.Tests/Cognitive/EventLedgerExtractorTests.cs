@@ -128,4 +128,38 @@ public class EventLedgerExtractorTests
         Assert.Equal(3, result[0].Chapter);
         Assert.Equal("2장의 중요 사건 발생", result[0].FactBullet);
     }
+
+    [Fact]
+    public async Task ExtractLedgerFactsAsync_WhenConversationalPreambleAndPostambleReturned_SuccessfullyParses()
+    {
+        // Arrange - 대화형 사설 및 마크다운 펜스 혼합
+        string rawLlmResponse = "알겠습니다. 최근 대화의 핵심 사건을 요약합니다:\n```json\n{\n  \"bullets\": [\n    \"루시엘이 서고에서 고대 룬 문자 마법서를 해독함\"\n  ]\n}\n```\n향후 서사에 참고하십시오.";
+        var apiService = new FakeGeminiApiService(rawLlmResponse);
+        var extractor = new EventLedgerExtractor(apiService);
+        var turns = new List<ChatMessage> { new("user", "해독해줘.", DateTime.Now) };
+
+        // Act
+        var result = await extractor.ExtractLedgerFactsAsync(turns);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal("루시엘이 서고에서 고대 룬 문자 마법서를 해독함", result[0].FactBullet);
+    }
+
+    [Fact]
+    public async Task ExtractLedgerFactsAsync_WhenJsonTruncated_RecoversValidBullets()
+    {
+        // Arrange - 출력 토큰 제한으로 닫는 괄호가 누락된 잘린 JSON
+        string truncatedJson = "{\n  \"bullets\": [\n    \"세레나가 북쪽 탑에서 반란군의 봉화를 목격함\"\n";
+        var apiService = new FakeGeminiApiService(truncatedJson);
+        var extractor = new EventLedgerExtractor(apiService);
+        var turns = new List<ChatMessage> { new("user", "탑을 올려다본다.", DateTime.Now) };
+
+        // Act
+        var result = await extractor.ExtractLedgerFactsAsync(turns);
+
+        // Assert - LlmJsonParser의 RepairTruncatedJson을 통해 무사히 복구되어야 함
+        Assert.Single(result);
+        Assert.Equal("세레나가 북쪽 탑에서 반란군의 봉화를 목격함", result[0].FactBullet);
+    }
 }

@@ -177,7 +177,7 @@ public partial class ChatViewModel : ObservableObject
                     ChatHistory.Add(new ChatMessage("user", scenarioMessage, DateTime.Now));
 
                     // 백엔드 메모리(단기 기억)에 강제 주입
-                    _memoryService.InjectInitialScenario(scenarioMessage);
+                    _memoryService.InjectInitialScenario(initialScenario);
                     _ = Task.Run(async () => await GRC.Helpers.FullHistoryLogger.LogMessageAsync(_currentFileName, new ChatMessage("user", scenarioMessage, DateTime.Now)));
                 }
                 var initialSession = _memoryService.ExportSession(CurrentPreset);
@@ -401,6 +401,7 @@ public partial class ChatViewModel : ObservableObject
 
         IsBusy = true;
         _cancellationTokenSource = new CancellationTokenSource();
+        string targetFileName = _currentFileName;
         bool isContinueMode = string.IsNullOrWhiteSpace(InputText);
         string displayUserText = isContinueMode ? "(스토리가 계속됩니다...)" : InputText;
         var finalUserMessage = new ChatMessage("user", displayUserText, DateTime.Now);
@@ -408,7 +409,7 @@ public partial class ChatViewModel : ObservableObject
         InputText = string.Empty;
         SuggestedReplies.Clear();
         ChatHistory.Add(finalUserMessage);
-        _ = Task.Run(async () => await GRC.Helpers.FullHistoryLogger.LogMessageAsync(_currentFileName, finalUserMessage));
+        _ = Task.Run(async () => await GRC.Helpers.FullHistoryLogger.LogMessageAsync(targetFileName, finalUserMessage));
 
         bool isChapterChanged = _memoryService.ConsumeChapterChangedFlag();
 
@@ -416,8 +417,6 @@ public partial class ChatViewModel : ObservableObject
         string? metaDirective = _chatWorkflowService.GetMetaDirective(
             isContinueMode ? "" : displayUserText,
             IsFastForwardEnabled,
-            _memoryService.CurrentContext?.CustomStats,
-            _memoryService.CurrentContext?.TriggeredMetaEvents,
             isChapterChanged);
 
         ChatMessage aiMessage = new ChatMessage("model", "", DateTime.Now);
@@ -444,9 +443,9 @@ public partial class ChatViewModel : ObservableObject
             {
                 if (isTtsEnabled && CurrentPreset != null)
                 {
-                    // 현재 메모리에 활성화된 로어북 텍스트 중에서 '인물' 카테고리만 필터링하여 재조립
-                    var activeCharacterLorebooks = CurrentPreset.Lorebooks?
-                        .Where(l => l.Category == "인물" && _memoryService.CurrentLorebookText.Contains($"[{l.Name}]"))
+                    // 현재 메모리에 활성화된 로어북 객체 중 '인물' 카테고리만 추출하여 재조립
+                    var activeCharacterLorebooks = _memoryService.CurrentActiveLorebooks?
+                        .Where(l => l.Category == "인물")
                         .Select(l => $"[{l.Name}]\n{l.Content}");
 
                     string activeLorebook = activeCharacterLorebooks != null && activeCharacterLorebooks.Any()
@@ -467,8 +466,8 @@ public partial class ChatViewModel : ObservableObject
                 {
                     try
                     {
-                        // UI 스레드의 ChatHistory를 복사하여 임시 메모리 생성
-                        var tempMemory = ChatHistory.Where(m => !m.Text.StartsWith("[시스템")).TakeLast(9).ToList();
+                        // 미압축 단기 기억 전수 스냅샷 복사
+                        var tempMemory = _memoryService.GetCurrentShortTermMemory().ToList();
 
                         // 방금 서버에서 받아온 AI의 답변을 임시 메모리에 덧붙임
                         tempMemory.Add(new ChatMessage("model", streamResult.FinalText, DateTime.Now));
@@ -481,25 +480,35 @@ public partial class ChatViewModel : ObservableObject
                     catch { }
                 }
             },
-            onStatusUpdated: (statusPayload) =>
+            onStatusUpdated: async (statusPayload) =>
             {
-                // UI 스레드 안전성 보장 및 갱신 Task 보관
-                _statusUpdateTask = Application.Current.Dispatcher.InvokeAsync(async () =>
+                if (!_isSessionActive || _currentFileName != targetFileName)
                 {
-                    _memoryService.UpdateContextStatus(statusPayload);
-                    UpdateStatusUI(_memoryService.CurrentContext?.CustomStats, _memoryService.CurrentContext?.Chars, _memoryService.CurrentContext?.Items, _memoryService.CurrentContext?.Places);
-                    System.Diagnostics.Debug.WriteLine("[ChatViewModel] 백그라운드 상태창 갱신 UI 및 데이터 반영 완료");
+                    System.Diagnostics.Debug.WriteLine("[ChatViewModel] 세션 비활성화 또는 세션 전환으로 상태창 갱신 콜백 취소");
+                    return;
+                }
 
-                    // 상태창이 갱신된 최종 메모리 세션을 파일에 즉시 영구 세이브!
-                    if (CurrentPreset != null)
-                    {
-                        var currentSession = _memoryService.ExportSession(CurrentPreset);
-                        await _sessionService.SaveSessionAsync(_currentFileName, currentSession);
-                        System.Diagnostics.Debug.WriteLine("[ChatViewModel] 상태창 갱신본 세션 디스크 영구 저장 완료");
-                    }
-                }).Task;
+                _memoryService.UpdateContextStatus(statusPayload);
+                UpdateStatusUI(
+                    _memoryService.CurrentContext?.CustomStats,
+                    _memoryService.CurrentContext?.Chars,
+                    _memoryService.CurrentContext?.Items,
+                    _memoryService.CurrentContext?.Places);
+                System.Diagnostics.Debug.WriteLine("[ChatViewModel] 백그라운드 상태창 갱신 UI 및 데이터 반영 완료");
+
+                // 상태창이 갱신된 최종 메모리 세션을 파일에 즉시 영구 세이브!
+                if (CurrentPreset != null)
+                {
+                    var currentSession = _memoryService.ExportSession(CurrentPreset);
+                    await _sessionService.SaveSessionAsync(targetFileName, currentSession);
+                    System.Diagnostics.Debug.WriteLine("[ChatViewModel] 상태창 갱신본 세션 디스크 영구 저장 완료");
+                }
             },
-            cancellationToken: _cancellationTokenSource.Token
+            cancellationToken: _cancellationTokenSource.Token,
+            onStatusTaskStarted: (task) =>
+            {
+                _statusUpdateTask = task;
+            }
         );
 
         if (result.IsSuccess)
@@ -804,9 +813,8 @@ public partial class ChatViewModel : ObservableObject
 
         try
         {
-            var currentSession = _memoryService.ExportSession(CurrentPreset);
-            string currentContextString = currentSession.CurrentContext.ToPromptString();
-            var recentMemory = ChatHistory.Where(m => !m.Text.StartsWith("[시스템...")).TakeLast(10).ToList();
+            string currentContextString = _memoryService.CurrentContext?.ToPromptString() ?? "";
+            var recentMemory = _memoryService.GetCurrentShortTermMemory().ToList();
 
             var suggestions = await _suggestionService.GenerateAsync(currentContextString, recentMemory);
 

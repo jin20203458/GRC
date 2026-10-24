@@ -153,13 +153,14 @@ public partial class SessionArchitectViewModel : ObservableObject
                 var stream = _architectService.GeneratePlanAsync(userMsg, _session.ExistingPreset, _cts.Token);
                 var planText = await ConsumeStreamAsync(stream, _cts.Token);
 
-                // JSON 파싱 시도
+                // JSON 파싱 시도 (1단계에서 청사진과 4대 섹션 마스터 세계관을 동시 확보)
                 var parsedPlan = _architectService.ParsePlan(planText);
                 if (parsedPlan != null)
                 {
                     parsedPlan.Concept = userMsg; // 컨셉 보존
                     Plan = parsedPlan;
                     _session.Plan = parsedPlan;
+                    _session.GeneratedWorldview = SessionArchitectService.SanitizeWorldview(parsedPlan.WorldviewOutline);
 
                     // 자율 모드에서는 스포일러 방지 요약 카드만 표시, 수동 모드에서는 전체 기획안 표시
                     Messages.Add(new ArchitectMessage
@@ -173,7 +174,7 @@ public partial class SessionArchitectViewModel : ObservableObject
 
                     CurrentStep = AgentStep.PlanReview;
 
-                    // 자율 모드: 계획 수립 후 나머지 5단계를 자동 순회
+                    // 자율 모드: 1단계(청사진·세계관) 완료 후 나머지 3단계(로어북 -> 시나리오 -> 상태창·지시문)를 자동 순회
                     if (IsAutoMode)
                     {
                         await RunAutoLoopAsync();
@@ -201,7 +202,7 @@ public partial class SessionArchitectViewModel : ObservableObject
 
                 string previousContent = GetCurrentStepContent(originalStep);
 
-                var stream = _architectService.ReviseContentAsync(originalStep, previousContent, userMsg, _session.Plan!, _cts.Token);
+                var stream = _architectService.ReviseContentAsync(originalStep, previousContent, userMsg, _session.Plan!, _session, _cts.Token);
                 var revisedText = await ConsumeStreamAsync(stream, _cts.Token);
 
                 // 수정 내용 파싱 및 업데이트
@@ -267,18 +268,16 @@ public partial class SessionArchitectViewModel : ObservableObject
     private bool CanSend() => !IsBusy;
 
     /// <summary>
-    /// 자율 모드: PlanReview 상태에서 시작하여 나머지 5단계를 자동 순회합니다.
+    /// 자율 모드: 1단계(PlanReview, 청사진·세계관) 완료 후 나머지 3단계를 인과 순서(로어북 -> 시나리오 -> 상태창·지시문)로 자동 순회합니다.
     /// 중간에 중단(Cancel) 또는 파싱 실패 시 수동 모드로 자동 전환합니다.
     /// </summary>
-    private async Task RunAutoLoopAsync(AgentStep startStep = AgentStep.WorldviewGen)
+    private async Task RunAutoLoopAsync(AgentStep startStep = AgentStep.LorebookGen)
     {
         AgentStep[] autoSteps =
         {
-            AgentStep.WorldviewGen,
             AgentStep.LorebookGen,
-            AgentStep.StatusGen,
             AgentStep.ScenarioGen,
-            AgentStep.PromptGen
+            AgentStep.StatusGen
         };
 
         var stepsToRun = autoSteps.SkipWhile(s => s != startStep).ToArray();
@@ -318,11 +317,11 @@ public partial class SessionArchitectViewModel : ObservableObject
                             Timestamp = DateTime.Now
                         });
 
-                        // 1회 자동 리파인
+                        // 1회 자동 리파인 (로어북은 외과수술식 핀포인트 배치 보정)
                         BusyMessage = GetBusyMessage(reviewStep, isRevising: true);
                         var reviseStream = _architectService.ReviseContentAsync(
                             reviewStep, GetCurrentStepContent(reviewStep), feedback,
-                            _session.Plan!, _cts!.Token);
+                            _session.Plan!, _session, _cts!.Token);
 
                         var revisedContentText = await ConsumeStreamAsync(reviseStream, _cts!.Token);
 
@@ -386,6 +385,7 @@ public partial class SessionArchitectViewModel : ObservableObject
     {
         if (IsBusy) return;
 
+        AgentStep previousReviewStep = CurrentStep;
         AgentStep nextGenStep = GetNextGenStep(CurrentStep);
         if (nextGenStep == AgentStep.Complete)
         {
@@ -452,12 +452,12 @@ public partial class SessionArchitectViewModel : ObservableObject
                     Text = $"컨텐츠 생성 파싱에 실패했습니다. AI 응답:\n\n{stepContentText}\n\n요구 사항을 다시 입력하거나 새로 시도해 주세요.",
                     Timestamp = DateTime.Now
                 });
-                CurrentStep = GetReviewStepFromGen(nextGenStep) - 2;
+                CurrentStep = previousReviewStep;
             }
         }
         catch (OperationCanceledException)
         {
-            CurrentStep = GetReviewStepFromGen(nextGenStep) - 2;
+            CurrentStep = previousReviewStep;
         }
         catch (Exception ex)
         {
@@ -467,7 +467,7 @@ public partial class SessionArchitectViewModel : ObservableObject
                 Text = $"에러 발생: {ex.Message}",
                 Timestamp = DateTime.Now
             });
-            CurrentStep = GetReviewStepFromGen(nextGenStep) - 2;
+            CurrentStep = previousReviewStep;
         }
         finally
         {
@@ -538,8 +538,8 @@ public partial class SessionArchitectViewModel : ObservableObject
         return step == AgentStep.PlanReview ||
                step == AgentStep.WorldviewReview ||
                step == AgentStep.LorebookReview ||
-               step == AgentStep.StatusReview ||
                step == AgentStep.ScenarioReview ||
+               step == AgentStep.StatusReview ||
                step == AgentStep.PromptReview;
     }
 
@@ -548,8 +548,8 @@ public partial class SessionArchitectViewModel : ObservableObject
         return step == AgentStep.Planning ||
                step == AgentStep.WorldviewGen ||
                step == AgentStep.LorebookGen ||
-               step == AgentStep.StatusGen ||
                step == AgentStep.ScenarioGen ||
+               step == AgentStep.StatusGen ||
                step == AgentStep.PromptGen;
     }
 
@@ -558,8 +558,8 @@ public partial class SessionArchitectViewModel : ObservableObject
         AgentStep.PlanReview => AgentStep.Planning,
         AgentStep.WorldviewReview => AgentStep.WorldviewGen,
         AgentStep.LorebookReview => AgentStep.LorebookGen,
-        AgentStep.StatusReview => AgentStep.StatusGen,
         AgentStep.ScenarioReview => AgentStep.ScenarioGen,
+        AgentStep.StatusReview => AgentStep.StatusGen,
         AgentStep.PromptReview => AgentStep.PromptGen,
         _ => AgentStep.Idle
     };
@@ -569,19 +569,19 @@ public partial class SessionArchitectViewModel : ObservableObject
         AgentStep.Planning => AgentStep.PlanReview,
         AgentStep.WorldviewGen => AgentStep.WorldviewReview,
         AgentStep.LorebookGen => AgentStep.LorebookReview,
-        AgentStep.StatusGen => AgentStep.StatusReview,
         AgentStep.ScenarioGen => AgentStep.ScenarioReview,
+        AgentStep.StatusGen => AgentStep.StatusReview,
         AgentStep.PromptGen => AgentStep.PromptReview,
         _ => AgentStep.Idle
     };
 
     private AgentStep GetNextGenStep(AgentStep currentReviewStep) => currentReviewStep switch
     {
-        AgentStep.PlanReview => AgentStep.WorldviewGen,
+        AgentStep.PlanReview => AgentStep.LorebookGen,
         AgentStep.WorldviewReview => AgentStep.LorebookGen,
-        AgentStep.LorebookReview => AgentStep.StatusGen,
-        AgentStep.StatusReview => AgentStep.ScenarioGen,
-        AgentStep.ScenarioReview => AgentStep.PromptGen,
+        AgentStep.LorebookReview => AgentStep.ScenarioGen,
+        AgentStep.ScenarioReview => AgentStep.StatusGen,
+        AgentStep.StatusReview => AgentStep.Complete,
         AgentStep.PromptReview => AgentStep.Complete,
         _ => AgentStep.Idle
     };
@@ -594,6 +594,7 @@ public partial class SessionArchitectViewModel : ObservableObject
         AgentStep.PlanReview => JsonSerializer.Serialize(_session.Plan),
         AgentStep.WorldviewReview => _session.GeneratedWorldview ?? "",
         AgentStep.LorebookReview => JsonSerializer.Serialize(_session.GeneratedLorebooks),
+        AgentStep.ScenarioReview => _session.GeneratedScenario ?? "",
         AgentStep.StatusReview => JsonSerializer.Serialize(new StatusDesignPayload
         {
             Stats = _session.GeneratedStats ?? new(),
@@ -602,7 +603,6 @@ public partial class SessionArchitectViewModel : ObservableObject
             InitialPlaces = _session.GeneratedInitialPlaces ?? [],
             InitialItems = _session.GeneratedInitialItems ?? []
         }),
-        AgentStep.ScenarioReview => _session.GeneratedScenario ?? "",
         AgentStep.PromptReview => _session.GeneratedSystemPrompt ?? "",
         _ => ""
     };
@@ -621,6 +621,7 @@ public partial class SessionArchitectViewModel : ObservableObject
                     plan.Concept = _session.Plan?.Concept ?? "";
                     _session.Plan = plan;
                     Plan = plan;
+                    _session.GeneratedWorldview = SessionArchitectService.SanitizeWorldview(plan.WorldviewOutline);
                     return true;
                 }
                 return false;
@@ -638,8 +639,12 @@ public partial class SessionArchitectViewModel : ObservableObject
                 }
                 return false;
 
+            case AgentStep.ScenarioReview:
+                _session.GeneratedScenario = SessionArchitectService.SanitizeScenario(rawResponse);
+                return !string.IsNullOrWhiteSpace(_session.GeneratedScenario);
+
             case AgentStep.StatusReview:
-                var fullPayload = _architectService.ParseStatusDesignPayload(rawResponse);
+                var fullPayload = _architectService.ParseStatusDesignPayload(rawResponse, _session.GeneratedLorebooks);
                 if (fullPayload != null)
                 {
                     _session.GeneratedStats = fullPayload.Stats;
@@ -647,6 +652,11 @@ public partial class SessionArchitectViewModel : ObservableObject
                     _session.GeneratedInitialChars = fullPayload.InitialChars;
                     _session.GeneratedInitialPlaces = fullPayload.InitialPlaces;
                     _session.GeneratedInitialItems = fullPayload.InitialItems;
+
+                    string rawDirectives = fullPayload.GenreDirectives != null && fullPayload.GenreDirectives.Count > 0
+                        ? string.Join("\n", fullPayload.GenreDirectives)
+                        : "";
+                    _session.GeneratedSystemPrompt = SessionArchitectService.CompileHybridSystemPrompt(rawDirectives, _session.Plan);
                     return true;
                 }
                 var legacyDesign = _architectService.ParseStatusDesign(rawResponse);
@@ -654,13 +664,10 @@ public partial class SessionArchitectViewModel : ObservableObject
                 {
                     _session.GeneratedStats = legacyDesign.Value.Stats;
                     _session.GeneratedStatusGuide = legacyDesign.Value.Guide;
+                    _session.GeneratedSystemPrompt = SessionArchitectService.CompileHybridSystemPrompt("", _session.Plan);
                     return true;
                 }
                 return false;
-
-            case AgentStep.ScenarioReview:
-                _session.GeneratedScenario = SessionArchitectService.SanitizeScenario(rawResponse);
-                return !string.IsNullOrWhiteSpace(_session.GeneratedScenario);
 
             case AgentStep.PromptReview:
                 _session.GeneratedSystemPrompt = rawResponse.Trim().StartsWith("<system>", StringComparison.OrdinalIgnoreCase)
@@ -680,23 +687,23 @@ public partial class SessionArchitectViewModel : ObservableObject
     {
         var sb = new StringBuilder();
         string title = !string.IsNullOrWhiteSpace(plan.SessionTitle) ? plan.SessionTitle : "신규 롤플레잉 세션";
-        sb.AppendLine($"### [1/6] 서사 청사진 수립 완료: {title}");
+        sb.AppendLine($"### [1/4] 서사 청사진 및 마스터 세계관 구축 완료: {title}");
         if (!string.IsNullOrWhiteSpace(plan.SurfaceTone))
             sb.AppendLine($"- **일상/표면 호흡:** {plan.SurfaceTone}");
         if (!string.IsNullOrWhiteSpace(plan.CoreWeight))
             sb.AppendLine($"- **서사/갈등 무게감:** {plan.CoreWeight}");
-        sb.AppendLine($"- **설계 규모:** 로어북 **{plan.LorebookPlan.Count}건**, 추적 스탯 **{plan.StatsPlan.Count}건**");
+        sb.AppendLine($"- **설계 규모:** 4대 거시 세계관 섹션, 로어북 **{plan.LorebookPlan.Count}건**, 추적 스탯 **{plan.StatsPlan.Count}건**");
         sb.AppendLine("\n*(스포일러 방지를 위해 세부 로어북과 심층 세계관 본문은 화면에 미리 노출하지 않고 백그라운드에서 생성합니다.)*");
         return sb.ToString();
     }
 
     private string GetAutoStepCompletionSummary(AgentStep reviewStep) => reviewStep switch
     {
-        AgentStep.WorldviewReview => "### [2/6] 마스터 세계관 구축 완료\n- `<master_setting>` 전용 4대 섹션 고밀도 레퍼런스가 생성 및 정제되었습니다.",
-        AgentStep.LorebookReview => $"### [3/6] 로어북 심층 생성 완료\n- 총 **{_session.GeneratedLorebooks?.Count ?? 0}개**의 인물/장소/세계관 로어북과 대사 샘플이 병렬 생성되었습니다.",
-        AgentStep.StatusReview => $"### [4/6] 상태창 및 Turn 0 초기 컨텍스트 시딩 완료\n- 추적 스탯 **{_session.GeneratedStats?.Count ?? 0}개** 및 초기 등장인물/장소/소지품 연동이 완료되었습니다.",
-        AgentStep.ScenarioReview => "### [5/6] 오프닝 시나리오 집필 완료\n- 세계관과 등장인물 말투가 반영된 첫 직면 장면이 준비되었습니다.",
-        AgentStep.PromptReview => "### [6/6] 하이브리드 시스템 지시문 컴파일 완료\n- 코어 행동 헌법과 장르 맞춤 연출 수칙이 결합되었습니다.",
+        AgentStep.WorldviewReview => "### [1/4] 마스터 세계관 구축 완료\n- `<master_setting>` 전용 4대 섹션 고밀도 레퍼런스가 생성 및 정제되었습니다.",
+        AgentStep.LorebookReview => $"### [2/4] 2-Wave 앙상블 로어북 심층 생성 완료\n- 총 **{_session.GeneratedLorebooks?.Count ?? 0}개**의 배경/인물 로어북과 상호 관계망이 2-Wave 통합 앙상블 파이프라인으로 생성되었습니다.",
+        AgentStep.ScenarioReview => "### [3/4] 오프닝 시나리오 집필 완료\n- 세계관과 등장인물 외양·말투가 반영된 첫 직면 장면이 준비되었습니다.",
+        AgentStep.StatusReview => $"### [4/4] 상태창·Turn 0 시딩 및 시스템 지시문 컴파일 완료\n- 오프닝 장면과 100% 동기화된 추적 스탯 **{_session.GeneratedStats?.Count ?? 0}개**, 초기 컨텍스트 및 하이브리드 시스템 지시문이 완성되었습니다.",
+        AgentStep.PromptReview => "### [4/4] 하이브리드 시스템 지시문 컴파일 완료\n- 코어 행동 헌법과 전수 컨텍스트 기반 장르 연출 수칙이 결합되었습니다.",
         _ => "단계 완료"
     };
 
@@ -708,8 +715,8 @@ public partial class SessionArchitectViewModel : ObservableObject
         AgentStep.PlanReview => GetPlanSummaryMarkdown(_session.Plan!),
         AgentStep.WorldviewReview => $"### 세계관 설정 구성\n\n{_session.GeneratedWorldview}",
         AgentStep.LorebookReview => GetLorebookSummaryMarkdown(_session.GeneratedLorebooks!),
-        AgentStep.StatusReview => GetStatusSummaryMarkdown(_session.GeneratedStats!, _session.GeneratedStatusGuide!),
         AgentStep.ScenarioReview => $"### 초기 시나리오 오프닝\n\n{_session.GeneratedScenario}",
+        AgentStep.StatusReview => GetStatusSummaryMarkdown(_session.GeneratedStats!, _session.GeneratedStatusGuide!),
         AgentStep.PromptReview => $"### 시스템 지시문 (System Instruction)\n\n```xml\n{_session.GeneratedSystemPrompt}\n```",
         _ => ""
     };
@@ -717,18 +724,19 @@ public partial class SessionArchitectViewModel : ObservableObject
     private string GetPlanSummaryMarkdown(AgentPlan plan)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"### AI 설계 계획안: {plan.SessionTitle}");
+        sb.AppendLine($"### [1/4] AI 설계 청사진 및 마스터 세계관: {plan.SessionTitle}");
         if (!string.IsNullOrWhiteSpace(plan.SurfaceTone))
             sb.AppendLine($"- **일상/표면 호흡:** {plan.SurfaceTone}");
         if (!string.IsNullOrWhiteSpace(plan.CoreWeight))
             sb.AppendLine($"- **배경/갈등 무게감:** {plan.CoreWeight}");
         if (!string.IsNullOrWhiteSpace(plan.PcInitialPosition))
             sb.AppendLine($"- **주인공 초기 입지:** {plan.PcInitialPosition}");
-        sb.AppendLine($"- **세계관 아웃라인:** {plan.WorldviewOutline}\n");
-        sb.AppendLine("#### 생성 예정 로어북 항목");
+        sb.AppendLine($"\n#### 마스터 세계관 (`<master_setting>`)\n{plan.WorldviewOutline}\n");
+        sb.AppendLine("#### 생성 예정 로어북 항목 (그물망 연결 구조)");
         foreach (var item in plan.LorebookPlan)
         {
-            sb.AppendLine($"- **{item.Name}** ({item.Category}, 우선순위 {item.Priority}): {item.Brief}");
+            string conn = !string.IsNullOrWhiteSpace(item.ConnectedEntities) ? $" *(연결망: {item.ConnectedEntities})*" : "";
+            sb.AppendLine($"- **{item.Name}** ({item.Category}, 우선순위 {item.Priority}): {item.Brief}{conn}");
         }
         sb.AppendLine("\n#### 설계 예정 스탯창 구성");
         sb.AppendLine(string.Join(", ", plan.StatsPlan.Select(s => $"`{s}`")));
@@ -740,7 +748,7 @@ public partial class SessionArchitectViewModel : ObservableObject
     private string GetLorebookSummaryMarkdown(List<LorebookEntry> lorebooks)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("### 생성된 로어북 데이터 세트");
+        sb.AppendLine("### [2/4] 생성된 로어북 데이터 세트");
         sb.AppendLine($"총 **{lorebooks.Count}**개의 백과사전 항목이 생성되었습니다.\n");
         foreach (var item in lorebooks)
         {
@@ -754,7 +762,7 @@ public partial class SessionArchitectViewModel : ObservableObject
     private string GetStatusSummaryMarkdown(Dictionary<string, string> stats, string guide)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("### 상태창 스탯 및 변동 규칙 설계");
+        sb.AppendLine("### [4/4] 상태창·Turn 0 시딩 및 시스템 지시문 설계");
         sb.AppendLine("#### [초기 스탯]");
         foreach (var stat in stats)
         {
@@ -770,6 +778,11 @@ public partial class SessionArchitectViewModel : ObservableObject
         }
         sb.AppendLine("\n#### [스탯 업데이트 가이드라인]");
         sb.AppendLine(guide);
+        if (!string.IsNullOrWhiteSpace(_session.GeneratedSystemPrompt))
+        {
+            sb.AppendLine("\n#### [컴파일된 하이브리드 시스템 지시문]");
+            sb.AppendLine($"```xml\n{_session.GeneratedSystemPrompt}\n```");
+        }
         return sb.ToString();
     }
 
@@ -802,15 +815,15 @@ public partial class SessionArchitectViewModel : ObservableObject
     private string GetBusyMessage(AgentStep step, bool isReviewing = false, bool isRevising = false) =>
         (step, isReviewing, isRevising) switch
         {
-            (_, _, true)                       => "AI가 검토 피드백을 바탕으로 수정하는 중",
-            (_, true, _)                       => "AI가 생성 결과를 자가 검토하는 중",
-            (AgentStep.Planning, _, _)         => "Pro 모델이 2축 서사 구조 및 기획안을 설계하는 중",
+            (_, _, true)                       => "AI가 검토 피드백을 바탕으로 외과수술식 보정을 수행하는 중",
+            (_, true, _)                       => "생성된 데이터의 구조 및 정합성을 검증하는 중",
+            (AgentStep.Planning, _, _)         => "Pro 모델이 그물망 서사 청사진 및 4대 섹션 마스터 세계관을 설계하는 중",
             (AgentStep.WorldviewGen, _, _)     => "Pro 모델이 고밀도 마스터 세계관을 구축하는 중",
-            (AgentStep.LorebookGen, _, _)      => "Pro 모델이 로어북 배치를 병렬 심층 생성하는 중",
-            (AgentStep.StatusGen, _, _)        => "Pro 모델이 상태창 및 Turn 0 컨텍스트를 시딩하는 중",
-            (AgentStep.ScenarioGen, _, _)      => "Pro 모델이 오프닝 시나리오를 집필하는 중",
-            (AgentStep.PromptGen, _, _)        => "하이브리드 시스템 지시문을 컴파일하는 중",
-            (AgentStep.Applying, _, _)         => "768차원 임베딩 발급 및 세션 파일을 적용하는 중",
+            (AgentStep.LorebookGen, _, _)      => "Pro 모델이 2-Wave 통합 앙상블 파이프라인으로 로어북을 심층 생성하는 중",
+            (AgentStep.ScenarioGen, _, _)      => "Pro 모델이 세계관과 로어북을 투영해 오프닝 시나리오를 집필하는 중",
+            (AgentStep.StatusGen, _, _)        => "Pro 모델이 오프닝 기반 상태창·Turn 0 시딩 및 시스템 지시문을 추출·컴파일하는 중",
+            (AgentStep.PromptGen, _, _)        => "전수 컨텍스트 기반 하이브리드 시스템 지시문을 컴파일하는 중",
+            (AgentStep.Applying, _, _)         => "768차원 병렬 임베딩 발급 및 세션 파일을 적용하는 중",
             _                                  => "AI가 답변을 구성하는 중"
         };
 

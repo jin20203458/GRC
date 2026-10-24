@@ -65,11 +65,11 @@ public partial class SessionArchitectWindow : Window
 
     /// <summary>
     /// CurrentStep에 따라 진행률 표시 바의 스타일 Tag를 변경하여
-    /// XAML 상의 DataTrigger가 작동하게 만듭니다.
+    /// XAML 상의 DataTrigger가 작동하게 만듭니다. (4단계 통합 파이프라인: 1~4)
     /// </summary>
     private void UpdateProgressBar(AgentStep step)
     {
-        // 각 단계의 인덱스를 계산 (1~6)
+        // 각 단계의 인덱스를 계산 (1~4)
         int currentStepIndex = 0;
 
         switch (step)
@@ -79,29 +79,25 @@ public partial class SessionArchitectWindow : Window
                 break;
             case AgentStep.Planning:
             case AgentStep.PlanReview:
-                currentStepIndex = 1;
-                break;
             case AgentStep.WorldviewGen:
             case AgentStep.WorldviewReview:
-                currentStepIndex = 2;
+                currentStepIndex = 1;
                 break;
             case AgentStep.LorebookGen:
             case AgentStep.LorebookReview:
+                currentStepIndex = 2;
+                break;
+            case AgentStep.ScenarioGen:
+            case AgentStep.ScenarioReview:
                 currentStepIndex = 3;
                 break;
             case AgentStep.StatusGen:
             case AgentStep.StatusReview:
-                currentStepIndex = 4;
-                break;
-            case AgentStep.ScenarioGen:
-            case AgentStep.ScenarioReview:
-                currentStepIndex = 5;
-                break;
             case AgentStep.PromptGen:
             case AgentStep.PromptReview:
             case AgentStep.Applying:
             case AgentStep.Complete:
-                currentStepIndex = 6;
+                currentStepIndex = 4;
                 break;
         }
 
@@ -109,8 +105,6 @@ public partial class SessionArchitectWindow : Window
         SetStepState(Step2Border, TextStep2, 2, currentStepIndex);
         SetStepState(Step3Border, TextStep3, 3, currentStepIndex);
         SetStepState(Step4Border, TextStep4, 4, currentStepIndex);
-        SetStepState(Step5Border, TextStep5, 5, currentStepIndex);
-        SetStepState(Step6Border, TextStep6, 6, currentStepIndex);
     }
 
     private void SetStepState(Border border, TextBlock text, int stepNum, int currentStepIndex)

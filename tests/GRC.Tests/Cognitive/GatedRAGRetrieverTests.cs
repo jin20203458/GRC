@@ -21,10 +21,10 @@ public class GatedRAGRetrieverTests
         var retriever = new GatedRAGRetriever();
         var queryVec = CreateDummyVector(0.036f);
 
-        // 일치 벡터 (유사도 1.0 >= 0.71)
+        // 일치 벡터 (유사도 1.0 >= 0.78)
         var hitVec = CreateDummyVector(0.036f);
 
-        // 직교에 가까운 벡터 (유사도 약 0.0 < 0.71)
+        // 직교에 가까운 벡터 (유사도 약 0.0 < 0.78)
         var missVec = new float[768];
         for (int i = 0; i < 768; i++) missVec[i] = (i % 2 == 0) ? 0.036f : -0.036f;
 
@@ -37,7 +37,7 @@ public class GatedRAGRetrieverTests
         // Act
         var result = retriever.RetrieveRecalledHistory(queryVec, ledgers, maxResults: 2);
 
-        // Assert - 0.71 이상인 적중 사건 1개만 인출
+        // Assert - 0.78 이상인 적중 사건 1개만 인출
         Assert.Single(result);
         Assert.Equal("적중 사건: 안개 숲에서 은반지 습득", result[0].FactBullet);
     }

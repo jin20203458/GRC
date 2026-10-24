@@ -13,7 +13,7 @@ namespace GRC.Services;
 /// </summary>
 public class HybridLorebookRetriever : IHybridLorebookRetriever
 {
-    public const float DenseThreshold = 0.68f;
+    public const float DenseThreshold = 0.75f;
     public const int DefaultMaxTokenBudget = 3000;
     public const int DefaultStickyTurns = 2; // 현재 턴 포함 총 3턴 활성 잔존 (트리거 턴 1 + 추가 2턴)
 
@@ -40,7 +40,7 @@ public class HybridLorebookRetriever : IHybridLorebookRetriever
             {
                 foreach (var entry in lorebookList)
                 {
-                    if (IsSparseMatched(userQuery, entry.Keywords))
+                    if (IsSparseMatched(userQuery, entry.Name, entry.Keywords))
                     {
                         directMatched.Add(entry);
                         continue;
@@ -117,12 +117,12 @@ public class HybridLorebookRetriever : IHybridLorebookRetriever
             }
 
             // [4단계] 3단계 우선순위 동적 패킹 (최대 maxTokenBudget)
-            // 1순위: 직접 매칭 (Priority 내림차순)
-            // 2순위: 이전 잔존 (Priority 내림차순)
-            // 3순위: 상태창 인물 (Priority 내림차순)
-            var sortedDirect = directMatched.DistinctBy(e => e.Name).OrderByDescending(e => e.Priority).ToList();
-            var sortedSticky = stickyMatched.DistinctBy(e => e.Name).OrderByDescending(e => e.Priority).ToList();
-            var sortedChar = charMatched.DistinctBy(e => e.Name).OrderByDescending(e => e.Priority).ToList();
+            // 1순위: 직접 매칭 (Priority 오름차순: 0이 가장 높은 우선순위)
+            // 2순위: 이전 잔존 (Priority 오름차순: 0이 가장 높은 우선순위)
+            // 3순위: 상태창 인물 (Priority 오름차순: 0이 가장 높은 우선순위)
+            var sortedDirect = directMatched.DistinctBy(e => e.Name).OrderBy(e => e.Priority).ToList();
+            var sortedSticky = stickyMatched.DistinctBy(e => e.Name).OrderBy(e => e.Priority).ToList();
+            var sortedChar = charMatched.DistinctBy(e => e.Name).OrderBy(e => e.Priority).ToList();
 
             var candidateOrder = sortedDirect
                 .Concat(sortedSticky)
@@ -178,19 +178,28 @@ public class HybridLorebookRetriever : IHybridLorebookRetriever
         return (int)Math.Ceiling(koreanChars * 0.67f + otherChars * 0.25f);
     }
 
-    private static bool IsSparseMatched(string text, List<string>? keywords)
+    private static bool IsSparseMatched(string text, string? name, List<string>? keywords)
     {
-        if (keywords == null || keywords.Count == 0) return false;
+        var validKeywords = new List<string>();
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            validKeywords.Add(name.Trim());
+        }
 
-        var validKeywords = keywords
-            .Where(k => !string.IsNullOrWhiteSpace(k))
-            .OrderByDescending(k => k.Length)
-            .ToList();
+        if (keywords != null && keywords.Count > 0)
+        {
+            validKeywords.AddRange(keywords.Where(k => !string.IsNullOrWhiteSpace(k)).Select(k => k.Trim()));
+        }
 
         if (validKeywords.Count == 0) return false;
 
+        validKeywords = validKeywords
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(k => k.Length)
+            .ToList();
+
         string cacheKey = string.Join("|", validKeywords);
-        var regex = RegexCache.GetOrAdd(cacheKey, k =>
+        var regex = RegexCache.GetOrAdd(cacheKey, _ =>
         {
             string escaped = string.Join("|", validKeywords.Select(Regex.Escape));
             // 한국어 조사(은/는/이/가/을/를/에게/에서 등) 최대 3글자 허용 패턴

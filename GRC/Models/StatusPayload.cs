@@ -7,12 +7,12 @@ namespace GRC.Models;
 public class StatusPayload
 {
     [JsonPropertyName("uiBadges")]
-    public Dictionary<string, string> CustomStats { get; set; } = new();
+    public Dictionary<string, string>? CustomStats { get; set; }
 
     [JsonPropertyName("characterConditionDesc")]
-    public Dictionary<string, string> Chars { get; set; } = new();
-    public List<string> Items { get; set; } = new();
-    public List<string> Places { get; set; } = new();
+    public Dictionary<string, string>? Chars { get; set; }
+    public List<string>? Items { get; set; }
+    public List<string>? Places { get; set; }
 }
 
 public class CharacterStatusUI

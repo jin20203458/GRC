@@ -48,7 +48,7 @@ public class HybridLorebookRetrieverTests
             new("흑철검", ["흑철검"], "고대 드워프가 제련한 검", "아이템", Priority: 10, Embedding: entryEmbedding)
         };
 
-        // Act - 유저는 "검은색 철검"이라고 입력하여 키워드 매칭 실패하지만, Dense 유사도 1.0 >= DenseThreshold(0.68) 만족
+        // Act - 유저는 "검은색 철검"이라고 입력하여 키워드 매칭 실패하지만, Dense 유사도 1.0 >= DenseThreshold(0.75) 만족
         var result = retriever.Retrieve("그는 검은색 철검을 바라보았다.", queryEmbedding, lorebooks);
 
         // Assert
@@ -107,7 +107,7 @@ public class HybridLorebookRetrieverTests
         var lorebooks = new List<LorebookEntry>();
         for (int i = 1; i <= 6; i++)
         {
-            lorebooks.Add(new LorebookEntry($"설정{i}", ["공통키워드"], $"짧은 설정 본문 {i}", "일반", Priority: 10 - i));
+            lorebooks.Add(new LorebookEntry($"설정{i}", ["공통키워드"], $"짧은 설정 본문 {i}", "일반", Priority: i - 1));
         }
 
         // Act - 유저 입력에 '공통키워드'가 있어 6개 모두 매칭됨 (총 토큰 약 240T <= 2000T)
@@ -128,9 +128,9 @@ public class HybridLorebookRetrieverTests
 
         var lorebooks = new List<LorebookEntry>
         {
-            new("긴설정1", ["마법"], longContent, "일반", Priority: 10),
-            new("긴설정2", ["마법"], longContent, "일반", Priority: 9),
-            new("긴설정3", ["마법"], longContent, "일반", Priority: 8)
+            new("긴설정1", ["마법"], longContent, "일반", Priority: 0),
+            new("긴설정2", ["마법"], longContent, "일반", Priority: 1),
+            new("긴설정3", ["마법"], longContent, "일반", Priority: 2)
         };
 
         // Act - 1번(약 880T) + 2번(약 880T) = 약 1760T. 3번째가 추가되면 2000T를 초과하므로 2개에서 커트되어야 함
@@ -191,10 +191,10 @@ public class HybridLorebookRetrieverTests
         var retriever = new HybridLorebookRetriever();
         var lorebooks = new List<LorebookEntry>
         {
-            new("성배", ["성배"], "성스러운 은제 성배", "아이템", Priority: 10),
-            new("루시엘", ["루시엘"], "은발 벽안의 마법사", "인물", Priority: 8),
-            new("세레나", ["세레나"], "붉은 머리의 여기사", "인물", Priority: 7),
-            new("카일", ["카일"], "1장 마을 경비병", "인물", Priority: 9) // Priority가 높아도 activeChars에 없으면 인출 금지
+            new("성배", ["성배"], "성스러운 은제 성배", "아이템", Priority: 0),
+            new("루시엘", ["루시엘"], "은발 벽안의 마법사", "인물", Priority: 1),
+            new("세레나", ["세레나"], "붉은 머리의 여기사", "인물", Priority: 2),
+            new("카일", ["카일"], "1장 마을 경비병", "인물", Priority: 0) // Priority가 높아도 activeChars에 없으면 인출 금지
         };
 
         var activeChars = new List<string> { "루시엘", "세레나" };
@@ -205,8 +205,8 @@ public class HybridLorebookRetrieverTests
         // Assert - 1순위 성배 + 3순위 활성 인물 2명(루시엘, 세레나)만 인출되고 비활성 인물(카일)은 제외됨
         Assert.Equal(3, result.Count);
         Assert.Equal("성배", result[0].Name);    // 1순위 직접 매칭
-        Assert.Equal("루시엘", result[1].Name);  // 3순위 상태창 활성 인물 (Priority 8)
-        Assert.Equal("세레나", result[2].Name);  // 3순위 상태창 활성 인물 (Priority 7)
+        Assert.Equal("루시엘", result[1].Name);  // 3순위 상태창 활성 인물 (Priority 1)
+        Assert.Equal("세레나", result[2].Name);  // 3순위 상태창 활성 인물 (Priority 2)
         Assert.DoesNotContain(result, r => r.Name == "카일");
     }
 
@@ -219,9 +219,9 @@ public class HybridLorebookRetrieverTests
 
         var lorebooks = new List<LorebookEntry>
         {
-            new("고대전함", ["고대전함"], massiveContent, "아이템", Priority: 10),
-            new("비행마법", ["고대전함"], massiveContent, "마법", Priority: 9),
-            new("루시엘", ["루시엘"], new string('나', 100), "인물", Priority: 8) // 약 77토큰
+            new("고대전함", ["고대전함"], massiveContent, "아이템", Priority: 0),
+            new("비행마법", ["고대전함"], massiveContent, "마법", Priority: 1),
+            new("루시엘", ["루시엘"], new string('나', 100), "인물", Priority: 2) // 약 77토큰
         };
 
         var activeChars = new List<string> { "루시엘" };
@@ -279,4 +279,63 @@ public class HybridLorebookRetrieverTests
         string text2 = LorebookService.BuildEmbeddingSourceText(entryWithoutKeywords);
         Assert.Equal("세계수: 거대한 나무", text2);
     }
+
+    [Fact]
+    public void Retrieve_SortsDirectMatches_ByPriorityAscending_ZeroIsHighestPriority()
+    {
+        // Arrange
+        var retriever = new HybridLorebookRetriever();
+        var lorebooks = new List<LorebookEntry>
+        {
+            new("보조검", ["검"], "보조 단검", "아이템", Priority: 2),
+            new("주무기", ["검"], "주력 대검", "아이템", Priority: 0),
+            new("예비검", ["검"], "예비 검", "아이템", Priority: 1)
+        };
+
+        // Act
+        var result = retriever.Retrieve("검을 장착한다.", null, lorebooks);
+
+        // Assert - Priority 0이 가장 먼저, 그 다음 1, 2 순으로 정렬되어야 함
+        Assert.Equal(3, result.Count);
+        Assert.Equal("주무기", result[0].Name); // Priority 0 (최고 우선순위)
+        Assert.Equal("예비검", result[1].Name); // Priority 1
+        Assert.Equal("보조검", result[2].Name); // Priority 2
+    }
+
+    [Fact]
+    public void Retrieve_WhenKeywordsEmpty_MatchesViaEntryName()
+    {
+        // Arrange - 키워드가 비어있는([]) 로어북
+        var retriever = new HybridLorebookRetriever();
+        var lorebooks = new List<LorebookEntry>
+        {
+            new("엘리시아", [], "아스테리아 제국의 제2황녀", "인물", Priority: 0)
+        };
+
+        // Act - 유저가 이름을 직접 부름 ("엘리시아에게")
+        var result = retriever.Retrieve("그는 엘리시아에게 조용히 다가갔다.", null, lorebooks);
+
+        // Assert - 키워드가 없어도 이름(Name)으로 1차 정규식 매칭 성공
+        Assert.Single(result);
+        Assert.Equal("엘리시아", result[0].Name);
+    }
+
+    [Fact]
+    public void Retrieve_WhenKeywordsDoNotContainName_MatchesViaEntryName()
+    {
+        // Arrange - 키워드 리스트에 이름("엘리시아")이 누락되고 별칭만 있는 로어북
+        var retriever = new HybridLorebookRetriever();
+        var lorebooks = new List<LorebookEntry>
+        {
+            new("엘리시아", ["황녀", "약혼녀"], "아스테리아 제국의 제2황녀", "인물", Priority: 0)
+        };
+
+        // Act - 유저가 키워드("황녀") 대신 이름("엘리시아를")으로 입력
+        var result = retriever.Retrieve("엘리시아를 차갑게 쏘아보았다.", null, lorebooks);
+
+        // Assert - 키워드에 이름이 없더라도 entry.Name으로 1차 정규식 즉시 적중
+        Assert.Single(result);
+        Assert.Equal("엘리시아", result[0].Name);
+    }
 }
+

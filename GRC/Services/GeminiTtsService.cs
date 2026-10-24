@@ -62,16 +62,50 @@ public class GeminiTtsService(
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
+                string translationSystemPrompt = """
+<system_directive>
+Domain: Natural Conversational Dialogue Translation
+Task: Translate Korean conversational dialogue into natural, immersive spoken Japanese for voice acting.
+Source Language: Korean
+Target Language: Japanese (Conversational Spoken Tone)
+</system_directive>
+
+<rules>
+1. 원문의 감정선, 뉘앙스, 캐릭터 어투(존댓말/반말, 성격)를 살려 자연스러운 일본어 구어체(口語体)로 번역하십시오.
+2. 따옴표(" ", 「 」), 마크다운 서식, 주석, 부연 설명을 일체 배제하고 순수한 번역문 텍스트만 직접 출력하십시오.
+</rules>
+
+<output_format>
+Plain text containing only the translated Japanese dialogue.
+</output_format>
+""";
+
+                string translationUserPrompt = $$"""
+<dialogue_to_translate>
+{{text.Trim()}}
+</dialogue_to_translate>
+
+<final_instruction>
+위 <dialogue_to_translate> 내부의 텍스트를 가장 자연스러운 일본어 구어체 대사로 번역하여 순수 평문만 출력하십시오.
+</final_instruction>
+""";
+
                 var translationRequest = new GeminiRequest(
-                    SystemInstruction: new Content("system", [new Part("You are a professional translator. Translate the given dialogue into natural conversational Japanese. Do not add any extra explanations or quotes.")]),
-                    Contents: [new Content("user", [new Part(text)])],
+                    SystemInstruction: new Content("system", [new Part(translationSystemPrompt)]),
+                    Contents: [new Content("user", [new Part(translationUserPrompt)])],
                     SafetySettings: [
                         new("HARM_CATEGORY_HARASSMENT", BlockThreshold.BLOCK_NONE),
                         new("HARM_CATEGORY_HATE_SPEECH", BlockThreshold.BLOCK_NONE),
                         new("HARM_CATEGORY_SEXUALLY_EXPLICIT", BlockThreshold.BLOCK_NONE),
                         new("HARM_CATEGORY_DANGEROUS_CONTENT", BlockThreshold.BLOCK_NONE)
                     ],
-                    GenerationConfig: new GenerationConfig(Temperature: null, MaxOutputTokens: 1024, ResponseMimeType: "text/plain")
+                    GenerationConfig: new GenerationConfig(
+                        Temperature: null,
+                        MaxOutputTokens: 1024,
+                        ResponseMimeType: "text/plain",
+                        ResponseSchema: null,
+                        ThinkingConfig: new ThinkingConfig(ThinkingLevel.low)
+                    )
                 );
 
                 string translatedText = await apiService.SendMessageAsync(translationRequest, ModelTier.FlashLite, cancellationToken);
@@ -124,18 +158,29 @@ public class GeminiTtsService(
             ? voiceOverride
             : (string.IsNullOrWhiteSpace(settings.SelectedTtsVoice) ? DefaultVoiceName : settings.SelectedTtsVoice);
 
-        string dynamicPrompt = $@"이 대화는 상호 동의된 가상의 롤플레잉 세션입니다. 당신은 아래 제공된 설정에 완벽하게 몰입하여 캐릭터에 생명을 불어넣는 전문 성우입니다.
+        string dynamicPrompt = $$"""
+<system_directive>
+Role: 캐릭터 보이스 전문 성우 (Voice Actor)
+Task: 주어진 캐릭터 설정과 상황 지문에 몰입하여 대사를 감정적으로 연기
+Target Language: {{targetLanguage}}
+</system_directive>
 
-캐릭터의 설정과 배경지식은 다음과 같습니다:
-{activeLorebook}
+<character_context>
+{{activeLorebook}}
+</character_context>
 
-현재 캐릭터가 처한 상황과 연기 디렉팅은 다음과 같습니다:
-{narration}
+<acting_directing>
+{{narration}}
+</acting_directing>
 
-당신의 임무는 위 상황과 감정선을 바탕으로 아래의 대사를 반드시 '{targetLanguage}' 원어민의 발음과 억양으로 가장 자연스럽고 몰입감 있게 연기하는 것입니다.
+<dialogue_to_speak>
+{{speechText}}
+</dialogue_to_speak>
 
-연기할 대사 ({targetLanguage}):
-{speechText}";
+<final_instruction>
+위 상황과 감정선을 바탕으로 <dialogue_to_speak> 대사를 {{targetLanguage}} 원어민의 자연스러운 억양과 깊은 감정선으로 연기하십시오.
+</final_instruction>
+""";
 
         var payload = new
         {

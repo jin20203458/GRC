@@ -32,7 +32,7 @@ public class ChatWorkflowServiceTests
     {
         public string CurrentSessionFileName { get; set; } = "session.json";
         public ChapterContext CurrentContext { get; } = new();
-        public string CurrentLorebookText => "";
+        public IReadOnlyList<LorebookEntry> CurrentActiveLorebooks => [];
 
         public Task<GeminiRequest> BuildNarrativeRequestAsync(ChatMessage userMessage, CharacterPreset preset, string? metaDirective = null)
             => Task.FromResult(new GeminiRequest(null, new List<Content>(), null, null));
@@ -50,11 +50,12 @@ public class ChatWorkflowServiceTests
         public ChatSession ExportSession(CharacterPreset currentPreset)
             => new(currentPreset, new List<ChatMessage>(), new ChapterContext(), "");
         public void UpdateContextStatus(StatusPayload payload, bool replaceCustomStats = false) { }
+        public IReadOnlyList<ChatMessage> GetCurrentShortTermMemory() => [];
     }
 
     private class FakeAppSettingsService : IAppSettingsService
     {
-        public Task<AppSettings> LoadSettingsAsync() => Task.FromResult(new AppSettings("dummy-api-key"));
+        public Task<AppSettings> LoadSettingsAsync() => Task.FromResult(new AppSettings("dummy-api-key", ChatDelay: 0));
         public Task SaveSettingsAsync(AppSettings settings) => Task.CompletedTask;
         public bool IsCredentialFileExists() => true;
         public Task<bool> CopyCredentialFileAsync(string sourceFilePath) => Task.FromResult(true);
@@ -89,47 +90,10 @@ public class ChatWorkflowServiceTests
     {
         var service = CreateService();
 
-        var directive = service.GetMetaDirective("아무 입력", isFastForwardEnabled: false, null, null, isChapterChanged: true);
+        var directive = service.GetMetaDirective("아무 입력", isFastForwardEnabled: false, isChapterChanged: true);
 
         Assert.NotNull(directive);
-        Assert.Contains("[시스템 개입: 챕터 전환 (New Chapter)]", directive);
-    }
-
-    [Fact]
-    public void GetMetaDirective_WhenTriggerStatReachesMax_ReturnsMaxDirectiveAndRecordsEvent()
-    {
-        var service = CreateService();
-        var triggeredEvents = new List<string>();
-        var stats = new Dictionary<string, string>
-        {
-            ["호감도"] = "100/100"
-        };
-
-        var directive = service.GetMetaDirective("대화 진행", isFastForwardEnabled: false, stats, triggeredEvents, isChapterChanged: false);
-
-        Assert.NotNull(directive);
-        Assert.Contains("[시스템 개입: 극적 상황 발생 (수치 도달)]", directive);
-        Assert.Contains("호감도", directive);
-        Assert.Contains("100(최대치)", directive);
-        Assert.Contains("호감도", triggeredEvents);
-    }
-
-    [Fact]
-    public void GetMetaDirective_WhenTriggerStatReachesMin_ReturnsMinDirectiveAndRecordsEvent()
-    {
-        var service = CreateService();
-        var triggeredEvents = new List<string>();
-        var stats = new Dictionary<string, string>
-        {
-            ["이성"] = "0/100"
-        };
-
-        var directive = service.GetMetaDirective("대화 진행", isFastForwardEnabled: false, stats, triggeredEvents, isChapterChanged: false);
-
-        Assert.NotNull(directive);
-        Assert.Contains("[시스템 개입: 극적 상황 발생 (수치 상실 및 소멸)]", directive);
-        Assert.Contains("이성", directive);
-        Assert.Contains("이성", triggeredEvents);
+        Assert.Contains("type=\"chapter_transition\"", directive);
     }
 
     [Fact]
@@ -137,10 +101,10 @@ public class ChatWorkflowServiceTests
     {
         var service = CreateService();
 
-        var directive = service.GetMetaDirective("빠른 진행 요청", isFastForwardEnabled: true, null, null, isChapterChanged: false);
+        var directive = service.GetMetaDirective("빠른 진행 요청", isFastForwardEnabled: true, isChapterChanged: false);
 
         Assert.NotNull(directive);
-        Assert.Contains("[시스템 개입: 서사 압축 및 고속 전개(Fast-Forward)]", directive);
+        Assert.Contains("type=\"fast_forward\"", directive);
     }
 
     [Fact]
@@ -148,9 +112,64 @@ public class ChatWorkflowServiceTests
     {
         var service = CreateService();
 
-        var directive = service.GetMetaDirective("", isFastForwardEnabled: false, null, null, isChapterChanged: false);
+        var directive = service.GetMetaDirective("", isFastForwardEnabled: false, isChapterChanged: false);
 
         Assert.NotNull(directive);
-        Assert.Contains("[시스템 명령: 서사 이어쓰기 (Auto-Continue)]", directive);
+        Assert.Contains("type=\"auto_continue\"", directive);
+    }
+
+    [Fact]
+    public async Task ProcessChatStreamAsync_FiltersMarkdownAsterisksFromStreamAndFinalText()
+    {
+        // Arrange
+        var chunks = new[] { "**\"안녕하세요.\"**", " 그녀가 ", "**미소**", " 지었다." };
+        var fakeApi = new FakeStreamingGeminiApiService(chunks);
+        var service = new ChatWorkflowService(
+            fakeApi,
+            new FakeMemoryManagerService(),
+            new FakeAppSettingsService(),
+            new FakeAudioService()
+        );
+
+        var receivedChars = new System.Text.StringBuilder();
+        var preset = new CharacterPreset("테스트", "세계관", "시스템");
+        var userMsg = new ChatMessage("user", "안녕", DateTime.Now);
+
+        // Act
+        var result = await service.ProcessChatStreamAsync(
+            userMsg,
+            preset,
+            onCharReceived: c => receivedChars.Append(c)
+        );
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        // 실시간 스트리밍으로 전달된 문자열에 '*' 기호가 전혀 없어야 함
+        Assert.DoesNotContain("*", receivedChars.ToString());
+        Assert.Equal("\"안녕하세요.\" 그녀가 미소 지었다.", receivedChars.ToString());
+
+        // 최종 반환 텍스트에도 '*' 기호가 전혀 없어야 함
+        Assert.DoesNotContain("*", result.FinalText);
+        Assert.Equal("\"안녕하세요.\" 그녀가 미소 지었다.", result.FinalText);
+    }
+
+    private class FakeStreamingGeminiApiService(IEnumerable<string> chunks) : IGeminiApiService
+    {
+        public Task<string> SendMessageAsync(GeminiRequest request, ModelTier? overrideTier = null, CancellationToken cancellationToken = default)
+            => Task.FromResult("");
+
+        public async IAsyncEnumerable<string> SendMessageStreamAsync(
+            GeminiRequest request,
+            ModelTier? overrideTier = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            foreach (var chunk in chunks)
+            {
+                yield return chunk;
+            }
+        }
+
+        public Task<float[]> GetEmbeddingAsync(string text, string? taskType = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(Array.Empty<float>());
     }
 }

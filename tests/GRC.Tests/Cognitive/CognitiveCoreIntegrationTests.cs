@@ -180,10 +180,11 @@ public class CognitiveCoreIntegrationTests(ITestOutputHelper output)
         Assert.NotNull(payload);
 
         output.WriteLine("--- [파싱된 상태창 페이로드] ---");
-        output.WriteLine($"아이템: {string.Join(", ", payload.Items)}");
-        output.WriteLine($"위치: {string.Join(", ", payload.Places)}");
+        output.WriteLine($"아이템: {string.Join(", ", payload.Items ?? [])}");
+        output.WriteLine($"위치: {string.Join(", ", payload.Places ?? [])}");
 
         // 아이템 중 양피지/조각 관련 단어가 정상 추출되었는지 검증
+        Assert.NotNull(payload.Items);
         bool itemDetected = payload.Items.Any(i => i.Contains("양피지") || i.Contains("조각"));
 
         output.WriteLine($"아이템 추출 성공: {itemDetected}");
@@ -200,14 +201,14 @@ public class CognitiveCoreIntegrationTests(ITestOutputHelper output)
 
         output.WriteLine("====================================================================================================");
         output.WriteLine("=== [실측 전수 검증] 2대 핵심 RAG 정탐(TP) 10개 vs 비교군(Control) 10개 (총 20개 문장) 분리도 평가 ===");
-        output.WriteLine("=== 모델: text-multilingual-embedding-002 (서울 asia-northeast3 리전) / 기준: 0.68f, 0.70f ===");
+        output.WriteLine("=== 모델: gemini-embedding-001 (서울 asia-northeast3 리전, MRL 768차원) / 기준: 0.75f, 0.78f ===");
         output.WriteLine("====================================================================================================");
 
         // ====================================================================
         // [1] 로어북 RAG (대상: 엘리시아)
-        // - 권장 임계치: 0.68f (비교군 최고점 0.6072 vs 정탐 하한선 0.6910)
+        // - 권장 임계치: 0.75f (비교군 최고점 0.7196 vs 정탐 하한선 0.7785)
         // ====================================================================
-        float lorebookThreshold = 0.68f;
+        float lorebookThreshold = 0.75f;
         string lorebookTarget = "엘리시아: 아스테리아 제국의 제2황녀이자 주인공의 정략결혼 약혼녀. 눈부신 금발과 벽안을 지닌 냉혹하고 오만한 미녀. 제국 마법단 총지휘관.";
         var lorebookCases = new List<RagEvaluationCase>
         {
@@ -225,9 +226,9 @@ public class CognitiveCoreIntegrationTests(ITestOutputHelper output)
 
         // ====================================================================
         // [2] 사건 불릿포인트 회상 RAG (대상: 부둣가 동맹 맹세)
-        // - 순수 시맨틱 임베딩 유사도 (>= 0.71f)
+        // - 순수 시맨틱 임베딩 유사도 (>= 0.78f, 비교군 최고점 0.7488 vs 정탐 하한선 0.7966)
         // ====================================================================
-        float ledgerThreshold = 0.71f;
+        float ledgerThreshold = 0.78f;
         string ledgerTarget = "비 내리는 부둣가에서 붉은 머리 마법사에게 비밀 서신을 건네받고 동맹을 맹세했다.";
         var ledgerCases = new List<RagEvaluationCase>
         {
@@ -267,7 +268,7 @@ public class CognitiveCoreIntegrationTests(ITestOutputHelper output)
         output.WriteLine($"### [{title}]");
         output.WriteLine($"* 대상 원문: \"{targetText}\"");
         output.WriteLine($"----------------------------------------------------------------------------------------------------");
-        output.WriteLine($"| {"유형",-6} | {"세부 유형",-24} | {"유사도",-8} | {"판정 (기준 0.70)",-18} | 입력 쿼리");
+        output.WriteLine($"| {"유형",-6} | {"세부 유형",-24} | {"유사도",-8} | {$"판정 (기준 {threshold:F2})",-18} | 입력 쿼리");
         output.WriteLine($"| :----- | :----------------------- | :------- | :----------------- | :------------------------------------------------------");
 
         var targetEmb = await apiService.GetEmbeddingAsync(targetText);
@@ -502,12 +503,12 @@ public class CognitiveCoreIntegrationTests(ITestOutputHelper output)
             }
         }
 
-        // 3. 임베딩 모델(text-multilingual-embedding-002)에 대해 global vs us-central1 vs asia-northeast3(서울) 비교
-        output.WriteLine("\n[테스트 대상 임베딩 모델]: text-multilingual-embedding-002");
-        string embedPayload = "{\"instances\":[{\"content\":\"테스트 문장\",\"task_type\":\"SEMANTIC_SIMILARITY\"}]}";
+        // 3. 임베딩 모델(gemini-embedding-001)에 대해 global vs us-central1 vs asia-northeast3(서울) 비교
+        output.WriteLine("\n[테스트 대상 임베딩 모델]: gemini-embedding-001");
+        string embedPayload = "{\"instances\":[{\"content\":\"테스트 문장\",\"task_type\":\"SEMANTIC_SIMILARITY\"}],\"parameters\":{\"outputDimensionality\":768}}";
 
         // 3-1. 임베딩 global 테스트
-        string embedGlobalUri = $"https://aiplatform.googleapis.com/v1/projects/{projectId}/locations/global/publishers/google/models/text-multilingual-embedding-002:predict";
+        string embedGlobalUri = $"https://aiplatform.googleapis.com/v1/projects/{projectId}/locations/global/publishers/google/models/gemini-embedding-001:predict";
         using var reqEmbedGlobal = new HttpRequestMessage(HttpMethod.Post, embedGlobalUri);
         reqEmbedGlobal.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         reqEmbedGlobal.Content = new StringContent(embedPayload, Encoding.UTF8, "application/json");
@@ -530,7 +531,7 @@ public class CognitiveCoreIntegrationTests(ITestOutputHelper output)
         }
 
         // 3-2. 임베딩 us-central1 테스트
-        string embedUsUri = $"https://us-central1-aiplatform.googleapis.com/v1/projects/{projectId}/locations/us-central1/publishers/google/models/text-multilingual-embedding-002:predict";
+        string embedUsUri = $"https://us-central1-aiplatform.googleapis.com/v1/projects/{projectId}/locations/us-central1/publishers/google/models/gemini-embedding-001:predict";
         using var reqEmbedUs = new HttpRequestMessage(HttpMethod.Post, embedUsUri);
         reqEmbedUs.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         reqEmbedUs.Content = new StringContent(embedPayload, Encoding.UTF8, "application/json");
@@ -553,7 +554,7 @@ public class CognitiveCoreIntegrationTests(ITestOutputHelper output)
         }
 
         // 3-3. 임베딩 asia-northeast3 (서울) 테스트
-        string embedSeoulUri = $"https://asia-northeast3-aiplatform.googleapis.com/v1/projects/{projectId}/locations/asia-northeast3/publishers/google/models/text-multilingual-embedding-002:predict";
+        string embedSeoulUri = $"https://asia-northeast3-aiplatform.googleapis.com/v1/projects/{projectId}/locations/asia-northeast3/publishers/google/models/gemini-embedding-001:predict";
         using var reqEmbedSeoul = new HttpRequestMessage(HttpMethod.Post, embedSeoulUri);
         reqEmbedSeoul.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         reqEmbedSeoul.Content = new StringContent(embedPayload, Encoding.UTF8, "application/json");
@@ -577,4 +578,106 @@ public class CognitiveCoreIntegrationTests(ITestOutputHelper output)
 
         output.WriteLine("================================================================================");
     }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task Rag_SemanticSimilarity_SameCharacterDifferentAction_Evaluation()
+    {
+        var (apiService, _) = CreateRealServices();
+
+        string[] targets =
+        [
+            "카인이 곰을 죽임",
+            "카인이 칼로 곰을 죽였다."
+        ];
+
+        var testQueries = new (string Category, string Description, string Query)[]
+        {
+            ("정탐", "동일 서술 (칼로 곰 사살)", "카인이 칼로 곰을 죽였다."),
+            ("정탐", "동일 사건 요약 (곰 사살)", "카인이 곰을 죽임"),
+            ("정탐", "유의어/의미 우회 (숨통 끊음)", "카인이 맹수 곰을 사냥하여 숨통을 끊어놓았다."),
+            ("정탐", "정황 우회 (숲에서 곰 처치)", "카인이 깊은 숲속에서 사나운 곰을 처치했다."),
+            ("하드 네거티브", "동일인+칼+요리 (사용자 의문)", "카인이 칼로 요리를 했다."),
+            ("하드 네거티브", "동일인+칼+식재료 손질", "카인이 주방에서 식칼로 고기와 야채를 썰었다."),
+            ("하드 네거티브", "동일인+칼+도구 정비", "카인이 숫돌에 날카로운 칼을 갈고 있다."),
+            ("하드 네거티브", "동일인+칼+인간 대결", "카인이 칼을 빼들고 적 기사와 칼부림을 벌였다."),
+            ("하드 네거티브", "동일인+사냥+다른 동물", "카인이 숲에서 활로 사슴을 사냥했다."),
+            ("하드 네거티브 (대화)", "동일인+칼+요리 대화", "\"카인, 그 칼로 오늘 저녁 요리 좀 해줄 수 있어?\""),
+            ("하드 네거티브 (지문)", "동일인+칼+요리 지문", "주방으로 들어간 카인은 칼을 쥐고 야채를 다듬으며 저녁 식사를 준비하기 시작했다."),
+            ("정탐 (대화형 회상)", "사건 명시적 질문", "\"카인이 예전에 그 칼로 곰을 때려잡았던 거 기억해?\""),
+            ("정탐 (은유적 회상)", "동일 사건 암시 대화", "\"그 숲속에서 맹수의 숨통을 끊어버렸던 그 끔찍한 날 말이야.\""),
+            ("대조군", "동일 대상(곰)+자연 생태", "거대한 곰이 강가에서 연어를 낚아채 먹고 있다."),
+            ("대조군", "동일인+일상 휴식", "카인이 나무 그늘 아래 누워 조용히 낮잠을 잤다.")
+
+        };
+
+        output.WriteLine("====================================================================================================");
+        output.WriteLine("=== [실측 검증] 동일 인물(카인)/도구(칼) 기반 행위 변별력 및 임계치(0.75f / 0.78f) 판정 테스트 ===");
+        output.WriteLine("=== 모델: gemini-embedding-001 (서울 asia-northeast3 리전, MRL 768차원) ===");
+        output.WriteLine("====================================================================================================");
+
+        foreach (var target in targets)
+        {
+            output.WriteLine($"\n====================================================================================================");
+            output.WriteLine($"### [사건 원문(기준)]: \"{target}\"");
+            output.WriteLine($"----------------------------------------------------------------------------------------------------");
+            output.WriteLine($"| {"유형",-12} | {"세부 내용",-24} | {"유사도",-8} | {"0.75 판정",-12} | {"0.78 판정",-12} | 입력 쿼리");
+            output.WriteLine($"| :----------- | :----------------------- | :--------- | :------------ | :------------ | :------------------------------------------------------");
+
+            var targetEmb = await apiService.GetEmbeddingAsync(target);
+            Assert.NotNull(targetEmb);
+
+            foreach (var item in testQueries)
+            {
+                var qEmb = await apiService.GetEmbeddingAsync(item.Query);
+                Assert.NotNull(qEmb);
+
+                float sim = VectorMathHelper.CosineSimilarity(qEmb, targetEmb);
+                string pass75 = sim >= 0.75f ? "통과 (RECALL)" : "차단 (BLOCKED)";
+                string pass78 = sim >= 0.78f ? "통과 (RECALL)" : "차단 (BLOCKED)";
+
+                output.WriteLine($"| {item.Category,-12} | {item.Description,-24} | {sim:F4}   | {pass75,-12} | {pass78,-12} | \"{item.Query}\"");
+            }
+        }
+
+        // [현실적 AI 추출 불릿 검증] 실제 EventLedgerExtractor가 생성하는 40~60자 인과 완결형 불릿
+        string realisticBearBullet = "카인이 숲속에서 습격해온 사나운 곰을 칼로 베어 처치했다.";
+        string realisticCookingBullet = "카인이 주방에서 식칼로 고기와 야채를 다듬어 저녁 요리를 완성했다.";
+
+        output.WriteLine($"\n====================================================================================================");
+        output.WriteLine($"### [현실적 AI 추출 불릿(인과 완결형, 30~50자) 간의 상호 유사도 측정]");
+        output.WriteLine($"* 사건 A (곰 처치): \"{realisticBearBullet}\"");
+        output.WriteLine($"* 사건 B (저녁 요리): \"{realisticCookingBullet}\"");
+        output.WriteLine($"----------------------------------------------------------------------------------------------------");
+
+        var embA = await apiService.GetEmbeddingAsync(realisticBearBullet);
+        var embB = await apiService.GetEmbeddingAsync(realisticCookingBullet);
+        Assert.NotNull(embA);
+        Assert.NotNull(embB);
+
+        float interBulletSim = VectorMathHelper.CosineSimilarity(embA, embB);
+        output.WriteLine($"* 사건 A vs 사건 B 불릿 간 상호 유사도: {interBulletSim:F4}");
+
+        var realQueries = new (string Desc, string Query)[]
+        {
+            ("곰 사냥 명시적 회상", "카인이 예전에 그 칼로 곰을 처치했던 일 기억해?"),
+            ("곰 사냥 우회적 회상", "그때 숲속에서 맹수의 숨통을 끊어버렸던 그 위험했던 순간 말이야."),
+            ("요리 상황 (하드 네거티브)", "카인이 식칼을 들고 주방에서 요리를 시작했다."),
+            ("요리 대화 (하드 네거티브)", "\"카인, 그 칼로 오늘 저녁 찌개 요리 좀 해줘.\"")
+        };
+
+        output.WriteLine($"\n[사건 A(곰 처치) 기준 쿼리별 유사도]");
+        foreach (var q in realQueries)
+        {
+            var qEmb = await apiService.GetEmbeddingAsync(q.Query);
+            float sim = VectorMathHelper.CosineSimilarity(qEmb, embA);
+            string p75 = sim >= 0.75f ? "통과" : "차단";
+            string p78 = sim >= 0.78f ? "통과" : "차단";
+            output.WriteLine($"| {q.Desc,-20} | {sim:F4} | 0.75:{p75} | 0.78:{p78} | \"{q.Query}\"");
+        }
+        output.WriteLine("====================================================================================================");
+    }
 }
+
+
+

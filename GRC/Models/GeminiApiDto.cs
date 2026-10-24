@@ -92,13 +92,14 @@ public record PromptFeedback(
 );
 
 // ==========================================
-// [Embedding DTO (text-embedding-004)]
+// [Embedding DTO (gemini-embedding-001 MRL 768차원)]
 // ==========================================
 
 // AI Studio 전용 임베딩 DTO
 public record EmbedContentRequest(
     [property: JsonPropertyName("content")] Content Content,
-    [property: JsonPropertyName("taskType")] string? TaskType = null
+    [property: JsonPropertyName("taskType")] string? TaskType = null,
+    [property: JsonPropertyName("outputDimensionality")] int? OutputDimensionality = null
 );
 
 public record EmbedContentResponse(
@@ -111,7 +112,12 @@ public record ContentEmbedding(
 
 // Vertex AI 전용 임베딩 DTO
 public record VertexEmbedRequest(
-    [property: JsonPropertyName("instances")] List<VertexEmbedInstance> Instances
+    [property: JsonPropertyName("instances")] List<VertexEmbedInstance> Instances,
+    [property: JsonPropertyName("parameters")] VertexEmbedParameters? Parameters = null
+);
+
+public record VertexEmbedParameters(
+    [property: JsonPropertyName("outputDimensionality")] int OutputDimensionality
 );
 
 public record VertexEmbedInstance(
@@ -126,4 +132,5 @@ public record VertexEmbedResponse(
 public record VertexEmbedPrediction(
     [property: JsonPropertyName("embeddings")] ContentEmbedding Embeddings
 );
+
 

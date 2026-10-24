@@ -22,19 +22,19 @@ public class ReplySuggestionService(IGeminiApiService apiService) : IReplySugges
 
         string conversationText = string.Join("\n", recentMemory.Select(m => $"{m.Role}: {m.Text}"));
 
-        string prompt = $"""
-        <current_snapshot>
-        {currentContextString}
-        </current_snapshot>
+        string prompt = $$"""
+<session_context>
+{{currentContextString}}
+</session_context>
 
-        <recent_conversation>
-        {conversationText}
-        </recent_conversation>
+<recent_conversation>
+{{conversationText}}
+</recent_conversation>
 
-        <final_instruction>
-        위 상황을 바탕으로 자연스럽고 입체적인 다음 행동 선택지 3가지를 즉시 JSON 배열로 출력하십시오.
-        </final_instruction>
-        """;
+<final_instruction>
+위 상황을 바탕으로 자연스럽고 입체적인 다음 행동 선택지 3가지를 즉시 JSON 배열로 출력하십시오.
+</final_instruction>
+""";
 
         var suggestionSchema = new
         {
@@ -45,25 +45,41 @@ public class ReplySuggestionService(IGeminiApiService apiService) : IReplySugges
 
         // 추천 전용 단발성 Request 생성
         string systemInstruction = """
-        <system_directive>
-        Role: 상호 동의된 가상의 롤플레잉 게임의 유저 선택지 생성기
-        Task: 현재 상황과 최근 대화를 분석하여 유저가 취할 수 있는 다음 행동/대사 선택지 3개를 JSON 배열로 생성
-        </system_directive>
+<system_directive>
+Domain: 텍스트 롤플레잉 게임 유저 선택지 생성 엔진
+Task: 현재 상황과 최근 대화를 분석하여 유저가 취할 수 있는 다음 행동/대사 선택지 3개를 JSON 배열로 생성
+</system_directive>
 
-        <rules>
-        1. <current_snapshot>과 <recent_conversation>을 기반으로 유저가 취할 수 있는 다음 행동/대사 선택지 3개를 생성.
-        2. 단순히 대화만 이어가는 것이 아니라, 1) 순수 행동(상호작용, 이동 등), 2) 대사와 행동의 결합, 3) 짧고 강렬한 대사 등 유저가 능동적으로 상황을 이끌어갈 수 있는 다채로운 형태를 제시.
-        3. 유저가 말을 할 수 없는 상태(수면, 물속 등)라면 대사 없이 지문/속마음만 작성.
-        4. 대사는 큰따옴표" "로 묶고, 속마음은「 」, 행동/지문은 기호 없이 작성.
-        5. 3개의 선택지가 각각 [긍정/수용/접근], [부정/반발/회피], [우회/관찰/제3의 행동]처럼 서로 확실히 다른 감정과 대응 방식을 띠도록 구성.
-        </rules>
+<rules>
+1. <session_context>와 <recent_conversation>을 기반으로 유저가 취할 수 있는 다음 행동/대사 선택지 3개를 생성하십시오.
+2. 단순히 대화만 이어가는 것이 아니라, 1) 순수 행동(상호작용, 이동 등), 2) 대사와 행동의 결합, 3) 짧고 강렬한 대사 등 유저가 능동적으로 상황을 이끌어갈 수 있는 다채로운 형태를 제시하십시오.
+3. 유저가 말을 할 수 없는 상태(수면, 물속 등)라면 대사 없이 지문/속마음만 작성하십시오.
+4. 대사는 큰따옴표" "로 묶고, 속마음은「 」, 행동/지문은 기호 없이 작성하십시오.
+5. 3개의 선택지가 각각 (긍정/수용/접근), (부정/반발/회피), (우회/관찰/제3의 대안)처럼 상호 배타적인 태도와 대응 방식을 띠도록 구성하십시오.
+</rules>
 
-        <example>
-        [상황: 어두운 동굴 입구에서 정체불명의 노인이 길을 가로막고 있다]
-        출력:
-        ["노인에게 다가가 정중히 고개를 숙인다. \"길을 비켜주시겠습니까, 어르신.\"", "검의 손잡이에 손을 올리며 경계 태세를 취한다.「수상하군. 왜 하필 이곳에.」", "동굴 입구를 우회하여 절벽 위쪽으로 올라갈 수 있는 길을 살핀다."]
-        </example>
-        """;
+<output_format>
+type ReplySuggestions = string[]; // 유저가 선택할 수 있는 추천 답변 3가지
+</output_format>
+
+<example>
+<input>
+<session_context>
+장소: 어두운 동굴 입구
+</session_context>
+<recent_conversation>
+model: 정체불명의 노인이 지팡이를 짚은 채 길을 가로막고 서 있다.
+</recent_conversation>
+</input>
+<output>
+[
+  "노인에게 다가가 정중히 고개를 숙인다. \"길을 비켜주시겠습니까, 어르신.\"",
+  "검의 손잡이에 손을 올리며 경계 태세를 취한다.「수상하군. 왜 하필 이곳에.」",
+  "동굴 입구를 우회하여 절벽 위쪽으로 올라갈 수 있는 길을 살핀다."
+]
+</output>
+</example>
+""";
 
         var req = new GeminiRequest(
             SystemInstruction: new Content("system", [new Part(systemInstruction)]),
@@ -74,7 +90,7 @@ public class ReplySuggestionService(IGeminiApiService apiService) : IReplySugges
                 new("HARM_CATEGORY_SEXUALLY_EXPLICIT", BlockThreshold.BLOCK_NONE),
                 new("HARM_CATEGORY_DANGEROUS_CONTENT", BlockThreshold.BLOCK_NONE)
             ],
-            GenerationConfig: new GenerationConfig(null, 8192, "application/json", suggestionSchema, new ThinkingConfig(ThinkingLevel.low))
+            GenerationConfig: new GenerationConfig(null, 1024, "application/json", suggestionSchema, new ThinkingConfig(ThinkingLevel.low))
         );
 
         try

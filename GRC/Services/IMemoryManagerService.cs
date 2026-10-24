@@ -1,4 +1,5 @@
 using GRC.Models;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace GRC.Services;
@@ -39,8 +40,9 @@ public interface IMemoryManagerService
     ChatSession ExportSession(CharacterPreset currentPreset);
 
     void UpdateContextStatus(StatusPayload payload, bool replaceCustomStats = false);
+    IReadOnlyList<ChatMessage> GetCurrentShortTermMemory();
     ChapterContext CurrentContext { get; }
-    string CurrentLorebookText { get; }
+    IReadOnlyList<LorebookEntry> CurrentActiveLorebooks { get; }
     string CurrentSessionFileName { get; set; }
 
 }

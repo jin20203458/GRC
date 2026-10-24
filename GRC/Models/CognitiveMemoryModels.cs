@@ -35,5 +35,9 @@ public record CognitiveContext(
     List<EntitySlotItem> Entities,
     List<LorebookEntry> RetrievedLores,
     List<EventLedgerItem> RecalledHistory,
-    int CurrentChapter = 1
+    int CurrentChapter = 1,
+    string? MetaDirective = null,
+    Dictionary<string, string>? CustomStats = null,
+    List<string>? Items = null,
+    List<string>? Places = null
 );

@@ -1,3 +1,4 @@
+using GRC.Helpers;
 using GRC.Models;
 using System;
 using System.Collections.Generic;
@@ -16,20 +17,26 @@ namespace GRC.Services;
 /// </summary>
 public class EventLedgerExtractor(IGeminiApiService apiService) : IEventLedgerExtractor
 {
-    private const string ExtractionPromptTemplate =
-        "당신은 RPG 게임의 객관적 역사 서기관입니다. 아래 최근 대화에서 일어난 '실제 사건, 이동한 장소, 획득/사용한 아이템, 체결된 약속/맹세, 그리고 새롭게 드러난 중요 단서나 비밀'만을 1~2문장의 객관적 팩트 불릿(최대 3~5개)으로 추출하십시오.\n\n" +
-        "[엄격한 제외 기준]:\n" +
-        "- 문학적 미사여구, 날씨/분위기 묘사 제외\n" +
-        "- 인물의 내면 심리 독백 및 단순 잡담 제외\n\n" +
-        "[출력 형식]:\n" +
-        "반드시 JSON 형식으로만 응답하십시오:\n" +
-        "{\n" +
-        "  \"bullets\": [\n" +
-        "    \"팩트 1\",\n" +
-        "    \"팩트 2\"\n" +
-        "  ]\n" +
-        "}\n\n" +
-        "[최근 대화 이력]:\n";
+    private const string ExtractionSystemInstruction = """
+<system_directive>
+Domain: RPG Narrative History & Causal Fact Bullet Extraction
+Task: 최근 대화 이력을 분석하여 핵심 사건, 이동한 장소, 획득/사용한 아이템, 체결된 약속, 중요 단서나 비밀을 1~2문장의 자기완결형 인과 팩트 불릿(최대 3~5개)으로 추출하십시오.
+Output Language: Korean
+</system_directive>
+
+<rules>
+1. 각 항목은 다른 문맥 없이 단독으로 읽혀도 전후 인과관계를 이해할 수 있는 '자기완결형 문장(1~2문장)'이어야 합니다.
+2. 모든 주체와 대상은 인물명, 지명, 아이템명 등 명시적인 고유명사로 기술하십시오.
+3. (원인/배경 + 명시적 주체 + 행동/사건 + 결과/변화)의 인과관계를 한 문장 안에 유기적으로 압축하십시오.
+</rules>
+
+<output_format>
+반드시 아래 TypeScript 인터페이스 규격의 순수 JSON으로만 응답하십시오:
+interface EventLedgerOutput {
+  bullets: string[]; // 인과관계가 완결된 1~2문장의 사건 팩트 불릿 목록 (최대 3~5개)
+}
+</output_format>
+""";
 
     public async Task<List<EventLedgerItem>> ExtractLedgerFactsAsync(
         IEnumerable<ChatMessage> recentTurns,
@@ -42,20 +49,23 @@ public class EventLedgerExtractor(IGeminiApiService apiService) : IEventLedgerEx
         if (turnList.Count == 0) return [];
 
         var sb = new StringBuilder();
+        sb.AppendLine("<dialogue_history>");
         foreach (var msg in turnList)
         {
             string speaker = string.Equals(msg.Role, "user", StringComparison.OrdinalIgnoreCase) ? "플레이어" : "AI";
             sb.AppendLine($"{speaker}: {msg.Text}");
         }
-
-        string fullUserPrompt = ExtractionPromptTemplate + sb;
+        sb.AppendLine("</dialogue_history>\n");
+        sb.AppendLine("<final_instruction>");
+        sb.AppendLine("위 <dialogue_history>에서 핵심 인과 사건을 추출하여 <output_format>의 JSON 규격으로만 응답하십시오.");
+        sb.AppendLine("</final_instruction>");
 
         var request = new GeminiRequest(
-            SystemInstruction: null,
-            Contents: [new Content("user", [new Part(fullUserPrompt)])],
+            SystemInstruction: new Content("system", [new Part(ExtractionSystemInstruction)]),
+            Contents: [new Content("user", [new Part(sb.ToString())])],
             SafetySettings: null,
             GenerationConfig: new GenerationConfig(
-                Temperature: 0.1f,
+                Temperature: null,
                 MaxOutputTokens: 1024,
                 ResponseMimeType: "application/json"
             )
@@ -106,41 +116,35 @@ public class EventLedgerExtractor(IGeminiApiService apiService) : IEventLedgerEx
         }
     }
 
+    private sealed class LedgerExtractionDto
+    {
+        public List<string>? Bullets { get; set; }
+    }
+
     private static List<string> ParseBulletsFromJson(string rawText)
     {
-        var result = new List<string>();
+        if (string.IsNullOrWhiteSpace(rawText)) return [];
 
         try
         {
-            // 마크다운 코드 블록(```json ... ```) 정제
-            string cleaned = rawText.Trim();
-            if (cleaned.StartsWith("```json", StringComparison.OrdinalIgnoreCase))
+            // 1. DTO 객체 역직렬화 (마크다운 펜스 제거, 사설 스킵, 잘린 JSON 복구 자동 처리)
+            var dto = LlmJsonParser.DeserializeSafe<LedgerExtractionDto>(rawText);
+            if (dto?.Bullets != null && dto.Bullets.Count > 0)
             {
-                cleaned = cleaned[7..];
-            }
-            else if (cleaned.StartsWith("```"))
-            {
-                cleaned = cleaned[3..];
-            }
-
-            if (cleaned.EndsWith("```"))
-            {
-                cleaned = cleaned[..^3];
+                return dto.Bullets
+                    .Where(b => !string.IsNullOrWhiteSpace(b))
+                    .Select(b => b.Trim())
+                    .ToList();
             }
 
-            cleaned = cleaned.Trim();
-
-            var node = JsonNode.Parse(cleaned);
-            if (node is JsonObject obj && obj.TryGetPropertyValue("bullets", out var bulletsNode) && bulletsNode is JsonArray arr)
+            // 2. 모델이 {"bullets": [...]} 대신 최상위 배열 ["팩트1", "팩트2"]로 응답했을 경우를 위한 Fallback
+            var arrayFallback = LlmJsonParser.DeserializeArraySafe<List<string>>(rawText);
+            if (arrayFallback != null && arrayFallback.Count > 0)
             {
-                foreach (var item in arr)
-                {
-                    string? bulletText = item?.GetValue<string>();
-                    if (!string.IsNullOrWhiteSpace(bulletText))
-                    {
-                        result.Add(bulletText.Trim());
-                    }
-                }
+                return arrayFallback
+                    .Where(b => !string.IsNullOrWhiteSpace(b))
+                    .Select(b => b.Trim())
+                    .ToList();
             }
         }
         catch
@@ -148,6 +152,6 @@ public class EventLedgerExtractor(IGeminiApiService apiService) : IEventLedgerEx
             // JSON 파싱 실패 시 안전하게 빈 리스트 반환
         }
 
-        return result;
+        return [];
     }
 }

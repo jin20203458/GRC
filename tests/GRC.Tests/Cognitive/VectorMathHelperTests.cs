@@ -75,7 +75,7 @@ public class VectorMathHelperTests
     [Fact]
     public void CosineSimilarity_HighDimensionalVector_ComputesCorrectly()
     {
-        // 768차원 text-embedding-004 모사
+        // 768차원 gemini-embedding-001 (MRL) 모사
         float[] v1 = new float[768];
         float[] v2 = new float[768];
         for (int i = 0; i < 768; i++)

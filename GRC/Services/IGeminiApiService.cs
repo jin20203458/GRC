@@ -18,7 +18,7 @@ public interface IGeminiApiService
     IAsyncEnumerable<string> SendMessageStreamAsync(GeminiRequest request, ModelTier? overrideTier = null, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 텍스트에 대한 임베딩 벡터(Google text-embedding-004, 768차원)를 비동기로 받아옵니다.
+    /// 텍스트에 대한 임베딩 벡터(Google gemini-embedding-001, MRL 768차원)를 비동기로 받아옵니다.
     /// </summary>
     Task<float[]> GetEmbeddingAsync(string text, string? taskType = null, CancellationToken cancellationToken = default);
 }

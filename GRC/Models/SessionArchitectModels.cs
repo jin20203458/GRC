@@ -57,6 +57,9 @@ public class LorebookPlanItem
     [JsonPropertyName("innerDepth")]
     public string InnerDepth { get; set; } = "";    // 내면의 입체성, 동기, 역린 또는 서사적 훅
 
+    [JsonPropertyName("connectedEntities")]
+    public string ConnectedEntities { get; set; } = ""; // 다른 로어북 항목들과의 관계망, 대립각, 소속 및 인과적 연결고리
+
     [JsonPropertyName("keywords")]
     public List<string> Keywords { get; set; } = []; // 검색 트리거용 순수 명사 키워드
 
@@ -65,7 +68,7 @@ public class LorebookPlanItem
 }
 
 /// <summary>
-/// 상태창 및 Turn 0 초기 컨텍스트 시딩 설계 결과 모델
+/// 상태창, Turn 0 초기 컨텍스트 시딩 및 세션 특화 GM 수칙(4·5번) 통합 설계 결과 모델
 /// </summary>
 public class StatusDesignPayload
 {
@@ -83,6 +86,9 @@ public class StatusDesignPayload
 
     [JsonPropertyName("initialItems")]
     public List<string> InitialItems { get; set; } = [];
+
+    [JsonPropertyName("genreDirectives")]
+    public List<string> GenreDirectives { get; set; } = [];
 }
 
 /// <summary>
@@ -97,10 +103,10 @@ public enum AgentStep
     WorldviewReview,   // 세계관 검토 대기
     LorebookGen,       // 로어북 생성 중
     LorebookReview,    // 로어북 검토 대기
-    StatusGen,         // 상태창 설계 중
-    StatusReview,      // 상태창 검토 대기
-    ScenarioGen,       // 시나리오 생성 중
+    ScenarioGen,       // 시나리오 생성 중 (4단계 선행)
     ScenarioReview,    // 시나리오 검토 대기
+    StatusGen,         // 상태창 설계 중 (5단계 후행 - 오프닝 기반 정밀 추출)
+    StatusReview,      // 상태창 검토 대기
     PromptGen,         // 시스템 프롬프트 생성 중
     PromptReview,      // 시스템 프롬프트 검토 대기
     Applying,          // 세션 파일 생성/적용 중

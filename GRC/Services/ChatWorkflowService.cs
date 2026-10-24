@@ -18,78 +18,30 @@ public class ChatWorkflowService(
     IAppSettingsService appSettingsService,
     IAudioService audioService) : IChatWorkflowService
 {
-    public string? GetMetaDirective(string inputText, bool isFastForwardEnabled, 
-        Dictionary<string, string>? currentStats, List<string>? triggeredEvents, 
-        bool isChapterChanged = false)
+    public string? GetMetaDirective(string inputText, bool isFastForwardEnabled, bool isChapterChanged = false)
     {
         if (isChapterChanged)
         {
             return """
-        <meta_directive>
-        [시스템 개입: 챕터 전환 (New Chapter)]
-        새로운 챕터가 시작되었습니다. 
-        진행 중이던 기존 사건이나 상황을 억지스럽지 않게 자연스럽게 마무리(일단락) 지으십시오.
-        그 후, 시간의 흐름을 요약하거나 새로운 장소/인물을 조명하는 방식을 통해 이야기의 막을 넘기듯 다음 챕터의 새로운 국면으로 부드럽게 전환하십시오.
+        <meta_directive type="chapter_transition">
+        새로운 챕터가 시작되었습니다. 진행 중이던 기존 사건이나 상황을 일단락 짓고, 시간의 흐름이나 새로운 장소/인물을 조명하여 다음 챕터의 새로운 국면으로 전환하십시오.
         </meta_directive>
         """;
         }
 
-        // 1. 동적 상태창 이벤트 검사
-        if (currentStats != null && currentStats.Count > 0)
-        {
-            string[] triggerKeywords = { "호감", "애정", "집착", "관계", "순종", "굴복", "타락", "혐오", "증오", "죄책감", "수치심", "이성", "침식", "흥분", "성욕", "붕괴" };
-
-            foreach (var kvp in currentStats)
-            {
-                string targetKey = kvp.Key;
-                if (!triggerKeywords.Any(keyword => targetKey.Contains(keyword))) continue;
-                if (triggeredEvents != null && triggeredEvents.Contains(targetKey)) continue;
-
-                var (statValue, maxValue) = ParseStatValue(kvp.Value);
-                if (statValue >= maxValue && maxValue > 0)
-                {
-                    triggeredEvents?.Add(targetKey);
-                    Debug.WriteLine($"[MetaDirective Triggered MAX] {targetKey} reached {statValue}/{maxValue}");
-                    return $"""
-                    <meta_directive>
-                    [시스템 개입: 극적 상황 발생 (수치 도달)]
-                    '{targetKey}' 수치가 {maxValue}(최대치)에 도달했습니다!
-                    이번 턴에 평범한 묘사를 중단하고, 유저에게 현재의 극대화된 '{targetKey}'을(를) 여과 없이 표현하는 결정적인 이벤트를 주도적으로 묘사하십시오.
-                    </meta_directive>
-                    """;
-                }
-                else if (statValue <= 0)
-                {
-                    triggeredEvents?.Add(targetKey);
-                    Debug.WriteLine($"[MetaDirective Triggered MIN] {targetKey} reached {statValue}");
-                    return $"""
-                    <meta_directive>
-                    [시스템 개입: 극적 상황 발생 (수치 상실 및 소멸)]
-                    '{targetKey}' 수치가 0에 도달하여 완전히 소멸되었습니다.
-                    이번 턴에 평범한 묘사를 중단하고, 캐릭터에게서 '{targetKey}'이(가) 완벽하게 사라졌을 때 나타나는 극단적인 태도 변화나 결정적인 결과를 주도적으로 묘사하십시오.
-                    </meta_directive>
-                    """;
-                }
-            }
-        }
-
-        // 2. 스킵 및 Continue 로직
         if (isFastForwardEnabled)
         {
             return """
-            <meta_directive>
-            [시스템 개입: 서사 압축 및 고속 전개(Fast-Forward)]
-            유저의 현재 행동을 기점으로 반복적이고 소모적인 과정은 영화의 몽타주 기법처럼 짧게 요약하십시오. 개연성을 해치며 맥락 없이 건너뛰지 말고, '시간의 흐름'과 '그동안 달성한 결과물'을 밀도 높은 지문으로 묘사한 뒤, 곧바로 다음의 의미 있는 사건(Next Scene)이 발생하는 시점으로 자연스럽게 전환하십시오.
+            <meta_directive type="fast_forward">
+            유저의 현재 행동을 기점으로 반복적인 과정은 압축하고, 시간의 흐름과 달성한 결과를 밀도 있게 서술한 뒤 곧바로 다음 사건이 발생하는 시점으로 전개하십시오.
             </meta_directive>
             """;
         }
         else if (string.IsNullOrWhiteSpace(inputText))
         {
             return """
-            <meta_directive>
-            [시스템 명령: 서사 이어쓰기 (Auto-Continue)]
-            직전 턴에서 묘사했던 상황, 대화, 혹은 멈췄던 장면에서 곧바로 이어지는 '다음 단락'을 소설가처럼 자연스럽게 이어서 작성하십시오.
-            원래 진행되던 흐름에 맞춰 주변 환경을 묘사하거나, NPC를 움직이거나, 새로운 사건을 발생시켜 스토리를 다음 국면으로 능동적으로 전개하십시오.
+            <meta_directive type="auto_continue">
+            직전 턴에서 이어진 장면의 다음 단락을 자연스럽게 이어 작성하십시오. 주변 환경을 묘사하거나 NPC의 행동 또는 새로운 사건을 발생시켜 스토리를 능동적으로 전개하십시오.
             </meta_directive>
             """;
         }
@@ -105,8 +57,9 @@ public class ChatWorkflowService(
          Func<string, string, Task<string>>? onDialoguePrefetch = null,
          Func<string, Task>? onAudioReady = null,
          Func<ChatStreamResult, Task>? onDownloadComplete = null,
-         Action<StatusPayload>? onStatusUpdated = null,
-         CancellationToken cancellationToken = default)
+         Func<StatusPayload, Task>? onStatusUpdated = null,
+         CancellationToken cancellationToken = default,
+         Action<Task>? onStatusTaskStarted = null)
     {
         var result = new ChatStreamResult();
         StringBuilder fullResponse = new();
@@ -225,6 +178,9 @@ public class ChatWorkflowService(
                     {
                         foreach (char c in chunk)
                         {
+                            // 마크다운 강조 기호(*) 실시간 필터링: 스트리밍 중과 완료 후 불일치 및 따옴표 오인식 원천 방지
+                            if (c == '*') continue;
+
                             fullResponse.Append(c);
 
                             // 모든 텍스트를 UI 채널로 전달 (서사 모델은 status 태그를 출력하지 않음)
@@ -282,7 +238,7 @@ public class ChatWorkflowService(
 
             if (string.IsNullOrWhiteSpace(responseText))
             {
-                responseText = "*(서사가 생성되었습니다)*";
+                responseText = "(서사가 생성되었습니다)";
             }
 
             result.FinalText = responseText;
@@ -293,7 +249,7 @@ public class ChatWorkflowService(
             // ==============================================================
             if (!cancellationToken.IsCancellationRequested && !string.IsNullOrWhiteSpace(responseText))
             {
-                _ = Task.Run(async () =>
+                var statusTask = Task.Run(async () =>
                 {
                     try
                     {
@@ -310,7 +266,7 @@ public class ChatWorkflowService(
                                 var payload = GRC.Helpers.LlmJsonParser.DeserializeSafe<StatusPayload>(cleanJson);
                                 if (payload != null && onStatusUpdated != null)
                                 {
-                                    onStatusUpdated(payload);
+                                    await onStatusUpdated(payload);
                                 }
                             }
                         }
@@ -325,6 +281,8 @@ public class ChatWorkflowService(
                         Debug.WriteLine($"[StatusAPI Error - BG] 상태창 백그라운드 갱신 실패: {ex.Message}");
                     }
                 });
+
+                onStatusTaskStarted?.Invoke(statusTask);
             }
 
             if (onDownloadComplete != null && result.IsSuccess)
@@ -347,31 +305,5 @@ public class ChatWorkflowService(
         }
 
         return result;
-    }
-
-    private (int Current, int Max) ParseStatValue(string rawValue)
-    {
-        if (string.IsNullOrWhiteSpace(rawValue)) return (0, 100);
-
-        // "10/300" 형태처럼 '/' 기호가 포함된 경우
-        if (rawValue.Contains("/"))
-        {
-            var parts = rawValue.Split('/');
-            if (parts.Length == 2 &&
-                int.TryParse(Regex.Match(parts[0], @"-?\d+").Value, out int current) &&
-                int.TryParse(Regex.Match(parts[1], @"-?\d+").Value, out int max))
-            {
-                return (current, max);
-            }
-        }
-
-        // 단일 숫자일 경우 (예: "50") 기존처럼 최대치를 알 수 없으므로 100으로 간주
-        var match = Regex.Match(rawValue, @"-?\d+");
-        if (match.Success && int.TryParse(match.Value, out int res))
-        {
-            return (res, 100);
-        }
-
-        return (0, 100);
     }
 }

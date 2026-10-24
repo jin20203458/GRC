@@ -113,72 +113,52 @@
             </Grid>
         </Border>
 
-        <!-- 1: 진행 바 (State Machine Indicator) -->
+        <!-- 1: 진행 바 (State Machine Indicator — 4단계 통합 파이프라인) -->
         <Border
             Grid.Row="1"
             Background="#121418"
             BorderBrush="#1AFFFFFF"
             BorderThickness="0,0,0,1"
             Padding="15,10">
-            <UniformGrid Columns="6" HorizontalAlignment="Stretch">
-                <!-- 1단계: 계획 수립 -->
+            <UniformGrid Columns="4" HorizontalAlignment="Stretch">
+                <!-- 1단계: 청사진 및 세계관 -->
                 <Border x:Name="Step1Border" Style="{StaticResource ProgressBorderStyle}">
                     <TextBlock
                         x:Name="TextStep1"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         Style="{StaticResource ProgressTextStyle}"
-                        Text="1. 계획 수립" />
+                        Text="1. 청사진·세계관" />
                 </Border>
 
-                <!-- 2단계: 세계관 -->
+                <!-- 2단계: 로어북 -->
                 <Border x:Name="Step2Border" Style="{StaticResource ProgressBorderStyle}">
                     <TextBlock
                         x:Name="TextStep2"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         Style="{StaticResource ProgressTextStyle}"
-                        Text="2. 세계관" />
+                        Text="2. 로어북" />
                 </Border>
 
-                <!-- 3단계: 로어북 -->
+                <!-- 3단계: 시나리오 -->
                 <Border x:Name="Step3Border" Style="{StaticResource ProgressBorderStyle}">
                     <TextBlock
                         x:Name="TextStep3"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         Style="{StaticResource ProgressTextStyle}"
-                        Text="3. 로어북" />
+                        Text="3. 오프닝 시나리오" />
                 </Border>
 
-                <!-- 4단계: 상태창 -->
+                <!-- 4단계: 상태창 및 시스템 지시 -->
                 <Border x:Name="Step4Border" Style="{StaticResource ProgressBorderStyle}">
                     <TextBlock
                         x:Name="TextStep4"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         Style="{StaticResource ProgressTextStyle}"
-                        Text="4. 상태창" />
-                </Border>
-
-                <!-- 5단계: 시나리오 -->
-                <Border x:Name="Step5Border" Style="{StaticResource ProgressBorderStyle}">
-                    <TextBlock
-                        x:Name="TextStep5"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Style="{StaticResource ProgressTextStyle}"
-                        Text="5. 시나리오" />
-                </Border>
-
-                <!-- 6단계: 프롬프트 -->
-                <Border x:Name="Step6Border" Style="{StaticResource ProgressBorderStyle}">
-                    <TextBlock
-                        x:Name="TextStep6"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Style="{StaticResource ProgressTextStyle}"
-                        Text="6. 시스템 지시" />
+                        Text="4. 상태창·시스템 지시" />
                 </Border>
             </UniformGrid>
         </Border>

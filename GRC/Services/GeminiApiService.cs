@@ -379,11 +379,11 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
                 }
 
                 // [중요 엔드포인트 및 모델 규격]:
-                // 1. 모델명: Vertex AI에서 'text-embedding-004'는 영어/코드 전용 모델이므로, 한글 입력 시 토큰 길이별 더미 벡터를 반환하는 결함이 발생합니다.
-                //    따라서 한국어/다국어 공식 특화 모델인 'text-multilingual-embedding-002'를 필히 사용해야 합니다.
-                // 2. 리전: Vertex AI 임베딩 모델은 'locations/asia-northeast3'(서울 리전, 약 500ms) 엔드포인트를 사용하여 태평양 횡단 지연시간(us-central1, 약 1,100ms)을 대폭 단축합니다.
+                // 1. 모델명: 구글 최신 다국어 통합 임베딩 모델인 'gemini-embedding-001'을 사용합니다.
+                //    MRL(Matryoshka Representation Learning) 파라미터를 통해 기본 3072차원을 손실 없이 768차원으로 축소 수신하여 기존 GRC 스토리지 규격을 보존합니다.
+                // 2. 리전: Vertex AI 임베딩 모델은 'locations/asia-northeast3'(서울 리전, 약 500ms) 엔드포인트를 사용하여 태평양 횡단 지연시간(us-central1, 약 1,300ms)을 대폭 단축합니다.
                 // 3. 인코딩: C# 기본 유니코드 이스케이프(\uXXXX)를 방지하기 위해 JavaScriptEncoder.UnsafeRelaxedJsonEscaping이 필수적입니다.
-                string endpoint = $"https://asia-northeast3-aiplatform.googleapis.com/v1/projects/{settings.ProjectId}/locations/asia-northeast3/publishers/google/models/text-multilingual-embedding-002:predict";
+                string endpoint = $"https://asia-northeast3-aiplatform.googleapis.com/v1/projects/{settings.ProjectId}/locations/asia-northeast3/publishers/google/models/gemini-embedding-001:predict";
                 httpRequest.RequestUri = new Uri(endpoint);
 
                 string token = await googleAuthService.GetGoogleAccessTokenAsync(cancellationToken);
@@ -395,7 +395,7 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
 
                 httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-                var payload = new VertexEmbedRequest([new VertexEmbedInstance(text, effectiveTaskType)]);
+                var payload = new VertexEmbedRequest([new VertexEmbedInstance(text, effectiveTaskType)], new VertexEmbedParameters(768));
                 string reqBody = JsonSerializer.Serialize(payload, _jsonOptions);
                 httpRequest.Content = new StringContent(reqBody, Encoding.UTF8, "application/json");
 
@@ -419,11 +419,11 @@ public class GeminiApiService(HttpClient httpClient, IAppSettingsService appSett
                     return Array.Empty<float>();
                 }
 
-                // AI Studio(generativelanguage.googleapis.com)에서는 'models/text-embedding-004'가 다국어 통합 모델로 정상 작동합니다.
-                string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={settings.ApiKey}";
+                // AI Studio(generativelanguage.googleapis.com)에서는 'models/gemini-embedding-001'로 최신 통합 호출하며, outputDimensionality: 768을 주입합니다.
+                string endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key={settings.ApiKey}";
                 httpRequest.RequestUri = new Uri(endpoint);
 
-                var payload = new EmbedContentRequest(new Content("user", [new Part(text)]), TaskType: effectiveTaskType);
+                var payload = new EmbedContentRequest(new Content("user", [new Part(text)]), TaskType: effectiveTaskType, OutputDimensionality: 768);
                 httpRequest.Content = new StringContent(JsonSerializer.Serialize(payload, _jsonOptions), Encoding.UTF8, "application/json");
 
                 using var response = await httpClient.SendAsync(httpRequest, cancellationToken);

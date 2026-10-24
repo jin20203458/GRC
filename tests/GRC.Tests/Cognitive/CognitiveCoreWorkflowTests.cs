@@ -20,7 +20,7 @@ public class CognitiveCoreWorkflowTests
         var service = new MemoryManagerService(fakeApi, fakeSettings);
         var preset = new CharacterPreset("Hero", "Fantasy World", "You are a heroic guide.");
         var userMsg = new ChatMessage("user", "앞으로 나아간다.", DateTime.Now);
-        string metaDirective = "<meta_directive>[시스템 개입: 챕터 전환]</meta_directive>";
+        string metaDirective = "<meta_directive type=\"chapter_transition\">새로운 챕터가 시작되었습니다.</meta_directive>";
 
         // Act
         var request = await service.BuildNarrativeRequestAsync(userMsg, preset, metaDirective);
@@ -35,7 +35,7 @@ public class CognitiveCoreWorkflowTests
         Assert.NotNull(lastContent);
         string text = lastContent!.Parts[0].Text ?? "";
         Assert.Contains("앞으로 나아간다.", text);
-        Assert.Contains("[시스템 개입: 챕터 전환]", text);
+        Assert.Contains("type=\"chapter_transition\"", text);
     }
 
     [Fact]
